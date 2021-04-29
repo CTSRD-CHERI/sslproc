@@ -30,17 +30,15 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/event.h>
-#include <sys/socket.h>
 #include <assert.h>
 #include <errno.h>
-#include <string.h>
 #include <syslog.h>
-#include <unistd.h>
 
 #include <sslproc.h>
 
-#include "local.h"
+#include "KEvent.h"
+#include "MessageBuffer.h"
+#include "MessageSocket.h"
 #include "ControlSocket.h"
 #include "SSLSession.h"
 
@@ -49,175 +47,72 @@ SSL_CTX *sslCtx;
 bool
 ControlSocket::init()
 {
-	if (!setFdNonBlocking(fd, "control socket"))
+	if (!inputBuffer.grow(64) ||
+	    !inputBuffer.controlAlloc(CMSG_SPACE(sizeof(int))))
 		return (false);
-	if (!inputBuffer.grow(64) || !outputBuffer.grow(64))
-		return (false);
-	if (!controlRead.init())
-		return (false);
-	if (!controlWrite.initDisabled())
+	if (!readEvent.init())
 		return (false);
 	return (true);
 }
 
 void
-ControlSocket::drainOutput()
-{
-	if (outputBuffer.empty())
-		return;
-
-	ssize_t rc = write(fd, outputBuffer.data(), outputBuffer.length());
-	if (rc == -1) {
-		if (errno == EAGAIN) {
-			controlRead.disable();
-			controlWrite.enable();
-			return;
-		}
-		syslog(LOG_WARNING, "failed to write control data");
-		exit(1);
-	}
-
-	if (rc == 0) {
-		syslog(LOG_WARNING, "control data fd is closed");
-		exit(1);
-	}
-
-	outputBuffer.advance(rc);
-	if (outputBuffer.empty()) {
-		controlRead.enable();
-		controlWrite.disable();
-	} else {
-		controlRead.disable();
-		controlWrite.enable();
-	}
-}
-
-void
 ControlSocket::handleMessage(const struct sslproc_message_header *hdr,
-    const struct cmsghdr *cmsg, size_t cmsgLen)
+    const struct cmsghdr *cmsg)
 {
-	struct sslproc_message_result resultMsg;
 	int *fds;
 	int error;
-
-	assert(outputBuffer.empty());
-
-	resultMsg.type = SSLPROC_RESULT;
-	resultMsg.request = hdr->type;
 
 	switch (hdr->type) {
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
 		    cmsg->cmsg_type != SCM_RIGHTS ||
-		    cmsg->cmsg_len != CMSG_SPACE(sizeof(int) * 2)) {
+		    cmsg->cmsg_len != CMSG_SPACE(sizeof(int))) {
 			syslog(LOG_WARNING,
 			    "invalid control message for SSLPROC_CREATE_SESSION");
+			error = EBADMSG;
+			writeReplyMessage(hdr->type, -1, &error, sizeof(error));
 			break;
 		}
 
 		fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
-		SSLSession *ss = new SSLSession(fds[0], fds[1]);
+		SSLSession *ss = new SSLSession(kq, fds[0]);
 		if (!ss->init()) {
 			syslog(LOG_WARNING, "failed to init SSL sesssion");
 			delete ss;
+			error = ENXIO;
+			writeReplyMessage(hdr->type, -1, &error, sizeof(error));
+			break;
 		}
+		writeReplyMessage(hdr->type, 0);
 		break;
 	}
 	default:
 		syslog(LOG_WARNING, "unknown control request %d", hdr->type);
 	}
-
-	drainOutput();
 }
 
 void
 ControlSocket::onEvent(const struct kevent *kevent)
 {
-	const struct sslproc_message_header *hdr;
-	struct msghdr msg;
-	struct iovec iov[1];
-	char cbuf[CMSG_SPACE(sizeof(int) * 2)];
-	const struct cmsghdr *cmsg;
-	ssize_t nread;
+	int rc, resid;
 
 	if (kevent->flags & EV_EOF)
 		exit(0);
 
-	if (kevent->filter == EVFILT_WRITE) {
-		drainOutput();
-		return;
-	}
-
-	for (;;) {
-		inputBuffer.reset();
-		iov[0].iov_base = inputBuffer.end();
-		iov[0].iov_len = inputBuffer.space();
-		memset(&msg, 0, sizeof(msg));
-		msg.msg_iov = iov;
-		msg.msg_iovlen = 1;
-		msg.msg_control = cbuf;
-		msg.msg_controllen = sizeof(cbuf);
-		msg.msg_flags = 0;
-		nread = recvmsg(kevent->ident, &msg, MSG_DONTWAIT | MSG_PEEK);
-		if (nread == -1) {
-			syslog(LOG_ERR,
-			    "failed to read from control socket: %m");
+	resid = kevent->data;
+	while (resid > 0) {
+		rc = readMessage(inputBuffer);
+		if (rc == 0)
+			exit(0);
+		if (rc == -1)
 			exit(1);
-		}
-		if (nread == 0)
-			break;
-		if (msg.msg_flags & MSG_TRUNC) {
-			hdr = reinterpret_cast<const struct sslproc_message_header *>
-			    (inputBuffer.data());
-			if (hdr->length >= sizeof(*hdr))
-				inputBuffer.grow(hdr->length);
-		}
 
-		inputBuffer.reset();
-		iov[0].iov_base = inputBuffer.end();
-		iov[0].iov_len = inputBuffer.space();
-		memset(&msg, 0, sizeof(msg));
-		msg.msg_iov = iov;
-		msg.msg_iovlen = 1;
-		msg.msg_control = cbuf;
-		msg.msg_controllen = sizeof(cbuf);
-		msg.msg_flags = 0;
-		nread = recvmsg(kevent->ident, &msg, MSG_DONTWAIT);
-		assert(nread > 0);
-		if (nread < sizeof(*hdr)) {
-			syslog(LOG_WARNING, "control socket message too short");
-			continue;
-		}
-		if ((msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) != 0) {
-			syslog(LOG_WARNING, "control socket message truncated");
-			continue;
-		}
-		hdr = reinterpret_cast<const struct sslproc_message_header *>
-		    (inputBuffer.data());
-		if (hdr->length < sizeof(*hdr)) {
-			syslog(LOG_WARNING,
-			    "invalid message on control socket");
-			continue;
-		}		
-		if (nread != hdr->length) {
-			syslog(LOG_WARNING,
-			    "control socket message length mismatch");
-			continue;
-		}
+		assert(inputBuffer.length() <= resid);
+		resid -= inputBuffer.length();
 
-		if (msg.msg_controllen != sizeof(cbuf)) {
-			syslog(LOG_WARNING,
-			    "invalid message on control socket");
-			continue;
-		}
-
-		if (msg.msg_controllen == 0)
-			cmsg = NULL;
-		else
-			cmsg = reinterpret_cast<const struct cmsghdr *>(cbuf);
-		handleMessage(hdr, cmsg, msg.msg_controllen);
-		if (!outputBuffer.empty())
-			return;
+		handleMessage(inputBuffer.hdr(), inputBuffer.cmsg());
+		if (hasWriteError())
+			exit(1);
 	}
 }

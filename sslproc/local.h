@@ -32,28 +32,7 @@
 
 #pragma once
 
-#include <sys/event.h>
 #include <openssl/ssl.h>
-
-class KeventListener {
-public:
-	virtual void onEvent(const struct kevent *) = 0;
-};
-
-class Kevent {
-public:
-	Kevent(int _fd, short _filter, KeventListener *_listener) : fd(_fd),
-	    filter(_filter), listener(_listener), enabled(true) {}
-	bool init();
-	bool initDisabled();
-	void enable();
-	void disable();
-private:
-	KeventListener *listener;
-	int fd;
-	short filter;
-	bool enabled;
-};
 
 extern SSL_CTX *sslCtx;
 

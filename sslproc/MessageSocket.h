@@ -32,31 +32,29 @@
 
 #pragma once
 
-#include <openssl/ssl.h>
-
-#include "KEvent.h"
 #include "MessageBuffer.h"
-#include "MessageSocket.h"
 
-class SSLSession : public KEventListener, MessageSocket {
-public:
-	SSLSession(KQueue *kq, int _fd) : MessageSocket(_fd),
-	    readEvent(kq, _fd, EVFILT_READ, this), fd(_fd) {}
-	~SSLSession();
-	bool init();
-	virtual void onEvent(const struct kevent *);
-	int rawRead(char *out, int outl);
-	int rawWrite(const char *in, int inl);
-
+/*
+ * A MessageSocket sends and receives sslproc_messages over a reliable
+ * datagram socket.  It provides methods to read messages and write
+ * messages.
+ */
+class MessageSocket {
+protected:
+	MessageSocket(int _fd) : fd(_fd) {};
+	int readMessage(MessageBuffer &);
+	bool writeMessage(int type, void *payload = nullptr,
+	    size_t payloadLen = 0, void *control = nullptr,
+	    size_t controlLen = 0);
+	void writeReplyMessage(int type, int ret, void *payload = nullptr,
+	    size_t payloadLen = 0);
+	void writeErrorReplyMessage(int type, int ret, int error)
+	{ writeReplyMessage(type, ret, &error, sizeof(error)); }
+	bool hasWriteError() { return writeError; }
 private:
-	bool handleMessage(const struct sslproc_message_header *hdr);
+	bool writeMessage(struct iovec *iov, int iovCnt,
+	    void *control, size_t controlLen);
 
-	KEvent readEvent;
-	MessageBuffer inputBuffer;
-	MessageBuffer replyBuffer;
-	DataBuffer readBuffer;
-
-	SSL *ssl;
-
+	bool writeError = false;
 	int fd;
 };

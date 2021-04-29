@@ -43,7 +43,7 @@ struct sslproc_message_header {
 
 /* Global messages from client -> sslproc over the 'control' socket. */
 
-/* Includes 'app' and 'raw' fds in an SCM_RIGHTS control message. */
+/* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
 
 /* Per-session messages from client -> sslproc over the 'app' fd. */

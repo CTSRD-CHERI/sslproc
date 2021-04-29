@@ -32,31 +32,66 @@
 
 #pragma once
 
-#include <openssl/ssl.h>
+#include <sys/socket.h>
 
-#include "KEvent.h"
-#include "MessageBuffer.h"
-#include "MessageSocket.h"
+#include <sslproc.h>
 
-class SSLSession : public KEventListener, MessageSocket {
+class DataBuffer {
 public:
-	SSLSession(KQueue *kq, int _fd) : MessageSocket(_fd),
-	    readEvent(kq, _fd, EVFILT_READ, this), fd(_fd) {}
-	~SSLSession();
-	bool init();
-	virtual void onEvent(const struct kevent *);
-	int rawRead(char *out, int outl);
-	int rawWrite(const char *in, int inl);
+	DataBuffer() = default;
+	~DataBuffer();
 
+	bool grow(size_t);
+	void *data() { return buffer; }
+	size_t capacity() { return cap; }
+	size_t length() { return len; }
+	void setLength(size_t);
 private:
-	bool handleMessage(const struct sslproc_message_header *hdr);
+	void *buffer = nullptr;
+	size_t cap = 0;
+	size_t len = 0;
+};
 
-	KEvent readEvent;
-	MessageBuffer inputBuffer;
-	MessageBuffer replyBuffer;
-	DataBuffer readBuffer;
+class MessageBuffer {
+public:
+	MessageBuffer() = default;
+	~MessageBuffer() = default;
 
-	SSL *ssl;
+	/* Message payload. */
+	bool grow(size_t amount) { return msg.grow(amount); }
+	void *data() { return msg.data(); }
+	size_t capacity() { return msg.capacity(); }
+	size_t length() { return (msg.length()); }
+	bool empty() { return (length() == 0); }
+	void setLength(size_t newLength) { msg.setLength(newLength); }
+	const struct sslproc_message_header *hdr()
+	{
+		if (length() < sizeof(struct sslproc_message_header))
+			return (nullptr);
+		return reinterpret_cast<const struct sslproc_message_header *>
+		    (data());
+	}
 
-	int fd;
+	/* Control message. */
+	bool controlAlloc(size_t amount) { return control.grow(amount); }
+	void *controlData() { return control.data(); }
+	size_t controlCapacity() { return control.capacity(); }
+	size_t controlLength() { return (control.length()); }
+	void setControlLength(size_t newLength)
+	{ control.setLength(newLength); }
+	const struct cmsghdr *cmsg()
+	{
+		if (controlLength() < sizeof(struct cmsghdr))
+			return (nullptr);
+		return reinterpret_cast<const struct cmsghdr *>(controlData());
+	}
+
+	void reset()
+	{
+		msg.setLength(0);
+		control.setLength(0);
+	}
+private:
+	DataBuffer msg;
+	DataBuffer control;
 };

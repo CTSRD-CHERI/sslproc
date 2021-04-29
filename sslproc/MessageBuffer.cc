@@ -30,33 +30,36 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
+#include <assert.h>
+#include <malloc_np.h>
+#include <stdlib.h>
 
-#include <openssl/ssl.h>
-
-#include "KEvent.h"
 #include "MessageBuffer.h"
-#include "MessageSocket.h"
 
-class SSLSession : public KEventListener, MessageSocket {
-public:
-	SSLSession(KQueue *kq, int _fd) : MessageSocket(_fd),
-	    readEvent(kq, _fd, EVFILT_READ, this), fd(_fd) {}
-	~SSLSession();
-	bool init();
-	virtual void onEvent(const struct kevent *);
-	int rawRead(char *out, int outl);
-	int rawWrite(const char *in, int inl);
+DataBuffer::~DataBuffer()
+{
+	free(buffer);
+}
 
-private:
-	bool handleMessage(const struct sslproc_message_header *hdr);
+bool
+DataBuffer::grow(size_t newCapacity)
+{
+	if (newCapacity <= cap)
+		return (true);
 
-	KEvent readEvent;
-	MessageBuffer inputBuffer;
-	MessageBuffer replyBuffer;
-	DataBuffer readBuffer;
+	void *newBuffer = realloc(buffer, newCapacity);
+	if (newBuffer == nullptr)
+		return (false);
 
-	SSL *ssl;
+	free(buffer);
+	buffer = newBuffer;
+	cap = malloc_usable_size(newBuffer);
+	return (true);
+}
 
-	int fd;
-};
+void
+DataBuffer::setLength(size_t newLength)
+{
+	assert(newLength <= cap);
+	len = newLength;
+}

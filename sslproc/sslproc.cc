@@ -31,22 +31,23 @@
  */
 
 /*
- * Each connection contains two directions, one for reading data via
- * SSL_read, and one for writing data via SSL_write.  Each direction
- * contains an input fd and an output fd.
+ * Each SSL session is managed messages passed over a UNIX domain
+ * datagram socket.  Each request is answered by a result message,
+ * but the helper library is permitted to submit async requests to
+ * client while servicing a request.  Only one async request is
+ * permitted at a time, and the client should respond to each
+ * async request with a result message.
  *
- * For SSL_read, sslproc reads raw (encrypted) data from the input fd
- * and writes application data to the output fd.  For SSL_write,
- * sslproc reads application data from the input fd and writes
- * encrypted data to the output fd.
+ * Sessions are created via control messages passed over a UNIX domain
+ * datagram socket.  The invoking process is required to pass a file
+ * descriptor to this global socket as fd 3.
  *
- * Sessions are managed via control messages passed over a UNIX domain
- * socket.  The per-connection messages are defined in sslproc.h.
+ * In addition to creating sessions, other control messages are passed
+ * via the global control socket for configuring global state such as
+ * the shared SSL_CTX used for all sessions.
  *
- * New sessions are created by passing a file descriptor of the
- * per-session UNIX domain socket over a global UNIX domain socket.
- * The invoking process is required to pass a file descriptor to the
- * global UNIX domain socket as fd 3.
+ * The messages used by both the global and per-connection control
+ * sockets are defined in sslproc.h.
  */
 
 #include <sys/event.h>
@@ -54,9 +55,8 @@
 #include <syslog.h>
 
 #include "local.h"
+#include "KEvent.h"
 #include "ControlSocket.h"
-
-static int kqfd;
 
 bool
 setFdNonBlocking(int fd, const char *descr)
@@ -80,124 +80,25 @@ setFdNonBlocking(int fd, const char *descr)
 	return (true);
 }
 
-bool
-Kevent::init()
-{
-	struct kevent kevent;
-	int flags, rc;
-
-	flags = EV_ADD;
-	if (!enabled)
-		flags |= EV_DISABLE;
-	EV_SET(&kevent, fd, filter, flags, 0, 0, listener);
-
-	rc = ::kevent(kqfd, &kevent, 1, NULL, 0, NULL);
-	if (rc == -1) {
-		syslog(LOG_ERR, "kevent register failed: %m");
-		return (false);
-	}
-	return (true);
-}
-
-bool
-Kevent::initDisabled()
-{
-	enabled = false;
-	return init();
-}
-
-void
-Kevent::disable()
-{
-	struct kevent kevent;
-	int rc;
-
-	if (!enabled)
-		return;
-	enabled = false;
-
-#ifdef EV_KEEPUDATA
-	EV_SET(&kevent, fd, filter, EV_DISABLE | EV_KEEPUDATA, 0, 0, NULL);
-#else
-	EV_SET(&kevent, fd, filter, EV_DISABLE, 0, 0, listener);
-#endif
-
-	rc = ::kevent(kqfd, &kevent, 1, NULL, 0, NULL);
-	if (rc == -1) {
-		syslog(LOG_ERR, "kevent enable failed: %m");
-		exit(1);
-	}
-}
-
-void
-Kevent::enable()
-{
-	struct kevent kevent;
-	int rc;
-
-	if (enabled)
-		return;
-	enabled = true;
-
-#ifdef EV_KEEPUDATA
-	EV_SET(&kevent, fd, filter, EV_ENABLE | EV_KEEPUDATA, 0, 0, NULL);
-#else
-	EV_SET(&kevent, fd, filter, EV_ENABLE, 0, 0, listener);
-#endif
-
-	rc = ::kevent(kqfd, &kevent, 1, NULL, 0, NULL);
-	if (rc == -1) {
-		syslog(LOG_ERR, "kevent enable failed: %m");
-		exit(1);
-	}
-}
-
-static void
-keventLoop(void)
-{
-	struct kevent kevent;
-	int rc;
-
-	for (;;) {
-		rc = ::kevent(kqfd, NULL, 0, &kevent, 1, NULL);
-		if (rc == -1) {
-			syslog(LOG_ERR, "kevent failed: %m");
-			exit(1);
-		}
-		if (rc == 0) {
-			syslog(LOG_ERR, "kevent found no events");
-			exit(1);
-		}
-		
-		KeventListener *listener =
-		    reinterpret_cast<KeventListener *>(kevent.udata);
-
-		listener->onEvent(&kevent);
-	}
-}
-
 int
 main(int ac, char **av)
 {
-
 	openlog("sslproc", LOG_PID, LOG_DAEMON);
 
-	kqfd = kqueue();
-	if (kqfd == -1) {
-		syslog(LOG_ERR, "failed to create kqueue: %m");
+	KQueue kq;
+	if (!kq.init())
 		return (1);
-	}
 
 	if (!initOpenSSL()) {
 		syslog(LOG_ERR, "failed to initialize OpenSSL");
 		return (1);
 	}
 
-	ControlSocket controlSocket(3);
+	ControlSocket controlSocket(&kq, 3);
 
 	if (!controlSocket.init())
 		return (1);
 
-	keventLoop();
+	kq.run();
 	return (0);
 }

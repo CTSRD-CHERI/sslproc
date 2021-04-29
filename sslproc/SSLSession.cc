@@ -31,9 +31,9 @@
  */
 
 #include <sys/event.h>
-#include <sys/socket.h>
 #include <assert.h>
 #include <errno.h>
+#include <string.h>
 #include <syslog.h>
 #include <unistd.h>
 
@@ -42,7 +42,6 @@
 #include <sslproc.h>
 
 #include "local.h"
-#include "IOBuffer.h"
 #include "SSLSession.h"
 
 static BIO_METHOD *rawBioMethod;
@@ -50,14 +49,11 @@ static BIO_METHOD *rawBioMethod;
 bool
 SSLSession::init()
 {
-	if (!setFdNonBlocking(appFd, "SSL session app fd"))
-		return (false);
-
-	if (!inputBuffer.grow(64) || !outputBuffer.grow(64))
+	if (!inputBuffer.grow(64) || !replyBuffer.grow(64))
 		return (false);
 
 	BIO *bio = BIO_new(rawBioMethod);
-	if (bio == NULL)
+	if (bio == nullptr)
 		return (false);
 	BIO_set_data(bio, this);
 
@@ -65,15 +61,13 @@ SSLSession::init()
 	/* XXX: SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER? */
 
 	ssl = SSL_new(sslCtx);
-	if (ssl == NULL) {
+	if (ssl == nullptr) {
 		BIO_free(bio);
 		return (false);
 	}
 	SSL_set_bio(ssl, bio, bio);
 
-	if (!appRead.init())
-		return (false);
-	if (!appWrite.initDisabled())
+	if (!readEvent.init())
 		return (false);
 	return (true);
 }
@@ -82,55 +76,14 @@ SSLSession::~SSLSession()
 {
 	SSL_free(ssl);
 
-	close(rawFd);
-	close(appFd);
-}
-
-void
-SSLSession::drainOutput()
-{
-	if (outputBuffer.empty())
-		return;
-
-	ssize_t rc = write(appFd, outputBuffer.data(), outputBuffer.length());
-	if (rc == -1) {
-		if (errno == EAGAIN) {
-			appRead.disable();
-			appWrite.enable();
-			return;
-		}
-		syslog(LOG_WARNING, "failed to write app data: %m");
-		delete this;
-		return;
-	}
-
-	if (rc == 0) {
-		syslog(LOG_WARNING, "app data fd is closed");
-		delete this;
-		return;
-	}
-
-	outputBuffer.advance(rc);
-	if (outputBuffer.empty()) {
-		appRead.enable();
-		appWrite.disable();
-	} else {
-		appRead.disable();
-		appWrite.enable();
-	}
+	close(fd);
 }
 
 bool
 SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 {
 	const struct sslproc_message_read *readMsg;
-	struct sslproc_message_result resultMsg;
-	int error, len;
-
-	assert(outputBuffer.empty());
-
-	resultMsg.type = SSLPROC_RESULT;
-	resultMsg.request = hdr->type;
+	int ret;
 
 	switch (hdr->type) {
 	case SSLPROC_CONNECT:
@@ -140,20 +93,12 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 			    hdr->length);
 			return (false);
 		}
-		resultMsg.ret = SSL_connect(ssl);
-		if (resultMsg.ret == 1) {
-			resultMsg.length = sizeof(resultMsg);
-			if (!outputBuffer.appendData(&resultMsg,
-			    sizeof(resultMsg)))
-				goto growfail;
-		} else {
-			resultMsg.length = sizeof(resultMsg) + sizeof(error);
-			error = SSL_get_error(ssl, resultMsg.ret);
-			if (!outputBuffer.appendData(&resultMsg,
-			    sizeof(resultMsg)) ||
-			    !outputBuffer.appendData(&error, sizeof(error)))
-				goto growfail;
-		}
+		ret = SSL_connect(ssl);
+		if (ret == 1)
+			writeReplyMessage(hdr->type, ret);
+		else
+			writeErrorReplyMessage(hdr->type, ret,
+			    SSL_get_error(ssl, ret));
 		break;
 	case SSLPROC_ACCEPT:
 		if (hdr->length != sizeof(*hdr)) {
@@ -162,20 +107,12 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 			    hdr->length);
 			return (false);
 		}
-		resultMsg.ret = SSL_accept(ssl);	
-		if (resultMsg.ret == 1) {
-			resultMsg.length = sizeof(resultMsg);
-			if (!outputBuffer.appendData(&resultMsg,
-			    sizeof(resultMsg)))
-				goto growfail;
-		} else {
-			resultMsg.length = sizeof(resultMsg) + sizeof(error);
-			error = SSL_get_error(ssl, resultMsg.ret);
-			if (!outputBuffer.appendData(&resultMsg,
-			    sizeof(resultMsg)) ||
-			    !outputBuffer.appendData(&error, sizeof(error)))
-				goto growfail;
-		}
+		ret = SSL_accept(ssl);
+		if (ret == 1)
+			writeReplyMessage(hdr->type, ret);
+		else
+			writeErrorReplyMessage(hdr->type, ret,
+			    SSL_get_error(ssl, ret));
 		break;
 	case SSLPROC_SHUTDOWN:
 		if (hdr->length != sizeof(*hdr)) {
@@ -184,20 +121,12 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 			    hdr->length);
 			return (false);
 		}
-		resultMsg.ret = SSL_shutdown(ssl);	
-		if (resultMsg.ret == 0 || resultMsg.ret == 1) {
-			resultMsg.length = sizeof(resultMsg);
-			if (!outputBuffer.appendData(&resultMsg,
-			    sizeof(resultMsg)))
-				goto growfail;
-		} else {
-			resultMsg.length = sizeof(resultMsg) + sizeof(error);
-			error = SSL_get_error(ssl, resultMsg.ret);
-			if (!outputBuffer.appendData(&resultMsg,
-			    sizeof(resultMsg)) ||
-			    !outputBuffer.appendData(&error, sizeof(error)))
-				goto growfail;
-		}
+		ret = SSL_shutdown(ssl);
+		if (ret == 1)
+			writeReplyMessage(hdr->type, ret);
+		else
+			writeErrorReplyMessage(hdr->type, ret,
+			    SSL_get_error(ssl, ret));
 		break;
 	case SSLPROC_READ:
 		if (hdr->length != sizeof(*readMsg)) {
@@ -208,29 +137,25 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 		}
 		readMsg = reinterpret_cast<const struct sslproc_message_read *>
 		    (hdr);
-		if (readMsg->resid < 0) {
-			if (!outputBuffer.grow(sizeof(resultMsg) +
-			    sizeof(error)))
-				goto growfail;
-		} else {
-			if (!outputBuffer.grow(sizeof(resultMsg) +
-			    readMsg->resid))
-				goto growfail;
+		if (readMsg->resid > 0) {
+			/*
+			 * XXX: We could perhaps just perform a
+			 * short read with whatever capacity we
+			 * have if it is not zero.
+			 */
+			if (!readBuffer.grow(readMsg->resid)) {
+				syslog(LOG_WARNING,
+				    "failed to grow read buffer");
+				return (false);
+			}
 		}
-		resultMsg.ret = SSL_read(ssl, outputBuffer.end() +
-		    sizeof(resultMsg), readMsg->resid);
-		if (resultMsg.ret <= 0) {
-			resultMsg.length = sizeof(resultMsg) + sizeof(error);
-			error = SSL_get_error(ssl, resultMsg.ret);
-			if (!outputBuffer.appendData(&resultMsg,
-			    sizeof(resultMsg)) ||
-			    !outputBuffer.appendData(&error, sizeof(error)))
-				goto growfail;
-		} else {
-			resultMsg.length = sizeof(resultMsg) + resultMsg.ret;
-			outputBuffer.appendData(&resultMsg, sizeof(resultMsg));
-			outputBuffer.advanceEnd(resultMsg.ret);
-		}
+		ret = SSL_read(ssl, readBuffer.data(), readMsg->resid);
+		if (ret > 0)
+			writeReplyMessage(hdr->type, ret, readBuffer.data(),
+			    ret);
+		else
+			writeErrorReplyMessage(hdr->type, ret,
+			    SSL_get_error(ssl, ret));
 		break;
 	case SSLPROC_WRITE:
 		if (hdr->length < sizeof(*hdr)) {
@@ -239,104 +164,52 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 			    hdr->length);
 			return (false);
 		}
-		resultMsg.ret = SSL_write(ssl, hdr + 1, hdr->length -
-		    sizeof(*hdr));
-		if (resultMsg.ret > 0) {
-			resultMsg.length = sizeof(resultMsg);
-			if (!outputBuffer.appendData(&resultMsg,
-			    sizeof(resultMsg)))
-				goto growfail;
-		} else {
-			resultMsg.length = sizeof(resultMsg) + sizeof(error);
-			error = SSL_get_error(ssl, resultMsg.ret);
-			if (!outputBuffer.appendData(&resultMsg,
-			    sizeof(resultMsg)) ||
-			    !outputBuffer.appendData(&error, sizeof(error)))
-				goto growfail;
-		}
-		break;		
+		ret = SSL_write(ssl, hdr + 1, hdr->length - sizeof(*hdr));
+		if (ret > 0)
+			writeReplyMessage(hdr->type, ret);
+		else
+			writeErrorReplyMessage(hdr->type, ret,
+			    SSL_get_error(ssl, ret));
+		break;
 	default:
 		syslog(LOG_WARNING, "unknown app request %d", hdr->type);
 		return (false);
 	}
 
-	drainOutput();
 	return (true);
-
-growfail:
-	syslog(LOG_WARNING, "failed to grow app output buffer");
-	return (false);
 }
 
 void
 SSLSession::onEvent(const struct kevent *kevent)
 {
-	const struct sslproc_message_header *hdr;
-	size_t toRead;
-	ssize_t rc;
+	int rc, resid;
 
 	if (kevent->flags & EV_EOF) {
 		delete this;
 		return;
 	}
 
-	if (kevent->filter == EVFILT_WRITE) {
-		drainOutput();
-		return;
-	}
-
-	for (;;) {
-		/* Figure out how much data to read this time. */
-		if (inputBuffer.length() < sizeof(*hdr)) {
-			toRead = sizeof(*hdr) - inputBuffer.length();
-		} else {
-			hdr = reinterpret_cast<const struct sslproc_message_header *>
-			    (inputBuffer.data());
-			toRead = hdr->length - inputBuffer.length();
-		}
-
-		if (!inputBuffer.grow(toRead)) {
-			syslog(LOG_WARNING, "%s: failed to grow message buffer",
-			    __func__);
-			delete this;
-			return;
-		}
-		rc = read(appFd, inputBuffer.end(), toRead);
-		if (rc == -1) {
-			if (errno == EAGAIN)
-				return;
-			syslog(LOG_WARNING, "%s: failed to read app data: %m",
-			    __func__);
-			delete this;
-			return;
-		}
+	resid = kevent->data;
+	while (resid > 0) {
+		rc = readMessage(inputBuffer);
 		if (rc == 0) {
-			syslog(LOG_WARNING, "app data fd is closed");
+			syslog(LOG_WARNING, "session fd is closed");
 			delete this;
 			return;
 		}
-		inputBuffer.advanceEnd(rc);
+		if (rc == -1) {
+			syslog(LOG_WARNING,
+			    "failed to read session message: %m");
+			delete this;
+			return;
+		}
 
-		if (inputBuffer.length() >= sizeof(*hdr)) {
-			hdr = reinterpret_cast<const struct sslproc_message_header *>
-			    (inputBuffer.data());
-			if (hdr->length < sizeof(*hdr)) {
-				syslog(LOG_WARNING,
-				    "%s: invalid message length %d", __func__,
-				    hdr->length);
-				delete this;
-				return;
-			}
+		assert(inputBuffer.length() <= resid);
+		resid -= inputBuffer.length();
 
-			if (inputBuffer.length() == hdr->length) {
-				if (!handleMessage(hdr)) {
-					delete this;
-					return;
-				}
-				inputBuffer.reset();
-				if (!outputBuffer.empty())
-					return;
-			}
+		if (!handleMessage(inputBuffer.hdr()) || hasWriteError()) {
+			delete this;
+			return;
 		}
 	}
 }
@@ -344,185 +217,122 @@ SSLSession::onEvent(const struct kevent *kevent)
 int
 SSLSession::rawRead(char *out, int outl)
 {
-	struct sslproc_message_read readMsg;
-	struct sslproc_message_result resultMsg;
-	int error;
-	ssize_t rc;
+	const struct sslproc_message_result *resultMsg;
+	int rc, resid;
 
-	readMsg.type = SSLPROC_READ_RAW;
-	readMsg.length = sizeof(readMsg);
-	readMsg.resid = outl;
+	resid = outl;
+	if (!writeMessage(SSLPROC_READ_RAW, &resid, sizeof(resid))) {
+		syslog(LOG_DEBUG,
+		    "failed to send SSLPROC_READ_RAW request: %m");
+		errno = EIO;
+		return (-1);
+	}
 
-	rc = write(rawFd, &readMsg, sizeof(readMsg));
+	rc = readMessage(replyBuffer);
+	if (rc == 0) {
+		syslog(LOG_DEBUG, "%s: EOF from session fd", __func__);
+		errno = EIO;
+		return (-1);
+	}
 	if (rc == -1) {
-		syslog(LOG_DEBUG, "%s failed to write to raw fd: %m", __func__);
+		syslog(LOG_DEBUG, "%s: failed to read reply: %m", __func__);
 		errno = EIO;
 		return (-1);
 	}
-	if (rc != sizeof(readMsg)) {
-		syslog(LOG_DEBUG, "%s: EOF from raw fd", __func__);
+	resultMsg = reinterpret_cast<const struct sslproc_message_result *>
+	    (replyBuffer.hdr());
+	if (resultMsg->type != SSLPROC_RESULT) {
+		syslog(LOG_DEBUG, "%s: unexpected reply message %d", __func__,
+		    resultMsg->type);
 		errno = EIO;
 		return (-1);
 	}
-
-	rc = read(rawFd, &resultMsg, sizeof(resultMsg));
-	if (rc == -1) {
-		syslog(LOG_DEBUG, "%s: failed to read from raw fd: %m",
-		    __func__);
-		errno = EIO;
-		return (-1);
-	}
-	if (rc != sizeof(resultMsg)) {
-		syslog(LOG_DEBUG, "%s: EOF from raw fd", __func__);
-		errno = EIO;
-		return (-1);
-	}
-	if (resultMsg.type != SSLPROC_RESULT) {
-		syslog(LOG_DEBUG, "%s: unexpected message %d", __func__,
-		    resultMsg.type);
-		errno = EIO;
-		return (-1);
-	}
-	if (resultMsg.request != SSLPROC_READ_RAW) {
+	if (resultMsg->request != SSLPROC_READ_RAW) {
 		syslog(LOG_DEBUG, "%s: reply mismatch", __func__);
 		errno = EIO;
 		return (-1);
 	}
 
-	if (resultMsg.ret == -1) {
-		rc = read(rawFd, &error, sizeof(error));
-		if (rc == -1) {
-			syslog(LOG_DEBUG, "%s: failed to read from raw fd: %m",
-			    __func__);
-			return (-1);
-		}
-		if (rc < sizeof(error)) {
-			syslog(LOG_DEBUG, "%s: EOF from raw fd", __func__);
-			errno = EIO;
-			return (-1);
-		}
-		errno = error;
+	if (resultMsg->ret == -1) {
+		errno = *(int *)(resultMsg + 1);
 		return (-1);
 	}
 
-	if (resultMsg.ret < 0) {
+	if (resultMsg->ret < 0) {
 		syslog(LOG_DEBUG, "%s: invalid result %d", __func__,
-		    resultMsg.ret);
+		    resultMsg->ret);
 		errno = EIO;
 		return (-1);
-	}		
-	if (resultMsg.ret > outl) {
+	}
+	if (resultMsg->ret > outl) {
 		syslog(LOG_DEBUG, "%s: returned too much data %d vs %d",
-		    __func__, resultMsg.ret, outl);
+		    __func__, resultMsg->ret, outl);
 		errno = EIO;
 		return (-1);
 	}
 
-	rc = read(rawFd, out, resultMsg.ret);
-	if (rc == -1) {
-		syslog(LOG_DEBUG, "%s: failed to read from raw fd: %m",
-		    __func__);
-		errno = EIO;
-		return (-1);
-	}
-	if (rc != resultMsg.ret) {
-		syslog(LOG_DEBUG, "%s: EOF from raw fd", __func__);
-		errno = EIO;
-		return (-1);
-	}
-
-	return (resultMsg.ret);
+	/* Copy, ugh */
+	memcpy(out, resultMsg + 1, resultMsg->ret);
+	return (resultMsg->ret);
 }
 
 int
 SSLSession::rawWrite(const char *in, int inl)
 {
-	struct sslproc_message_header writeMsg;
-	struct sslproc_message_result resultMsg;
-	int error;
-	ssize_t rc;
+	const struct sslproc_message_result *resultMsg;
+	int rc;
 
-	writeMsg.type = SSLPROC_WRITE_RAW;
-	writeMsg.length = sizeof(writeMsg) + inl;
+	if (!writeMessage(SSLPROC_WRITE_RAW, const_cast<char *>(in), inl)) {
+		syslog(LOG_DEBUG,
+		    "failed to send SSLPROC_WRITE_RAW request: %m");
+		errno = EIO;
+		return (-1);
+	}
 
-	rc = write(rawFd, &writeMsg, sizeof(writeMsg));
+	rc = readMessage(replyBuffer);
+	if (rc == 0) {
+		syslog(LOG_DEBUG, "%s: EOF from session fd", __func__);
+		errno = EIO;
+		return (-1);
+	}
 	if (rc == -1) {
-		syslog(LOG_DEBUG, "%s failed to write to raw fd: %m", __func__);
+		syslog(LOG_DEBUG, "%s: failed to read reply: %m", __func__);
 		errno = EIO;
 		return (-1);
 	}
-	if (rc != sizeof(writeMsg)) {
-		syslog(LOG_DEBUG, "%s: EOF from raw fd", __func__);
+	resultMsg = reinterpret_cast<const struct sslproc_message_result *>
+	    (replyBuffer.hdr());
+	if (resultMsg->type != SSLPROC_RESULT) {
+		syslog(LOG_DEBUG, "%s: unexpected reply message %d", __func__,
+		    resultMsg->type);
 		errno = EIO;
 		return (-1);
 	}
-
-	rc = write(rawFd, in, inl);
-	if (rc == -1) {
-		syslog(LOG_DEBUG, "%s failed to write to raw fd: %m", __func__);
-		errno = EIO;
-		return (-1);
-	}
-	if (rc != inl) {
-		syslog(LOG_DEBUG, "%s: EOF from raw fd", __func__);
-		errno = EIO;
-		return (-1);
-	}
-
-	rc = read(rawFd, &resultMsg, sizeof(resultMsg));
-	if (rc == -1) {
-		syslog(LOG_DEBUG, "%s: failed to read from raw fd: %m",
-		    __func__);
-		errno = EIO;
-		return (-1);
-	}
-	if (rc < sizeof(resultMsg)) {
-		syslog(LOG_DEBUG, "%s: EOF from raw fd", __func__);
-		errno = EIO;
-		return (-1);
-	}
-	if (resultMsg.type != SSLPROC_RESULT) {
-		syslog(LOG_DEBUG, "%s: unexpected message %d", __func__,
-		    resultMsg.type);
-		errno = EIO;
-		return (-1);
-	}
-	if (resultMsg.request != SSLPROC_WRITE_RAW) {
+	if (resultMsg->request != SSLPROC_WRITE_RAW) {
 		syslog(LOG_DEBUG, "%s: reply mismatch", __func__);
 		errno = EIO;
 		return (-1);
 	}
 
-	if (resultMsg.ret == -1) {
-		rc = read(rawFd, &error, sizeof(error));
-		if (rc == -1) {
-			syslog(LOG_DEBUG, "%s: failed to read from raw fd: %m",
-			    __func__);
-			return (-1);
-		}
-		if (rc < sizeof(error)) {
-			syslog(LOG_DEBUG, "%s: EOF from raw fd", __func__);
-			errno = EIO;
-			return (-1);
-		}
-		errno = error;
+	if (resultMsg->ret == -1) {
+		errno = *(int *)(resultMsg + 1);
 		return (-1);
 	}
 
-	if (resultMsg.ret < 0) {
+	if (resultMsg->ret < 0) {
 		syslog(LOG_DEBUG, "%s: invalid result %d", __func__,
-		    resultMsg.ret);
+		    resultMsg->ret);
 		errno = EIO;
 		return (-1);
-	}		
-	if (resultMsg.ret > inl) {
-		syslog(LOG_DEBUG, "%s: returned too much data %d vs %d",
-		    __func__, resultMsg.ret, inl);
+	}
+	if (resultMsg->ret > inl) {
+		syslog(LOG_DEBUG, "%s: write too much data %d vs %d",
+		    __func__, resultMsg->ret, inl);
 		errno = EIO;
 		return (-1);
 	}
 
-	return (resultMsg.ret);
+	return (resultMsg->ret);
 }
 
 static int
@@ -531,7 +341,7 @@ rawBioRead(BIO *bio, char *out, int outl)
 	SSLSession *ss = reinterpret_cast<SSLSession *>(BIO_get_data(bio));
 	int ret;
 
-	if (out == NULL || outl == 0)
+	if (out == nullptr || outl == 0)
 		return (0);
 
 	ret = ss->rawRead(out, outl);
@@ -550,7 +360,7 @@ rawBioWrite(BIO *bio, const char *in, int inl)
 	SSLSession *ss = reinterpret_cast<SSLSession *>(BIO_get_data(bio));
 	int ret;
 
-	if (in == NULL || inl == 0)
+	if (in == nullptr || inl == 0)
 		return (0);
 
 	ret = ss->rawWrite(in, inl);
@@ -588,10 +398,10 @@ rawBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 bool
 initOpenSSL()
 {
-	OPENSSL_init_ssl(OPENSSL_INIT_ENGINE_ALL_BUILTIN, NULL);
+	OPENSSL_init_ssl(OPENSSL_INIT_ENGINE_ALL_BUILTIN, nullptr);
 	rawBioMethod = BIO_meth_new(BIO_get_new_index() | BIO_TYPE_SOURCE_SINK,
 		"sslproc raw");
-	if (rawBioMethod == NULL)
+	if (rawBioMethod == nullptr)
 		return (false);
 	BIO_meth_set_read(rawBioMethod, rawBioRead);
 	BIO_meth_set_write(rawBioMethod, rawBioWrite);

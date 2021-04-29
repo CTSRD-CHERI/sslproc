@@ -32,21 +32,21 @@
 
 #pragma once
 
-#include "IOBuffer.h"
+#include "KEvent.h"
+#include "MessageBuffer.h"
+#include "MessageSocket.h"
 
-class ControlSocket : public KeventListener {
+class ControlSocket : public KEventListener, MessageSocket {
 public:
-	ControlSocket(int _fd) : fd(_fd), controlRead(_fd, EVFILT_READ, this),
-	    controlWrite(_fd, EVFILT_WRITE, this) {};
+	ControlSocket(KQueue *_kq, int _fd) : MessageSocket(_fd), kq(_kq),
+	    readEvent(_kq, _fd, EVFILT_READ, this) {};
 	bool init();
 	virtual void onEvent(const struct kevent *);
 private:
-	void drainOutput();
 	void handleMessage(const struct sslproc_message_header *hdr,
-	    const struct cmsghdr *cmsg, size_t cmsgLen);
-	int fd;
-	Kevent controlRead;
-	Kevent controlWrite;
-	IOBuffer inputBuffer;
-	IOBuffer outputBuffer;
+	    const struct cmsghdr *cmsg);
+
+	KQueue *kq;
+	KEvent readEvent;
+	MessageBuffer inputBuffer;
 };

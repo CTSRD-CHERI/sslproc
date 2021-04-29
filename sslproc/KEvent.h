@@ -32,31 +32,37 @@
 
 #pragma once
 
-#include <openssl/ssl.h>
+#include <sys/event.h>
 
-#include "KEvent.h"
-#include "MessageBuffer.h"
-#include "MessageSocket.h"
-
-class SSLSession : public KEventListener, MessageSocket {
+class KQueue {
 public:
-	SSLSession(KQueue *kq, int _fd) : MessageSocket(_fd),
-	    readEvent(kq, _fd, EVFILT_READ, this), fd(_fd) {}
-	~SSLSession();
+	KQueue() {}
+	~KQueue();
 	bool init();
-	virtual void onEvent(const struct kevent *);
-	int rawRead(char *out, int outl);
-	int rawWrite(const char *in, int inl);
-
+	void run();
+	bool registerEvent(const struct kevent *);
 private:
-	bool handleMessage(const struct sslproc_message_header *hdr);
-
-	KEvent readEvent;
-	MessageBuffer inputBuffer;
-	MessageBuffer replyBuffer;
-	DataBuffer readBuffer;
-
-	SSL *ssl;
-
 	int fd;
+};
+
+class KEventListener {
+public:
+	virtual void onEvent(const struct kevent *) = 0;
+};
+
+class KEvent {
+public:
+	KEvent(KQueue *_kq, int _fd, short _filter, KEventListener *_listener)
+	    : kq (_kq), fd(_fd), filter(_filter), listener(_listener),
+	    enabled(true) {}
+	bool init();
+	bool initDisabled();
+	void enable();
+	void disable();
+private:
+	KQueue *kq;
+	KEventListener *listener;
+	int fd;
+	short filter;
+	bool enabled;
 };
