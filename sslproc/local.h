@@ -37,4 +37,3 @@
 extern SSL_CTX *sslCtx;
 
 bool	initOpenSSL();
-bool	setFdNonBlocking(int fd, const char *descr);

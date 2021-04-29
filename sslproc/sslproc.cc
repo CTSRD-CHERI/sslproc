@@ -50,35 +50,11 @@
  * sockets are defined in sslproc.h.
  */
 
-#include <sys/event.h>
-#include <fcntl.h>
 #include <syslog.h>
 
 #include "local.h"
 #include "KEvent.h"
 #include "ControlSocket.h"
-
-bool
-setFdNonBlocking(int fd, const char *descr)
-{
-	int rc;
-
-	rc = fcntl(fd, F_GETFL);
-	if (rc == -1) {
-		syslog(LOG_ERR, "fcntl(F_GETFL) of %s failed: %m", descr);
-		return (false);
-	}
-
-	if (rc & O_NONBLOCK)
-		return (true);
-
-	rc = fcntl(fd, F_SETFL, rc | O_NONBLOCK);
-	if (rc == -1) {
-		syslog(LOG_ERR, "fcntl(F_SETFL) of %s failed: %m", descr);
-		return (false);
-	}
-	return (true);
-}
 
 int
 main(int ac, char **av)

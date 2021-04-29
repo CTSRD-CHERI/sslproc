@@ -90,65 +90,12 @@ bool
 KEvent::init()
 {
 	struct kevent kevent;
-	int flags;
 
-	flags = EV_ADD;
-	if (!enabled)
-		flags |= EV_DISABLE;
-	EV_SET(&kevent, fd, filter, flags, 0, 0, listener);
+	EV_SET(&kevent, fd, filter, EV_ADD, 0, 0, listener);
 
 	if (!kq->registerEvent(&kevent)) {
 		syslog(LOG_ERR, "kevent register failed: %m");
 		return (false);
 	}
 	return (true);
-}
-
-bool
-KEvent::initDisabled()
-{
-	enabled = false;
-	return init();
-}
-
-void
-KEvent::disable()
-{
-	struct kevent kevent;
-
-	if (!enabled)
-		return;
-	enabled = false;
-
-#ifdef EV_KEEPUDATA
-	EV_SET(&kevent, fd, filter, EV_DISABLE | EV_KEEPUDATA, 0, 0, nullptr);
-#else
-	EV_SET(&kevent, fd, filter, EV_DISABLE, 0, 0, listener);
-#endif
-
-	if (!kq->registerEvent(&kevent)) {
-		syslog(LOG_ERR, "kevent enable failed: %m");
-		exit(1);
-	}
-}
-
-void
-KEvent::enable()
-{
-	struct kevent kevent;
-
-	if (enabled)
-		return;
-	enabled = true;
-
-#ifdef EV_KEEPUDATA
-	EV_SET(&kevent, fd, filter, EV_ENABLE | EV_KEEPUDATA, 0, 0, nullptr);
-#else
-	EV_SET(&kevent, fd, filter, EV_ENABLE, 0, 0, listener);
-#endif
-
-	if (!kq->registerEvent(&kevent)) {
-		syslog(LOG_ERR, "kevent enable failed: %m");
-		exit(1);
-	}
 }

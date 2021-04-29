@@ -53,16 +53,11 @@ public:
 class KEvent {
 public:
 	KEvent(KQueue *_kq, int _fd, short _filter, KEventListener *_listener)
-	    : kq (_kq), fd(_fd), filter(_filter), listener(_listener),
-	    enabled(true) {}
+	    : kq (_kq), fd(_fd), filter(_filter), listener(_listener) {}
 	bool init();
-	bool initDisabled();
-	void enable();
-	void disable();
 private:
 	KQueue *kq;
 	KEventListener *listener;
 	int fd;
 	short filter;
-	bool enabled;
 };
