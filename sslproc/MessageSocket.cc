@@ -36,7 +36,7 @@
 #include <string.h>
 #include <syslog.h>
 
-#include <sslproc.h>
+#include <sslproc_msg.h>
 
 #include "MessageSocket.h"
 

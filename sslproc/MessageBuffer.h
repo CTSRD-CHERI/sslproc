@@ -34,7 +34,7 @@
 
 #include <sys/socket.h>
 
-#include <sslproc.h>
+#include <sslproc_msg.h>
 
 class DataBuffer {
 public:

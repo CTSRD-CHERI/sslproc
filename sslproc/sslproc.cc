@@ -47,7 +47,7 @@
  * the shared SSL_CTX used for all sessions.
  *
  * The messages used by both the global and per-connection control
- * sockets are defined in sslproc.h.
+ * sockets are defined in sslproc_msg.h.
  */
 
 #include <syslog.h>

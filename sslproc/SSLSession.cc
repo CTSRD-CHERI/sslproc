@@ -39,7 +39,7 @@
 
 #include <openssl/ssl.h>
 
-#include <sslproc.h>
+#include <sslproc_msg.h>
 
 #include "local.h"
 #include "SSLSession.h"

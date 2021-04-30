@@ -34,7 +34,7 @@
 #include <errno.h>
 #include <syslog.h>
 
-#include <sslproc.h>
+#include <sslproc_msg.h>
 
 #include "KEvent.h"
 #include "MessageBuffer.h"
