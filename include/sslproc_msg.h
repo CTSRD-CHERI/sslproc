@@ -43,6 +43,14 @@ struct sslproc_message_header {
 
 /* Global messages from client -> sslproc over the 'control' socket. */
 
+#define SSLPROC_CREATE_CONTEXT	1
+
+struct sslproc_message_create_context {
+	int	type;
+	int	length;
+	int	method;		/* SSLPROC_METHOD_* */
+};
+
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
 
@@ -89,4 +97,13 @@ struct sslproc_message_result {
 				 * Returned data for reads on succcess.
 				 * Error values on failures.
 				 */
+};
+
+struct sslproc_message_result_error {
+	int	type;		/* SSLPROC_RESULT */
+	int	length;
+	int	request;	/* SSLPROC_* */
+	int	ret;
+	int	ssl_error;	/* SSL_ERROR_* */
+	long	error;		/* ERR_get_error() or errno */
 };

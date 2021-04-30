@@ -32,29 +32,8 @@
 
 #pragma once
 
-#include "MessageBuffer.h"
+/* Public interface to libsslproc. */
 
-/*
- * A MessageSocket sends and receives sslproc_messages over a reliable
- * datagram socket.  It provides methods to read messages and write
- * messages.
- */
-class MessageSocket {
-protected:
-	MessageSocket(int _fd) : fd(_fd) {};
-	int readMessage(MessageBuffer &);
-	bool writeMessage(int type, void *payload = nullptr,
-	    size_t payloadLen = 0, void *control = nullptr,
-	    size_t controlLen = 0);
-	void writeReplyMessage(int type, int ret, void *payload = nullptr,
-	    size_t payloadLen = 0);
-	void writeErrnoReply(int type, int ret, int error);
-	void writeSSLErrorReply(int type, int ret, int error);
-	bool hasWriteError() { return writeError; }
-private:
-	bool writeMessage(struct iovec *iov, int iovCnt,
-	    void *control, size_t controlLen);
-
-	bool writeError = false;
-	int fd;
-};
+#define	SSLPROC_METHOD_TLS		0	/* TLS_method() */
+#define	SSLPROC_METHOD_TLS_CLIENT	1	/* TLS_server_method() */
+#define	SSLPROC_METHOD_TLS_SERVER	2	/* TLS_client_method() */

@@ -9,4 +9,4 @@ find_package(OpenSSL REQUIRED)
 
 add_subdirectory(sslproc)
 
-#install(FILES include/sslproc.h DESTINATION include)
+install(FILES include/sslproc.h DESTINATION include)

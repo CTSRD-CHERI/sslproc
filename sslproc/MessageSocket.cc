@@ -36,6 +36,9 @@
 #include <string.h>
 #include <syslog.h>
 
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+
 #include <sslproc_msg.h>
 
 #include "MessageSocket.h"
@@ -174,4 +177,38 @@ MessageSocket::writeReplyMessage(int type, int ret, void *payload,
 	else
 		cnt = 2;
 	writeMessage(iov, cnt, nullptr, 0);
+}
+
+struct errorBody {
+	int	ssl_error;
+	long	error;
+};
+
+void
+MessageSocket::writeErrnoReply(int type, int ret, int error)
+{
+	errorBody body;
+
+	body.ssl_error = SSL_ERROR_SYSCALL;
+	body.error = error;
+	writeReplyMessage(type, ret, &body, sizeof(body));
+}
+
+void
+MessageSocket::writeSSLErrorReply(int type, int ret, int error)
+{
+	errorBody body;
+
+	body.ssl_error = error;
+	switch (error) {
+	case SSL_ERROR_SYSCALL:
+		body.error = errno;
+		break;
+	case SSL_ERROR_SSL:
+		body.error = ERR_get_error();
+		break;
+	default:
+		body.error = 0;
+	}
+	writeReplyMessage(type, ret, &body, sizeof(body));
 }

@@ -57,15 +57,19 @@ SSLSession::init()
 		return (false);
 	BIO_set_data(bio, this);
 
-	/* XXX: SSL_ctx_new? */
-	/* XXX: SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER? */
-
 	ssl = SSL_new(sslCtx);
 	if (ssl == nullptr) {
 		BIO_free(bio);
 		return (false);
 	}
 	SSL_set_bio(ssl, bio, bio);
+
+	/*
+	 * Since inputBuffer's pointer can move due to realloc()'s,
+	 * the pointer may not be the same when a partial SSL_write()
+	 * is re-attempted.
+	 */
+	SSL_set_mode(ssl, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 
 	if (!readEvent.init())
 		return (false);
@@ -97,7 +101,7 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 		if (ret == 1)
 			writeReplyMessage(hdr->type, ret);
 		else
-			writeErrorReplyMessage(hdr->type, ret,
+			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
 	case SSLPROC_ACCEPT:
@@ -111,7 +115,7 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 		if (ret == 1)
 			writeReplyMessage(hdr->type, ret);
 		else
-			writeErrorReplyMessage(hdr->type, ret,
+			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
 	case SSLPROC_SHUTDOWN:
@@ -125,7 +129,7 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 		if (ret == 1)
 			writeReplyMessage(hdr->type, ret);
 		else
-			writeErrorReplyMessage(hdr->type, ret,
+			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
 	case SSLPROC_READ:
@@ -154,7 +158,7 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 			writeReplyMessage(hdr->type, ret, readBuffer.data(),
 			    ret);
 		else
-			writeErrorReplyMessage(hdr->type, ret,
+			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
 	case SSLPROC_WRITE:
@@ -168,7 +172,7 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 		if (ret > 0)
 			writeReplyMessage(hdr->type, ret);
 		else
-			writeErrorReplyMessage(hdr->type, ret,
+			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
 	default:
