@@ -36,11 +36,9 @@
 #include <string.h>
 #include <syslog.h>
 
-#include <openssl/err.h>
 #include <openssl/ssl.h>
 
-#include <sslproc_msg.h>
-
+#include "Messages.h"
 #include "MessageSocket.h"
 
 int
@@ -191,24 +189,5 @@ MessageSocket::writeErrnoReply(int type, int ret, int error)
 
 	body.ssl_error = SSL_ERROR_SYSCALL;
 	body.error = error;
-	writeReplyMessage(type, ret, &body, sizeof(body));
-}
-
-void
-MessageSocket::writeSSLErrorReply(int type, int ret, int error)
-{
-	errorBody body;
-
-	body.ssl_error = error;
-	switch (error) {
-	case SSL_ERROR_SYSCALL:
-		body.error = errno;
-		break;
-	case SSL_ERROR_SSL:
-		body.error = ERR_get_error();
-		break;
-	default:
-		body.error = 0;
-	}
 	writeReplyMessage(type, ret, &body, sizeof(body));
 }

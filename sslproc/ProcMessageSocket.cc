@@ -30,51 +30,32 @@
  * SUCH DAMAGE.
  */
 
-/*
- * Each SSL session is managed messages passed over a UNIX domain
- * datagram socket.  Each request is answered by a result message,
- * but the helper library is permitted to submit async requests to
- * client while servicing a request.  Only one async request is
- * permitted at a time, and the client should respond to each
- * async request with a result message.
- *
- * Sessions are created via control messages passed over a UNIX domain
- * datagram socket.  The invoking process is required to pass a file
- * descriptor to this global socket as fd 3.
- *
- * In addition to creating sessions, other control messages are passed
- * via the global control socket for configuring global state such as
- * the shared SSL_CTX used for all sessions.
- *
- * The messages used by both the global and per-connection control
- * sockets are defined in Messages.h.
- */
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 
-#include <syslog.h>
+#include <MessageSocket.h>
+#include "ProcMessageSocket.h"
 
-#include "local.h"
-#include "KEvent.h"
-#include "ControlSocket.h"
+struct errorBody {
+	int	ssl_error;
+	long	error;
+};
 
-int
-main(int ac, char **av)
+void
+ProcMessageSocket::writeSSLErrorReply(int type, int ret, int error)
 {
-	openlog("sslproc", LOG_PID, LOG_DAEMON);
+	errorBody body;
 
-	KQueue kq;
-	if (!kq.init())
-		return (1);
-
-	if (!initOpenSSL()) {
-		syslog(LOG_ERR, "failed to initialize OpenSSL");
-		return (1);
+	body.ssl_error = error;
+	switch (error) {
+	case SSL_ERROR_SYSCALL:
+		body.error = errno;
+		break;
+	case SSL_ERROR_SSL:
+		body.error = ERR_get_error();
+		break;
+	default:
+		body.error = 0;
 	}
-
-	ControlSocket controlSocket(&kq, 3);
-
-	if (!controlSocket.init())
-		return (1);
-
-	kq.run();
-	return (0);
+	writeReplyMessage(type, ret, &body, sizeof(body));
 }

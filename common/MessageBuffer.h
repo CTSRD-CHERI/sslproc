@@ -32,29 +32,66 @@
 
 #pragma once
 
-#include "MessageBuffer.h"
+#include <sys/socket.h>
 
-/*
- * A MessageSocket sends and receives sslproc_messages over a reliable
- * datagram socket.  It provides methods to read messages and write
- * messages.
- */
-class MessageSocket {
-protected:
-	MessageSocket(int _fd) : fd(_fd) {};
-	int readMessage(MessageBuffer &);
-	bool writeMessage(int type, void *payload = nullptr,
-	    size_t payloadLen = 0, void *control = nullptr,
-	    size_t controlLen = 0);
-	void writeReplyMessage(int type, int ret, void *payload = nullptr,
-	    size_t payloadLen = 0);
-	void writeErrnoReply(int type, int ret, int error);
-	void writeSSLErrorReply(int type, int ret, int error);
-	bool hasWriteError() { return writeError; }
+#include "Messages.h"
+
+class DataBuffer {
+public:
+	DataBuffer() = default;
+	~DataBuffer();
+
+	bool grow(size_t);
+	void *data() { return buffer; }
+	size_t capacity() { return cap; }
+	size_t length() { return len; }
+	void setLength(size_t);
 private:
-	bool writeMessage(struct iovec *iov, int iovCnt,
-	    void *control, size_t controlLen);
+	void *buffer = nullptr;
+	size_t cap = 0;
+	size_t len = 0;
+};
 
-	bool writeError = false;
-	int fd;
+class MessageBuffer {
+public:
+	MessageBuffer() = default;
+	~MessageBuffer() = default;
+
+	/* Message payload. */
+	bool grow(size_t amount) { return msg.grow(amount); }
+	void *data() { return msg.data(); }
+	size_t capacity() { return msg.capacity(); }
+	size_t length() { return (msg.length()); }
+	bool empty() { return (length() == 0); }
+	void setLength(size_t newLength) { msg.setLength(newLength); }
+	const struct sslproc_message_header *hdr()
+	{
+		if (length() < sizeof(struct sslproc_message_header))
+			return (nullptr);
+		return reinterpret_cast<const struct sslproc_message_header *>
+		    (data());
+	}
+
+	/* Control message. */
+	bool controlAlloc(size_t amount) { return control.grow(amount); }
+	void *controlData() { return control.data(); }
+	size_t controlCapacity() { return control.capacity(); }
+	size_t controlLength() { return (control.length()); }
+	void setControlLength(size_t newLength)
+	{ control.setLength(newLength); }
+	const struct cmsghdr *cmsg()
+	{
+		if (controlLength() < sizeof(struct cmsghdr))
+			return (nullptr);
+		return reinterpret_cast<const struct cmsghdr *>(controlData());
+	}
+
+	void reset()
+	{
+		msg.setLength(0);
+		control.setLength(0);
+	}
+private:
+	DataBuffer msg;
+	DataBuffer control;
 };

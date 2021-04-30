@@ -32,66 +32,11 @@
 
 #pragma once
 
-#include <sys/socket.h>
+#include <MessageSocket.h>
 
-#include <sslproc_msg.h>
-
-class DataBuffer {
-public:
-	DataBuffer() = default;
-	~DataBuffer();
-
-	bool grow(size_t);
-	void *data() { return buffer; }
-	size_t capacity() { return cap; }
-	size_t length() { return len; }
-	void setLength(size_t);
-private:
-	void *buffer = nullptr;
-	size_t cap = 0;
-	size_t len = 0;
-};
-
-class MessageBuffer {
-public:
-	MessageBuffer() = default;
-	~MessageBuffer() = default;
-
-	/* Message payload. */
-	bool grow(size_t amount) { return msg.grow(amount); }
-	void *data() { return msg.data(); }
-	size_t capacity() { return msg.capacity(); }
-	size_t length() { return (msg.length()); }
-	bool empty() { return (length() == 0); }
-	void setLength(size_t newLength) { msg.setLength(newLength); }
-	const struct sslproc_message_header *hdr()
-	{
-		if (length() < sizeof(struct sslproc_message_header))
-			return (nullptr);
-		return reinterpret_cast<const struct sslproc_message_header *>
-		    (data());
-	}
-
-	/* Control message. */
-	bool controlAlloc(size_t amount) { return control.grow(amount); }
-	void *controlData() { return control.data(); }
-	size_t controlCapacity() { return control.capacity(); }
-	size_t controlLength() { return (control.length()); }
-	void setControlLength(size_t newLength)
-	{ control.setLength(newLength); }
-	const struct cmsghdr *cmsg()
-	{
-		if (controlLength() < sizeof(struct cmsghdr))
-			return (nullptr);
-		return reinterpret_cast<const struct cmsghdr *>(controlData());
-	}
-
-	void reset()
-	{
-		msg.setLength(0);
-		control.setLength(0);
-	}
-private:
-	DataBuffer msg;
-	DataBuffer control;
+/* A ProcMessageSocket adds a helper method for writing libssl errors. */
+class ProcMessageSocket : public MessageSocket {
+protected:
+	ProcMessageSocket(int fd) : MessageSocket(fd) {}
+	void writeSSLErrorReply(int type, int ret, int error);
 };

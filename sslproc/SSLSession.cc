@@ -39,9 +39,8 @@
 
 #include <openssl/ssl.h>
 
-#include <sslproc_msg.h>
-
 #include "local.h"
+#include "Messages.h"
 #include "SSLSession.h"
 
 static BIO_METHOD *rawBioMethod;

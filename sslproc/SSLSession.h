@@ -36,11 +36,11 @@
 
 #include "KEvent.h"
 #include "MessageBuffer.h"
-#include "MessageSocket.h"
+#include "ProcMessageSocket.h"
 
-class SSLSession : public KEventListener, MessageSocket {
+class SSLSession : public KEventListener, ProcMessageSocket {
 public:
-	SSLSession(KQueue *kq, int _fd) : MessageSocket(_fd),
+	SSLSession(KQueue *kq, int _fd) : ProcMessageSocket(_fd),
 	    readEvent(kq, _fd, EVFILT_READ, this), fd(_fd) {}
 	~SSLSession();
 	bool init();

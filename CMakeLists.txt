@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_package(OpenSSL REQUIRED)
 
+add_subdirectory(common)
 add_subdirectory(sslproc)
 
 install(FILES include/sslproc.h DESTINATION include)

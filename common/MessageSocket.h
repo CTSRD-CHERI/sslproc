@@ -30,51 +30,30 @@
  * SUCH DAMAGE.
  */
 
+#pragma once
+
+#include "MessageBuffer.h"
+
 /*
- * Each SSL session is managed messages passed over a UNIX domain
- * datagram socket.  Each request is answered by a result message,
- * but the helper library is permitted to submit async requests to
- * client while servicing a request.  Only one async request is
- * permitted at a time, and the client should respond to each
- * async request with a result message.
- *
- * Sessions are created via control messages passed over a UNIX domain
- * datagram socket.  The invoking process is required to pass a file
- * descriptor to this global socket as fd 3.
- *
- * In addition to creating sessions, other control messages are passed
- * via the global control socket for configuring global state such as
- * the shared SSL_CTX used for all sessions.
- *
- * The messages used by both the global and per-connection control
- * sockets are defined in Messages.h.
+ * A MessageSocket sends and receives sslproc_messages over a reliable
+ * datagram socket.  It provides methods to read messages and write
+ * messages.
  */
+class MessageSocket {
+protected:
+	MessageSocket(int _fd) : fd(_fd) {};
+	int readMessage(MessageBuffer &);
+	bool writeMessage(int type, void *payload = nullptr,
+	    size_t payloadLen = 0, void *control = nullptr,
+	    size_t controlLen = 0);
+	void writeReplyMessage(int type, int ret, void *payload = nullptr,
+	    size_t payloadLen = 0);
+	void writeErrnoReply(int type, int ret, int error);
+	bool hasWriteError() { return writeError; }
+private:
+	bool writeMessage(struct iovec *iov, int iovCnt,
+	    void *control, size_t controlLen);
 
-#include <syslog.h>
-
-#include "local.h"
-#include "KEvent.h"
-#include "ControlSocket.h"
-
-int
-main(int ac, char **av)
-{
-	openlog("sslproc", LOG_PID, LOG_DAEMON);
-
-	KQueue kq;
-	if (!kq.init())
-		return (1);
-
-	if (!initOpenSSL()) {
-		syslog(LOG_ERR, "failed to initialize OpenSSL");
-		return (1);
-	}
-
-	ControlSocket controlSocket(&kq, 3);
-
-	if (!controlSocket.init())
-		return (1);
-
-	kq.run();
-	return (0);
-}
+	bool writeError = false;
+	int fd;
+};

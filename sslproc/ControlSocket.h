@@ -34,11 +34,11 @@
 
 #include "KEvent.h"
 #include "MessageBuffer.h"
-#include "MessageSocket.h"
+#include "ProcMessageSocket.h"
 
-class ControlSocket : public KEventListener, MessageSocket {
+class ControlSocket : public KEventListener, ProcMessageSocket {
 public:
-	ControlSocket(KQueue *_kq, int _fd) : MessageSocket(_fd), kq(_kq),
+	ControlSocket(KQueue *_kq, int _fd) : ProcMessageSocket(_fd), kq(_kq),
 	    readEvent(_kq, _fd, EVFILT_READ, this) {};
 	bool init();
 	virtual void onEvent(const struct kevent *);

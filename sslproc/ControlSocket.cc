@@ -37,9 +37,9 @@
 #include <openssl/ssl.h>
 
 #include <sslproc.h>
-#include <sslproc_msg.h>
 
 #include "KEvent.h"
+#include "Messages.h"
 #include "MessageBuffer.h"
 #include "MessageSocket.h"
 #include "ControlSocket.h"
