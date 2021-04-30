@@ -35,7 +35,7 @@
 #include "MessageBuffer.h"
 
 /*
- * A MessageSocket sends and receives sslproc_messages over a reliable
+ * A MessageSocket sends and receives messages over a reliable
  * datagram socket.  It provides methods to read messages and write
  * messages.
  */

@@ -83,9 +83,9 @@ SSLSession::~SSLSession()
 }
 
 bool
-SSLSession::handleMessage(const struct sslproc_message_header *hdr)
+SSLSession::handleMessage(const Message::Header *hdr)
 {
-	const struct sslproc_message_read *readMsg;
+	const Message::Read *readMsg;
 	int ret;
 
 	switch (hdr->type) {
@@ -138,8 +138,7 @@ SSLSession::handleMessage(const struct sslproc_message_header *hdr)
 			    hdr->length);
 			return (false);
 		}
-		readMsg = reinterpret_cast<const struct sslproc_message_read *>
-		    (hdr);
+		readMsg = reinterpret_cast<const Message::Read *>(hdr);
 		if (readMsg->resid > 0) {
 			/*
 			 * XXX: We could perhaps just perform a
@@ -220,7 +219,8 @@ SSLSession::onEvent(const struct kevent *kevent)
 int
 SSLSession::rawRead(char *out, int outl)
 {
-	const struct sslproc_message_result *resultMsg;
+	const Message::Result *msg;
+	const Message::ErrorBody *body;
 	int rc, resid;
 
 	resid = outl;
@@ -242,47 +242,51 @@ SSLSession::rawRead(char *out, int outl)
 		errno = EIO;
 		return (-1);
 	}
-	resultMsg = reinterpret_cast<const struct sslproc_message_result *>
-	    (replyBuffer.hdr());
-	if (resultMsg->type != SSLPROC_RESULT) {
+	msg = reinterpret_cast<const Message::Result *>(replyBuffer.hdr());
+	if (msg->type != SSLPROC_RESULT) {
 		syslog(LOG_DEBUG, "%s: unexpected reply message %d", __func__,
-		    resultMsg->type);
+		    msg->type);
 		errno = EIO;
 		return (-1);
 	}
-	if (resultMsg->request != SSLPROC_READ_RAW) {
+	if (msg->request != SSLPROC_READ_RAW) {
 		syslog(LOG_DEBUG, "%s: reply mismatch", __func__);
 		errno = EIO;
 		return (-1);
 	}
 
-	if (resultMsg->ret == -1) {
-		errno = *(int *)(resultMsg + 1);
+	if (msg->ret == -1) {
+		body = reinterpret_cast<const Message::ErrorBody *>(msg->body);
+		if (body->sslError == SSL_ERROR_SYSCALL)
+			errno = body->error;
+		else
+			errno = EIO;
 		return (-1);
 	}
 
-	if (resultMsg->ret < 0) {
+	if (msg->ret < 0) {
 		syslog(LOG_DEBUG, "%s: invalid result %d", __func__,
-		    resultMsg->ret);
+		    msg->ret);
 		errno = EIO;
 		return (-1);
 	}
-	if (resultMsg->ret > outl) {
+	if (msg->ret > outl) {
 		syslog(LOG_DEBUG, "%s: returned too much data %d vs %d",
-		    __func__, resultMsg->ret, outl);
+		    __func__, msg->ret, outl);
 		errno = EIO;
 		return (-1);
 	}
 
 	/* Copy, ugh */
-	memcpy(out, resultMsg + 1, resultMsg->ret);
-	return (resultMsg->ret);
+	memcpy(out, msg->body, msg->ret);
+	return (msg->ret);
 }
 
 int
 SSLSession::rawWrite(const char *in, int inl)
 {
-	const struct sslproc_message_result *resultMsg;
+	const Message::Result *msg;
+	const Message::ErrorBody *body;
 	int rc;
 
 	if (!writeMessage(SSLPROC_WRITE_RAW, const_cast<char *>(in), inl)) {
@@ -303,39 +307,42 @@ SSLSession::rawWrite(const char *in, int inl)
 		errno = EIO;
 		return (-1);
 	}
-	resultMsg = reinterpret_cast<const struct sslproc_message_result *>
-	    (replyBuffer.hdr());
-	if (resultMsg->type != SSLPROC_RESULT) {
+	msg = reinterpret_cast<const Message::Result *>(replyBuffer.hdr());
+	if (msg->type != SSLPROC_RESULT) {
 		syslog(LOG_DEBUG, "%s: unexpected reply message %d", __func__,
-		    resultMsg->type);
+		    msg->type);
 		errno = EIO;
 		return (-1);
 	}
-	if (resultMsg->request != SSLPROC_WRITE_RAW) {
+	if (msg->request != SSLPROC_WRITE_RAW) {
 		syslog(LOG_DEBUG, "%s: reply mismatch", __func__);
 		errno = EIO;
 		return (-1);
 	}
 
-	if (resultMsg->ret == -1) {
-		errno = *(int *)(resultMsg + 1);
+	if (msg->ret == -1) {
+		body = reinterpret_cast<const Message::ErrorBody *>(msg->body);
+		if (body->sslError == SSL_ERROR_SYSCALL)
+			errno = body->error;
+		else
+			errno = EIO;
 		return (-1);
 	}
 
-	if (resultMsg->ret < 0) {
+	if (msg->ret < 0) {
 		syslog(LOG_DEBUG, "%s: invalid result %d", __func__,
-		    resultMsg->ret);
+		    msg->ret);
 		errno = EIO;
 		return (-1);
 	}
-	if (resultMsg->ret > inl) {
+	if (msg->ret > inl) {
 		syslog(LOG_DEBUG, "%s: write too much data %d vs %d",
-		    __func__, resultMsg->ret, inl);
+		    __func__, msg->ret, inl);
 		errno = EIO;
 		return (-1);
 	}
 
-	return (resultMsg->ret);
+	return (msg->ret);
 }
 
 static int

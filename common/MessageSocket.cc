@@ -44,7 +44,7 @@
 int
 MessageSocket::readMessage(MessageBuffer &buffer)
 {
-	const struct sslproc_message_header *hdr;
+	const Message::Header *hdr;
 	struct msghdr msg;
 	struct iovec iov[1];
 	ssize_t nread;
@@ -137,7 +137,7 @@ bool
 MessageSocket::writeMessage(int type, void *payload, size_t payloadLen,
     void *control, size_t controlLen)
 {
-	struct sslproc_message_header hdr;
+	Message::Header hdr;
 	struct iovec iov[2];
 	int cnt;
 
@@ -158,7 +158,7 @@ void
 MessageSocket::writeReplyMessage(int type, int ret, void *payload,
     size_t payloadLen)
 {
-	struct sslproc_message_result result;
+	Message::Result result;
 	struct iovec iov[2];
 	int cnt;
 
@@ -177,17 +177,12 @@ MessageSocket::writeReplyMessage(int type, int ret, void *payload,
 	writeMessage(iov, cnt, nullptr, 0);
 }
 
-struct errorBody {
-	int	ssl_error;
-	long	error;
-};
-
 void
 MessageSocket::writeErrnoReply(int type, int ret, int error)
 {
-	errorBody body;
+	Message::ErrorBody body;
 
-	body.ssl_error = SSL_ERROR_SYSCALL;
+	body.sslError = SSL_ERROR_SYSCALL;
 	body.error = error;
 	writeReplyMessage(type, ret, &body, sizeof(body));
 }

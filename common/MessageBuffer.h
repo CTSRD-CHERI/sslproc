@@ -64,12 +64,11 @@ public:
 	size_t length() { return (msg.length()); }
 	bool empty() { return (length() == 0); }
 	void setLength(size_t newLength) { msg.setLength(newLength); }
-	const struct sslproc_message_header *hdr()
+	const Message::Header *hdr()
 	{
-		if (length() < sizeof(struct sslproc_message_header))
+		if (length() < sizeof(Message::Header))
 			return (nullptr);
-		return reinterpret_cast<const struct sslproc_message_header *>
-		    (data());
+		return reinterpret_cast<const Message::Header *>(data());
 	}
 
 	/* Control message. */

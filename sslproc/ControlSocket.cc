@@ -59,7 +59,7 @@ ControlSocket::init()
 }
 
 void
-ControlSocket::handleMessage(const struct sslproc_message_header *hdr,
+ControlSocket::handleMessage(const Message::Header *hdr,
     const struct cmsghdr *cmsg)
 {
 	int *fds;
@@ -72,9 +72,8 @@ ControlSocket::handleMessage(const struct sslproc_message_header *hdr,
 			break;
 		}
 
-		const struct sslproc_message_create_context *msg =
-		    reinterpret_cast<const struct sslproc_message_create_context*>
-		    (hdr);
+		const Message::CreateContext *msg =
+		    reinterpret_cast<const Message::CreateContext *>(hdr);
 		const SSL_METHOD *method = nullptr;
 		switch (msg->method) {
 		case SSLPROC_METHOD_TLS:

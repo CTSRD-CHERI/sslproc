@@ -43,7 +43,7 @@ public:
 	bool init();
 	virtual void onEvent(const struct kevent *);
 private:
-	void handleMessage(const struct sslproc_message_header *hdr,
+	void handleMessage(const Message::Header *hdr,
 	    const struct cmsghdr *cmsg);
 
 	KQueue *kq;

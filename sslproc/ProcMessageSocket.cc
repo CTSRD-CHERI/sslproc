@@ -33,20 +33,16 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
-#include <MessageSocket.h>
+#include "Messages.h"
+#include "MessageSocket.h"
 #include "ProcMessageSocket.h"
-
-struct errorBody {
-	int	ssl_error;
-	long	error;
-};
 
 void
 ProcMessageSocket::writeSSLErrorReply(int type, int ret, int error)
 {
-	errorBody body;
+	Message::ErrorBody body;
 
-	body.ssl_error = error;
+	body.sslError = error;
 	switch (error) {
 	case SSL_ERROR_SYSCALL:
 		body.error = errno;

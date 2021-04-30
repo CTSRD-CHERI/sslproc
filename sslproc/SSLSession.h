@@ -49,7 +49,7 @@ public:
 	int rawWrite(const char *in, int inl);
 
 private:
-	bool handleMessage(const struct sslproc_message_header *hdr);
+	bool handleMessage(const Message::Header *hdr);
 
 	KEvent readEvent;
 	MessageBuffer inputBuffer;

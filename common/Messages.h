@@ -33,23 +33,22 @@
 #pragma once
 
 /*
- * Messages sent and received over the various sockets or pipes.
+ * Messages sent and received over the various sockets.
  */
+namespace Message {
 
-struct sslproc_message_header {
-	int	type;
-	int	length;
-};
+	struct Header {
+		int	type;
+		int	length;
+	};
 
 /* Global messages from client -> sslproc over the 'control' socket. */
 
 #define SSLPROC_CREATE_CONTEXT	1
 
-struct sslproc_message_create_context {
-	int	type;
-	int	length;
-	int	method;		/* SSLPROC_METHOD_* */
-};
+	struct CreateContext : public Header {
+		int	method;		/* SSLPROC_METHOD_* */
+	};
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
@@ -67,11 +66,9 @@ struct sslproc_message_create_context {
 
 #define	SSLPROC_READ		0x44
 
-struct sslproc_message_read {
-	int	type;
-	int	length;
-	int	resid;		/* Max amount of data requested. */
-};
+	struct Read : public Header {
+		int	resid;		/* Max amount of data requested. */
+	};
 
 #define	SSLPROC_WRITE		0x45
 
@@ -85,25 +82,20 @@ struct sslproc_message_read {
 #define	SSLPROC_READ_RAW	0x80
 #define	SSLPROC_WRITE_RAW	0x81
 
-/* Returned at completion of each operation. */
+/*
+ * The receiver always returns a Result message to the sender at the
+ * completion of each operation.
+ */
 #define	SSLPROC_RESULT		0x100
 
-struct sslproc_message_result {
-	int	type;		/* SSLPROC_RESULT */
-	int	length;
-	int	request;	/* SSLPROC_* */
-	int	ret;
-	char	data[];		/*
-				 * Returned data for reads on succcess.
-				 * Error values on failures.
-				 */
-};
+	struct Result : public Header {
+		int	request;	/* SSLPROC_* */
+		int	ret;
+		char	body[];
+	};
 
-struct sslproc_message_result_error {
-	int	type;		/* SSLPROC_RESULT */
-	int	length;
-	int	request;	/* SSLPROC_* */
-	int	ret;
-	int	ssl_error;	/* SSL_ERROR_* */
-	long	error;		/* ERR_get_error() or errno */
-};
+	struct ErrorBody {
+		int	sslError;	/* SSL_ERROR_* */
+		long	error;		/* ERR_get_error() or errno */
+	};
+}
