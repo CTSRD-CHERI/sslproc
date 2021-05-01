@@ -44,11 +44,16 @@ namespace Message {
 
 /* Global messages from client -> sslproc over the 'control' socket. */
 
-#define SSLPROC_CREATE_CONTEXT	1
+#define	SSLPROC_NOP		1
+#define	SSLPROC_CREATE_CONTEXT	2
 
 	struct CreateContext : public Header {
 		int	method;		/* SSLPROC_METHOD_* */
 	};
+
+#define	SSLPROC_METHOD_TLS		0	/* TLS_method() */
+#define	SSLPROC_METHOD_TLS_CLIENT	1	/* TLS_server_method() */
+#define	SSLPROC_METHOD_TLS_SERVER	2	/* TLS_client_method() */
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10

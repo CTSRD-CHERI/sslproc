@@ -32,8 +32,15 @@
 
 #pragma once
 
-/* Public interface to libsslproc. */
+#include "LibMessageSocket.h"
 
-#define	SSLPROC_METHOD_TLS		0	/* TLS_method() */
-#define	SSLPROC_METHOD_TLS_CLIENT	1	/* TLS_server_method() */
-#define	SSLPROC_METHOD_TLS_SERVER	2	/* TLS_client_method() */
+class ControlSocket : public LibMessageSocket {
+public:
+	ControlSocket(int _fd) : LibMessageSocket(_fd), fd(_fd) {};
+	bool init();
+	~ControlSocket();
+private:
+	bool handleMessage(const Message::Header *hdr);
+
+	int fd;
+};

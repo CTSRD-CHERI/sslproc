@@ -36,8 +36,6 @@
 
 #include <openssl/ssl.h>
 
-#include <sslproc.h>
-
 #include "KEvent.h"
 #include "Messages.h"
 #include "MessageBuffer.h"
@@ -65,6 +63,9 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 	int *fds;
 
 	switch (hdr->type) {
+	case SSLPROC_NOP:
+		writeReplyMessage(hdr->type, 0);
+		break;
 	case SSLPROC_CREATE_CONTEXT:
 	{
 		if (sslCtx != nullptr) {
