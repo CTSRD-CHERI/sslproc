@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <stdlib.h>
 #include <unistd.h>
 
 #include <Messages.h>
@@ -48,10 +49,49 @@ ControlSocket::init()
 
 	/* Create the remote context. */
 	writeMessage(SSLPROC_CREATE_CONTEXT);
-	if (waitForReply(SSLPROC_CREATE_CONTEXT) == nullptr)
+	const Message::Result *reply = waitForReply(SSLPROC_CREATE_CONTEXT);
+	if (reply == nullptr)
+		return (false);
+	if (reply->ret != 0)
 		return (false);
 
 	return (true);
+}
+
+long
+ControlSocket::setContextOptions(long options)
+{
+	writeMessage(SSLPROC_CTX_SET_OPTIONS, &options, sizeof(options));
+	const Message::Result *reply = waitForReply(SSLPROC_CTX_SET_OPTIONS);
+	if (reply == nullptr)
+		abort();
+	if (reply->ret != 0)
+		abort();
+	return (*reinterpret_cast<const long *>(reply->body));
+}
+
+long
+ControlSocket::clearContextOptions(long options)
+{
+	writeMessage(SSLPROC_CTX_CLEAR_OPTIONS, &options, sizeof(options));
+	const Message::Result *reply = waitForReply(SSLPROC_CTX_CLEAR_OPTIONS);
+	if (reply == nullptr)
+		abort();
+	if (reply->ret != 0)
+		abort();
+	return (*reinterpret_cast<const long *>(reply->body));
+}
+
+long
+ControlSocket::getContextOptions()
+{
+	writeMessage(SSLPROC_CTX_GET_OPTIONS);
+	const Message::Result *reply = waitForReply(SSLPROC_CTX_GET_OPTIONS);
+	if (reply == nullptr)
+		abort();
+	if (reply->ret != 0)
+		abort();
+	return (*reinterpret_cast<const long *>(reply->body));
 }
 
 bool

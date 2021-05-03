@@ -43,5 +43,8 @@
 #define	SSL_CTX_new		PSSL_CTX_new
 #define	SSL_CTX_up_ref		PSSL_CTX_up_ref
 #define	SSL_CTX_free		PSSL_CTX_free
+#define	SSL_CTX_set_options	PSSL_CTX_set_options
+#define	SSL_CTX_clear_options	PSSL_CTX_clear_options
+#define	SSL_CTX_get_options	PSSL_CTX_get_options
 
 /* SSL */

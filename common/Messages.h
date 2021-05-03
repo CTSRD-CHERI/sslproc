@@ -44,8 +44,8 @@ namespace Message {
 
 /* Global messages from client -> sslproc over the 'control' socket. */
 
-#define	SSLPROC_NOP		1
-#define	SSLPROC_CREATE_CONTEXT	2
+#define	SSLPROC_NOP			1
+#define	SSLPROC_CREATE_CONTEXT		2
 
 	struct CreateContext : public Header {
 		int	method;		/* SSLPROC_METHOD_* */
@@ -54,6 +54,16 @@ namespace Message {
 #define	SSLPROC_METHOD_TLS		0	/* TLS_method() */
 #define	SSLPROC_METHOD_TLS_CLIENT	1	/* TLS_server_method() */
 #define	SSLPROC_METHOD_TLS_SERVER	2	/* TLS_client_method() */
+
+/* These three return 'long options' on success. */
+#define	SSLPROC_CTX_SET_OPTIONS		3
+#define	SSLPROC_CTX_CLEAR_OPTIONS	4
+
+	struct Options : public Header {
+		long	options;
+	};
+
+#define	SSLPROC_CTX_GET_OPTIONS		5
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10

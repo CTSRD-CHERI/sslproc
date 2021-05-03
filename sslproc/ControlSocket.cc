@@ -68,6 +68,10 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		break;
 	case SSLPROC_CREATE_CONTEXT:
 	{
+		if (hdr->length != sizeof(Message::CreateContext)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
 		if (sslCtx != nullptr) {
 			writeErrnoReply(hdr->type, -1, EBUSY);
 			break;
@@ -97,6 +101,40 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
 		else
 			writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case SSLPROC_CTX_SET_OPTIONS:
+	case SSLPROC_CTX_CLEAR_OPTIONS:
+	{
+		if (hdr->length != sizeof(Message::Options)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		if (sslCtx != nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		const Message::Options *msg =
+		    reinterpret_cast<const Message::Options *>(hdr);
+		long options;
+
+		if (hdr->type == SSLPROC_CTX_SET_OPTIONS)
+			options = SSL_CTX_set_options(sslCtx, msg->options);
+		else
+			options = SSL_CTX_clear_options(sslCtx, msg->options);
+		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
+		break;
+	}
+	case SSLPROC_CTX_GET_OPTIONS:
+	{
+		if (sslCtx != nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		long options = SSL_CTX_get_options(sslCtx);
+		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
 		break;
 	}
 	case SSLPROC_CREATE_SESSION:

@@ -37,8 +37,12 @@
 class ControlSocket : public LibMessageSocket {
 public:
 	ControlSocket(int _fd) : LibMessageSocket(_fd), fd(_fd) {};
-	bool init();
 	~ControlSocket();
+	bool init();
+
+	long setContextOptions(long options);
+	long clearContextOptions(long options);
+	long getContextOptions();
 private:
 	bool handleMessage(const Message::Header *hdr);
 

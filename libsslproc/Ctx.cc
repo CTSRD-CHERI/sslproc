@@ -110,3 +110,21 @@ PSSL_CTX_free(PSSL_CTX *ctx)
 	delete ctx->cs;
 	free(ctx);
 }
+
+long
+PSSL_CTX_set_options(PSSL_CTX *ctx, long options)
+{
+	return (ctx->cs->setContextOptions(options));
+}
+
+long
+PSSL_CTX_clear_options(PSSL_CTX *ctx, long options)
+{
+	return (ctx->cs->clearContextOptions(options));
+}
+
+long
+PSSL_CTX_get_options(PSSL_CTX *ctx)
+{
+	return (ctx->cs->getContextOptions());
+}

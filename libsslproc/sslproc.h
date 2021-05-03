@@ -54,6 +54,9 @@ typedef struct _PSSL_CTX PSSL_CTX;
 PSSL_CTX *PSSL_CTX_new(const PSSL_METHOD *method);
 int PSSL_CTX_up_ref(PSSL_CTX *ctx);
 void PSSL_CTX_free(PSSL_CTX *ctx);
+long PSSL_CTX_set_options(PSSL_CTX *ctx, long options);
+long PSSL_CTX_clear_options(PSSL_CTX *ctx, long options);
+long PSSL_CTX_get_options(PSSL_CTX *ctx);
 
 /* SSL */
 

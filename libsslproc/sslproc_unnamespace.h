@@ -43,5 +43,8 @@
 #undef SSL_CTX_new
 #undef SSL_CTX_up_ref
 #undef SSL_CTX_free
+#undef SSL_CTX_set_options
+#undef SSL_CTX_clear_options
+#undef SSL_CTX_get_options
 
 /* SSL */
