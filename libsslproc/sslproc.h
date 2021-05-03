@@ -38,6 +38,22 @@ __BEGIN_DECLS
 
 /* OPENSSL_init? */
 
+/* ERR */
+
+unsigned long PERR_get_error(void);
+unsigned long PERR_peek_error(void);
+unsigned long PERR_peek_last_error(void);
+unsigned long PERR_get_error_line(const char **file, int *line);
+unsigned long PERR_peek_error_line(const char **file, int *line);
+unsigned long PERR_peek_last_error_line(const char **file, int *line);
+unsigned long PERR_get_error_line_data(const char **file, int *line,
+    const char **data, int *flags);
+unsigned long PERR_peek_error_line_data(const char **file, int *line,
+    const char **data, int *flags);
+unsigned long PERR_peek_last_error_line_data(const char **file, int *line,
+    const char **data, int *flags);
+void PERR_clear_error(void);
+
 /* SSL_METHOD */
 
 struct _PSSL_METHOD;

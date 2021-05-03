@@ -46,3 +46,5 @@ private:
 private:
 	MessageBuffer replyBuffer;
 };
+
+void	setMessageError(const Message::Result *msg);

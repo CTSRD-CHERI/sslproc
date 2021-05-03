@@ -1,4 +1,4 @@
-add_library(libsslproc SHARED libsslproc.cc ControlSocket.cc Ctx.cc
+add_library(libsslproc SHARED libsslproc.cc ControlSocket.cc Ctx.cc Err.cc
 	    LibMessageSocket.cc Method.cc)
 target_link_libraries(libsslproc common)
 

@@ -32,9 +32,12 @@
 
 #include <errno.h>
 
+#include <openssl/ssl.h>
+
 #include <Messages.h>
 #include <MessageBuffer.h>
 #include "LibMessageSocket.h"
+#include "sslproc_internal.h"
 
 bool
 LibMessageSocket::init()
@@ -85,4 +88,14 @@ LibMessageSocket::waitForReply(int type)
 			/* XXX: Error handling? */
 			return (nullptr);
 	}
+}
+
+void
+setMessageError(const Message::Result *msg)
+{
+	const Message::ErrorBody *body =
+	    reinterpret_cast<const Message::ErrorBody *>(msg->body);
+
+	if (body->sslError == SSL_ERROR_SSL)
+		PERR_set_error(body->error);
 }

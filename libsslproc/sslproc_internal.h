@@ -41,6 +41,16 @@ __BEGIN_DECLS
 
 int	POPENSSL_init_ssl(void);
 
+/* ERR */
+
+void	PERR_init(void);
+void	PERR_PUT_error(int func, int reason, const char *file, int line);
+void	PERR_set_error(long error);
+
+#define	PROCerr(f,r)	PERR_PUT_error((f), (r), __FILE__, __LINE__)
+
+#define	PROC_F_SSL_CTX_NEW	1
+
 /* SSL_METHOD */
 
 struct _PSSL_METHOD {

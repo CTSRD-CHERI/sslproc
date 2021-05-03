@@ -52,8 +52,10 @@ ControlSocket::init()
 	const Message::Result *reply = waitForReply(SSLPROC_CREATE_CONTEXT);
 	if (reply == nullptr)
 		return (false);
-	if (reply->ret != 0)
+	if (reply->ret != 0) {
+		setMessageError(reply);
 		return (false);
+	}
 
 	return (true);
 }

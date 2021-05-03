@@ -35,6 +35,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <openssl/err.h>
+
 #include "sslproc.h"
 #include "sslproc_internal.h"
 #include "ControlSocket.h"
@@ -42,13 +44,18 @@
 PSSL_CTX *
 PSSL_CTX_new(const PSSL_METHOD *method)
 {
+	POPENSSL_init_ssl();
+
 	PSSL_CTX *ctx = new PSSL_CTX();
-	if (ctx == nullptr)
+	if (ctx == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_MALLOC_FAILURE);
 		return (nullptr);
+	}
 
 	int fds[2];
 	if (socketpair(PF_LOCAL, SOCK_DGRAM, 0, fds) == -1) {
 		free(ctx);
+		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
 		return (nullptr);
 	}
 
@@ -61,6 +68,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 		close(fds[0]);
 		close(fds[1]);
 		free(ctx);
+		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
 		return (nullptr);
 	}
 
@@ -79,6 +87,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	if (!ctx->cs->init()) {
 		delete ctx->cs;
 		free(ctx);
+		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
 		return (nullptr);
 	}
 

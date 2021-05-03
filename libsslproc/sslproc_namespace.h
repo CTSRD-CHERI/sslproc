@@ -30,6 +30,19 @@
  * SUCH DAMAGE.
  */
 
+/* ERR */
+
+#define	ERR_get_error			PERR_get_error
+#define	ERR_peek_error			PERR_peek_error
+#define	ERR_peek_last_error		PERR_peek_last_error
+#define	ERR_get_error_line		PERR_get_error_line
+#define	ERR_peek_error_line		PERR_peek_error_line
+#define	ERR_peek_last_error_line	PERR_peek_last_error_line
+#define	ERR_get_error_line_data		PERR_get_error_line_data
+#define	ERR_peek_error_line_data	PERR_peek_error_line_data
+#define	ERR_peek_last_error_line_data	PERR_peek_last_error_line_data
+#define	ERR_clear_error			PERR_clear_error
+
 /* SSL_METHOD */
 
 #define	SSL_METHOD		PSSL_METHOD

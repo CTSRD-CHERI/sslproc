@@ -31,9 +31,27 @@
  */
 
 #include "sslproc_internal.h"
+#include <atomic>
 
 int
 POPENSSL_init_ssl(void)
 {
+	static std::atomic_int initted;
+
+	if (initted > 0)
+		return (0);
+
+	for (;;) {
+		int value;
+
+		value = initted.load();
+		if (value > 0)
+			return (0);
+		if (value == 0 && initted.compare_exchange_weak(value, -1))
+			break;
+	}
+
+	PERR_init();
+	initted.store(1);
 	return (0);
 }
