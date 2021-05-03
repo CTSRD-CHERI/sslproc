@@ -97,5 +97,7 @@ setMessageError(const Message::Result *msg)
 	    reinterpret_cast<const Message::ErrorBody *>(msg->body);
 
 	if (body->sslError == SSL_ERROR_SSL)
-		PERR_set_error(body->error);
+		ERR_PUT_error(ERR_GET_LIB(body->error),
+		    ERR_GET_FUNC(body->error), ERR_GET_REASON(body->error),
+		    "NA", 0);
 }

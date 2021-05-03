@@ -30,43 +30,25 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
-
-#include <sys/cdefs.h>
-#include <atomic>
-
 #include <openssl/err.h>
 
-__BEGIN_DECLS
+#include "sslproc.h"
+#include "sslproc_internal.h"
 
-/* OPENSSL_init */
+int PROC_lib;
 
-int	POPENSSL_init_ssl(void);
-
-/* ERR */
-
-extern int PROC_lib;
-void	PERR_init(void);
-
-#define	PROCerr(f,r)	ERR_PUT_error(PROC_lib, (f), (r), __FILE__, __LINE__)
-
-#define	PROC_F_SSL_CTX_NEW	1
-
-/* SSL_METHOD */
-
-struct _PSSL_METHOD {
-	int method;	/* SSL_METHOD_* */
+static ERR_STRING_DATA PROC_strings[] = {
+	{0, "sslproc"},
+	{ERR_PACK(0, PROC_F_SSL_CTX_NEW, 0), "PSSL_CTX_new"},
+	{0, nullptr},
 };
 
-/* SSL_CTX */
+void
+PERR_init(void)
+{
+	PROC_lib = ERR_get_next_error_library();
 
-class ControlSocket;
-
-struct _PSSL_CTX {
-	ControlSocket *cs;
-	std::atomic_int refs;
-};
-
-/* SSL */
-
-__END_DECLS
+	/* We have to patch the library-wide entry by hand. */
+	PROC_strings[0].error = ERR_PACK(PROC_lib, 0, 0);
+	ERR_load_strings(PROC_lib, PROC_strings);
+}

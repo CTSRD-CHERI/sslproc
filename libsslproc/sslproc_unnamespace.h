@@ -30,19 +30,6 @@
  * SUCH DAMAGE.
  */
 
-/* ERR */
-
-#undef ERR_get_error
-#undef ERR_peek_error
-#undef ERR_peek_last_error
-#undef ERR_get_error_line
-#undef ERR_peek_error_line
-#undef ERR_peek_last_error_line
-#undef ERR_get_error_line_data
-#undef ERR_peek_error_line_data
-#undef ERR_peek_last_error_line_data
-#undef ERR_clear_error
-
 /* SSL_METHOD */
 
 #undef SSL_METHOD
