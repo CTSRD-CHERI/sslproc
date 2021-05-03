@@ -30,24 +30,36 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
+#include "sslproc.h"
+#include "sslproc_internal.h"
+#include <Messages.h>
 
-#include <sys/cdefs.h>
-
-__BEGIN_DECLS
-
-/* OPENSSL_init */
-
-int	POPENSSL_init_ssl(void);
-
-/* SSL_METHOD */
-
-struct _PSSL_METHOD {
-	int method;	/* SSL_METHOD_* */
+static PSSL_METHOD TLS = {
+	.method = SSLPROC_METHOD_TLS
 };
 
-/* SSL_CTX */
+const PSSL_METHOD *
+PTLS_method(void)
+{
+	return (&TLS);
+}
 
-/* SSL */
+static PSSL_METHOD TLS_server = {
+	.method = SSLPROC_METHOD_TLS_SERVER
+};
 
-__END_DECLS
+const PSSL_METHOD *
+PTLS_server_method(void)
+{
+	return (&TLS_server);
+}
+
+static PSSL_METHOD TLS_client = {
+	.method = SSLPROC_METHOD_TLS_CLIENT
+};
+
+const PSSL_METHOD *
+PTLS_client_method(void)
+{
+	return (&TLS_client);
+}

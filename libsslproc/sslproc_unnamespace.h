@@ -32,6 +32,11 @@
 
 /* SSL_METHOD */
 
+#undef SSL_METHOD
+#undef TLS_method
+#undef TLS_server_method
+#undef TLS_client_method
+
 /* SSL_CTX */
 
 /* SSL */

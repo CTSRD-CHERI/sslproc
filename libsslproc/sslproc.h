@@ -40,6 +40,13 @@ __BEGIN_DECLS
 
 /* SSL_METHOD */
 
+struct _PSSL_METHOD;
+typedef struct _PSSL_METHOD PSSL_METHOD;
+
+const PSSL_METHOD *PTLS_method(void);
+const PSSL_METHOD *PTLS_server_method(void);
+const PSSL_METHOD *PTLS_client_method(void);
+
 /* SSL_CTX */
 
 /* SSL */

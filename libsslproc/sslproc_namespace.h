@@ -32,6 +32,11 @@
 
 /* SSL_METHOD */
 
+#define	SSL_METHOD		PSSL_METHOD
+#define	TLS_method		PTLS_method
+#define	TLS_server_method	PTLS_server_method
+#define	TLS_client_method	PTLS_client_method
+
 /* SSL_CTX */
 
 /* SSL */
