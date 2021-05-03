@@ -30,58 +30,10 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-#include "sslproc.h"
 #include "sslproc_internal.h"
-#include "ControlSocket.h"
-
-ControlSocket *controlSocket;
 
 int
 POPENSSL_init_ssl(void)
 {
-	int fds[2];
-	pid_t pid;
-
-	/* XXX: This is not thread-safe. */
-	if (controlSocket != nullptr)
-		return (0);
-
-	if (socketpair(PF_LOCAL, SOCK_DGRAM, 0, fds) == -1)
-		return (-1);
-
-	/*
-	 * This doesn't use posix_spawn due to a lack of
-	 * posix_spawn_file_actions_addclosefrom().
-	 */
-	pid = vfork();
-	if (pid == -1) {
-		close(fds[0]);
-		close(fds[1]);
-		return (-1);
-	}
-
-	if (pid == 0) {
-		/* child */
-		if (dup2(fds[1], 3) == -1)
-			exit(127);
-		closefrom(4);
-		execlp("sslproc", "sslproc", NULL);
-		exit(127);
-	}
-
-	close(fds[1]);
-
-	ControlSocket *cs = new ControlSocket(fds[0]);
-	if (!cs->init()) {
-		delete cs;
-		return (-1);
-	}
-
-	controlSocket = cs;
 	return (0);
 }

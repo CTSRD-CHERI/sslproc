@@ -46,9 +46,9 @@ ControlSocket::init()
 	if (!LibMessageSocket::init())
 		return (false);
 
-	/* Try to send a NOP message to see if the helper is working. */
-	writeMessage(SSLPROC_NOP);
-	if (waitForReply(SSLPROC_NOP) == nullptr)
+	/* Create the remote context. */
+	writeMessage(SSLPROC_CREATE_CONTEXT);
+	if (waitForReply(SSLPROC_CREATE_CONTEXT) == nullptr)
 		return (false);
 
 	return (true);

@@ -33,6 +33,7 @@
 #pragma once
 
 #include <sys/cdefs.h>
+#include <atomic>
 
 __BEGIN_DECLS
 
@@ -47,6 +48,13 @@ struct _PSSL_METHOD {
 };
 
 /* SSL_CTX */
+
+class ControlSocket;
+
+struct _PSSL_CTX {
+	ControlSocket *cs;
+	std::atomic_int refs;
+};
 
 /* SSL */
 

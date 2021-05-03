@@ -30,31 +30,83 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-#include <sys/cdefs.h>
+#include "sslproc.h"
+#include "sslproc_internal.h"
+#include "ControlSocket.h"
 
-__BEGIN_DECLS
+PSSL_CTX *
+PSSL_CTX_new(const PSSL_METHOD *method)
+{
+	PSSL_CTX *ctx = new PSSL_CTX();
+	if (ctx == nullptr)
+		return (nullptr);
 
-/* OPENSSL_init? */
+	int fds[2];
+	if (socketpair(PF_LOCAL, SOCK_DGRAM, 0, fds) == -1) {
+		free(ctx);
+		return (nullptr);
+	}
 
-/* SSL_METHOD */
+	/*
+	 * This doesn't use posix_spawn due to a lack of
+	 * posix_spawn_file_actions_addclosefrom().
+	 */
+	pid_t pid = vfork();
+	if (pid == -1) {
+		close(fds[0]);
+		close(fds[1]);
+		free(ctx);
+		return (nullptr);
+	}
 
-struct _PSSL_METHOD;
-typedef struct _PSSL_METHOD PSSL_METHOD;
+	if (pid == 0) {
+		/* child */
+		if (dup2(fds[1], 3) == -1)
+			exit(127);
+		closefrom(4);
+		execlp("sslproc", "sslproc", NULL);
+		exit(127);
+	}
 
-const PSSL_METHOD *PTLS_method(void);
-const PSSL_METHOD *PTLS_server_method(void);
-const PSSL_METHOD *PTLS_client_method(void);
+	close(fds[1]);
 
-/* SSL_CTX */
+	ctx->cs = new ControlSocket(fds[0]);
+	if (!ctx->cs->init()) {
+		delete ctx->cs;
+		free(ctx);
+		return (nullptr);
+	}
 
-struct _PSSL_CTX;
-typedef struct _PSSL_CTX PSSL_CTX;
-PSSL_CTX *PSSL_CTX_new(const PSSL_METHOD *method);
-int PSSL_CTX_up_ref(PSSL_CTX *ctx);
-void PSSL_CTX_free(PSSL_CTX *ctx);
+	ctx->refs = 1;
+	return (ctx);
+}
 
-/* SSL */
+int
+PSSL_CTX_up_ref(PSSL_CTX *ctx)
+{
+	int refs;
 
-__END_DECLS
+	refs = ctx->refs;
+	for (;;) {
+		if (refs == INT_MAX)
+			return (0);
+		if (ctx->refs.compare_exchange_weak(refs, refs + 1,
+		    std::memory_order_relaxed))
+			return (1);
+	}
+}
+
+void
+PSSL_CTX_free(PSSL_CTX *ctx)
+{
+	if (ctx->refs.fetch_sub(1, std::memory_order_relaxed) > 1)
+		return;
+
+	delete ctx->cs;
+	free(ctx);
+}
