@@ -57,7 +57,7 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 	msg.msg_control = buffer.controlData();
 	msg.msg_controllen = buffer.controlCapacity();
 	msg.msg_flags = 0;
-	nread = recvmsg(fd, &msg, MSG_DONTWAIT | MSG_PEEK);
+	nread = recvmsg(fd, &msg, MSG_PEEK);
 	if (nread == 0)
 		return (0);
 	if (nread == -1) {
@@ -80,7 +80,7 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 	msg.msg_control = buffer.controlData();
 	msg.msg_controllen = buffer.controlCapacity();
 	msg.msg_flags = 0;
-	nread = recvmsg(fd, &msg, MSG_DONTWAIT);
+	nread = recvmsg(fd, &msg, 0);
 	assert(nread > 0);
 	buffer.setLength(nread);
 	buffer.setControlLength(msg.msg_controllen);
