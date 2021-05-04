@@ -34,7 +34,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
-#include <syslog.h>
 
 #include <openssl/ssl.h>
 
@@ -59,8 +58,12 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 	msg.msg_controllen = buffer.controlCapacity();
 	msg.msg_flags = 0;
 	nread = recvmsg(fd, &msg, MSG_DONTWAIT | MSG_PEEK);
-	if (nread == 0 || nread == -1)
-		return (nread);
+	if (nread == 0)
+		return (0);
+	if (nread == -1) {
+		observeReadError(READ_ERROR, nullptr);
+		return (-1);
+	}
 	assert(nread >= sizeof(*hdr));
 	if (msg.msg_flags & MSG_TRUNC) {
 		hdr = buffer.hdr();
@@ -79,23 +82,23 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 	nread = recvmsg(fd, &msg, MSG_DONTWAIT);
 	assert(nread > 0);
 	if (nread < sizeof(*hdr)) {
-		syslog(LOG_WARNING, "message too short");
+		observeReadError(SHORT, nullptr);
 		errno = EBADMSG;
 		return (-1);
 	}
 	if ((msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) != 0) {
-		syslog(LOG_WARNING, "message truncated");
+		observeReadError(TRUNCATED, nullptr);
 		errno = EBADMSG;
 		return (-1);
 	}
 	hdr = buffer.hdr();
 	if (hdr->length < sizeof(*hdr)) {
-		syslog(LOG_WARNING, "invalid message length %d", hdr->length);
+		observeReadError(BAD_MSG_LENGTH, hdr);
 		errno = EBADMSG;
 		return (-1);
 	}
 	if (nread != hdr->length) {
-		syslog(LOG_WARNING, "message length mismatch");
+		observeReadError(LENGTH_MISMATCH, hdr);
 		errno = EMSGSIZE;
 		return (-1);
 	}
@@ -120,14 +123,7 @@ MessageSocket::writeMessage(struct iovec *iov, int iovCnt, void *control,
 	msg.msg_flags = 0;
 	nwritten = sendmsg(fd, &msg, 0);
 	if (nwritten == -1) {
-		syslog(LOG_WARNING, "failed to write message");
-		writeError = true;
-		return (false);
-	}
-
-	if (nwritten == 0) {
-		syslog(LOG_WARNING, "message fd is closed on write");
-		writeError = true;
+		observeWriteError();
 		return (false);
 	}
 	return (true);

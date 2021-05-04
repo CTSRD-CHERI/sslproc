@@ -184,7 +184,36 @@ ControlSocket::onEvent(const struct kevent *kevent)
 		resid -= inputBuffer.length();
 
 		handleMessage(inputBuffer.hdr(), inputBuffer.cmsg());
-		if (hasWriteError())
-			exit(1);
 	}
+}
+
+void
+ControlSocket::observeReadError(enum ReadError error,
+    const Message::Header *hdr)
+{
+	switch (error) {
+	case READ_ERROR:
+		syslog(LOG_WARNING, "failed to read from control socket: %m");
+		break;
+	case SHORT:
+		syslog(LOG_WARNING, "control message too short");
+		break;
+	case TRUNCATED:
+		syslog(LOG_WARNING, "control message truncated");
+		break;
+	case BAD_MSG_LENGTH:
+		syslog(LOG_WARNING, "invalid control message length %d",
+		    hdr->length);
+		break;
+	case LENGTH_MISMATCH:
+		syslog(LOG_WARNING, "control message length mismatch");
+		break;
+	}
+}
+
+void
+ControlSocket::observeWriteError()
+{
+	syslog(LOG_WARNING, "failed to write message on control socket: %m");
+	exit(1);
 }

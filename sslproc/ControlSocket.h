@@ -43,6 +43,9 @@ public:
 	bool init();
 	virtual void onEvent(const struct kevent *);
 private:
+	virtual void observeReadError(enum ReadError,
+	    const Message::Header *hdr);
+	virtual void observeWriteError();
 	void handleMessage(const Message::Header *hdr,
 	    const struct cmsghdr *cmsg);
 

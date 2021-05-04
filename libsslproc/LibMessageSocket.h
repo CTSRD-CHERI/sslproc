@@ -43,7 +43,9 @@ public:
 	const Message::Result *waitForReply(int type);
 private:
 	virtual bool handleMessage(const Message::Header *hdr) = 0;
-private:
+	virtual void observeReadError(enum ReadError error,
+	    const Message::Header *hdr);
+	virtual void observeWriteError();
 	MessageBuffer replyBuffer;
 };
 

@@ -47,6 +47,26 @@ LibMessageSocket::init()
 	return (true);
 }
 
+void
+LibMessageSocket::observeReadError(enum ReadError error,
+    const Message::Header *hdr)
+{
+	switch (error) {
+	case READ_ERROR:
+		PROCerr(PROC_F_RECVMSG, ERR_R_IO_ERROR);
+		break;
+	default:
+		PROCerr(PROC_F_READ_MESSAGE, ERR_R_BAD_MESSAGE);
+		break;
+	}
+}
+
+void
+LibMessageSocket::observeWriteError()
+{
+	PROCerr(PROC_F_WRITE_MESSAGE, ERR_R_IO_ERROR);
+}
+
 const Message::Result *
 LibMessageSocket::waitForReply(int type)
 {
@@ -54,19 +74,13 @@ LibMessageSocket::waitForReply(int type)
 	int rc;
 
 	for (;;) {
-		/*
-		 * TODO: do we perhaps stuff a suitable error into our own
-		 * per-thread error queue?
-		 */
-		if (hasWriteError()) {
-			errno = EIO;
+		if (ERR_peek_error() != 0)
 			return (nullptr);
-		}
 
 		rc = readMessage(replyBuffer);
 
 		if (rc == 0) {
-			errno = ENOENT;
+			PROCerr(PROC_F_WAIT_FOR_REPLY, ERR_R_UNEXPECTED_EOF);
 			return (nullptr);
 		}
 		if (rc == -1)
@@ -80,12 +94,11 @@ LibMessageSocket::waitForReply(int type)
 			if (result->request == type)
 			    return (result);
 
-			/* XXX: Should probably kill the entire connection. */
+			PROCerr(PROC_F_WAIT_FOR_REPLY, ERR_R_MISMATCHED_REPLY);
 			return (nullptr);
 		}
 
 		if (!handleMessage(hdr))
-			/* XXX: Error handling? */
 			return (nullptr);
 	}
 }

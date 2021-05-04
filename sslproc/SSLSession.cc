@@ -194,14 +194,7 @@ SSLSession::onEvent(const struct kevent *kevent)
 	resid = kevent->data;
 	while (resid > 0) {
 		rc = readMessage(inputBuffer);
-		if (rc == 0) {
-			syslog(LOG_WARNING, "session fd is closed");
-			delete this;
-			return;
-		}
-		if (rc == -1) {
-			syslog(LOG_WARNING,
-			    "failed to read session message: %m");
+		if (rc == 0 || rc == -1) {
 			delete this;
 			return;
 		}
@@ -209,11 +202,41 @@ SSLSession::onEvent(const struct kevent *kevent)
 		assert(inputBuffer.length() <= resid);
 		resid -= inputBuffer.length();
 
-		if (!handleMessage(inputBuffer.hdr()) || hasWriteError()) {
+		if (!handleMessage(inputBuffer.hdr()) || writeFailed) {
 			delete this;
 			return;
 		}
 	}
+}
+
+void
+SSLSession::observeReadError(enum ReadError error, const Message::Header *hdr)
+{
+	switch (error) {
+	case READ_ERROR:
+		syslog(LOG_WARNING, "failed to read from session message: %m");
+		break;
+	case SHORT:
+		syslog(LOG_WARNING, "session message too short");
+		break;
+	case TRUNCATED:
+		syslog(LOG_WARNING, "session message truncated");
+		break;
+	case BAD_MSG_LENGTH:
+		syslog(LOG_WARNING, "invalid session message length %d",
+		    hdr->length);
+		break;
+	case LENGTH_MISMATCH:
+		syslog(LOG_WARNING, "session message length mismatch");
+		break;
+	}
+}
+
+void
+SSLSession::observeWriteError()
+{
+	syslog(LOG_WARNING, "failed to write message on session socket: %m");
+	writeFailed = true;
 }
 
 int

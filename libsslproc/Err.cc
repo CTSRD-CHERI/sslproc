@@ -40,6 +40,13 @@ int PROC_lib;
 static ERR_STRING_DATA PROC_strings[] = {
 	{0, "sslproc"},
 	{ERR_PACK(0, PROC_F_SSL_CTX_NEW, 0), "PSSL_CTX_new"},
+	{ERR_PACK(0, PROC_F_READ_MESSAGE, 0), "MessageSocket::readMessage"},
+	{ERR_PACK(0, PROC_F_WRITE_MESSAGE, 0), "MessageSocket::writeMessage"},
+	{ERR_PACK(0, PROC_F_RECVMSG, 0), "recvmsg"},
+	{ERR_PACK(0, 0, ERR_R_IO_ERROR), "I/O error"},
+	{ERR_PACK(0, 0, ERR_R_BAD_MESSAGE), "invalid message"},
+	{ERR_PACK(0, 0, ERR_R_UNEXPECTED_EOF), "unexpected EOF"},
+	{ERR_PACK(0, 0, ERR_R_MISMATCHED_REPLY), "mismatched reply"},
 	{0, nullptr},
 };
 

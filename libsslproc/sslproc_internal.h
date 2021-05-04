@@ -51,6 +51,15 @@ void	PERR_init(void);
 #define	PROCerr(f,r)	ERR_PUT_error(PROC_lib, (f), (r), __FILE__, __LINE__)
 
 #define	PROC_F_SSL_CTX_NEW	1
+#define	PROC_F_READ_MESSAGE	2
+#define	PROC_F_WRITE_MESSAGE	3
+#define	PROC_F_RECVMSG		4
+#define	PROC_F_WAIT_FOR_REPLY	5
+
+#define	ERR_R_IO_ERROR		(128|ERR_R_FATAL)
+#define	ERR_R_BAD_MESSAGE	(129|ERR_R_FATAL)
+#define	ERR_R_UNEXPECTED_EOF	(130|ERR_R_FATAL)
+#define	ERR_R_MISMATCHED_REPLY	(131|ERR_R_FATAL)
 
 /* SSL_METHOD */
 

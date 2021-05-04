@@ -41,6 +41,14 @@
  */
 class MessageSocket {
 protected:
+	enum ReadError {
+		READ_ERROR,
+		SHORT,
+		TRUNCATED,
+		BAD_MSG_LENGTH,
+		LENGTH_MISMATCH
+	};
+
 	MessageSocket(int _fd) : fd(_fd) {};
 	int readMessage(MessageBuffer &);
 	bool writeMessage(int type, void *payload = nullptr,
@@ -49,11 +57,12 @@ protected:
 	void writeReplyMessage(int type, int ret, void *payload = nullptr,
 	    size_t payloadLen = 0);
 	void writeErrnoReply(int type, int ret, int error);
-	bool hasWriteError() { return writeError; }
+	virtual void observeReadError(enum ReadError error,
+	    const Message::Header *hdr) = 0;
+	virtual void observeWriteError() = 0;
 private:
 	bool writeMessage(struct iovec *iov, int iovCnt,
 	    void *control, size_t controlLen);
 
-	bool writeError = false;
 	int fd;
 };

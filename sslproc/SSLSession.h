@@ -50,6 +50,9 @@ public:
 
 private:
 	bool handleMessage(const Message::Header *hdr);
+	virtual void observeReadError(enum ReadError,
+	    const Message::Header *hdr);
+	virtual void observeWriteError();
 
 	KEvent readEvent;
 	MessageBuffer inputBuffer;
@@ -59,4 +62,5 @@ private:
 	SSL *ssl;
 
 	int fd;
+	bool writeFailed = false;
 };
