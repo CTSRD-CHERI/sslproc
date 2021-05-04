@@ -64,6 +64,7 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 		observeReadError(READ_ERROR, nullptr);
 		return (-1);
 	}
+	buffer.setLength(nread);
 	assert(nread >= sizeof(*hdr));
 	if (msg.msg_flags & MSG_TRUNC) {
 		hdr = buffer.hdr();
@@ -81,6 +82,8 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 	msg.msg_flags = 0;
 	nread = recvmsg(fd, &msg, MSG_DONTWAIT);
 	assert(nread > 0);
+	buffer.setLength(nread);
+	buffer.setControlLength(msg.msg_controllen);
 	if (nread < sizeof(*hdr)) {
 		observeReadError(SHORT, nullptr);
 		errno = EBADMSG;
