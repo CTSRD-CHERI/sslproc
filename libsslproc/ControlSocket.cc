@@ -35,6 +35,7 @@
 
 #include <Messages.h>
 #include "ControlSocket.h"
+#include "sslproc_internal.h"
 
 ControlSocket::~ControlSocket()
 {
@@ -42,13 +43,10 @@ ControlSocket::~ControlSocket()
 }
 
 bool
-ControlSocket::init()
+ControlSocket::createContext(const PSSL_METHOD *method)
 {
-	if (!LibMessageSocket::init())
-		return (false);
-
-	/* Create the remote context. */
-	writeMessage(SSLPROC_CREATE_CONTEXT);
+	writeMessage(SSLPROC_CREATE_CONTEXT, &method->method,
+	    sizeof(method->method));
 	const Message::Result *reply = waitForReply(SSLPROC_CREATE_CONTEXT);
 	if (reply == nullptr)
 		return (false);
@@ -56,7 +54,6 @@ ControlSocket::init()
 		setMessageError(reply);
 		return (false);
 	}
-
 	return (true);
 }
 

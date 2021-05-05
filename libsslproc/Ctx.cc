@@ -84,7 +84,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	close(fds[1]);
 
 	ctx->cs = new ControlSocket(fds[0]);
-	if (!ctx->cs->init()) {
+	if (!ctx->cs->init() || !ctx->cs->createContext(method)) {
 		delete ctx->cs;
 		free(ctx);
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);

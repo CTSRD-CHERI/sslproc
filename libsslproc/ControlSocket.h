@@ -33,13 +33,14 @@
 #pragma once
 
 #include "LibMessageSocket.h"
+#include "sslproc.h"
 
 class ControlSocket : public LibMessageSocket {
 public:
 	ControlSocket(int _fd) : LibMessageSocket(_fd), fd(_fd) {};
 	~ControlSocket();
-	bool init();
 
+	bool createContext(const PSSL_METHOD *method);
 	long setContextOptions(long options);
 	long clearContextOptions(long options);
 	long getContextOptions();
