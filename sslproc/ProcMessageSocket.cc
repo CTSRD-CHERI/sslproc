@@ -38,20 +38,19 @@
 #include "ProcMessageSocket.h"
 
 void
-ProcMessageSocket::writeSSLErrorReply(int type, int ret, int error)
+ProcMessageSocket::writeSSLErrorReply(int type, long ret, int errorType)
 {
-	Message::ErrorBody body;
+	long error;
 
-	body.sslError = error;
-	switch (error) {
+	switch (errorType) {
 	case SSL_ERROR_SYSCALL:
-		body.error = errno;
+		error = errno;
 		break;
 	case SSL_ERROR_SSL:
-		body.error = ERR_get_error();
+		error = ERR_get_error();
 		break;
 	default:
-		body.error = 0;
+		error = 0;
 	}
-	writeReplyMessage(type, ret, &body, sizeof(body));
+	writeErrorReply(type, ret, errorType, error);
 }

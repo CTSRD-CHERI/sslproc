@@ -243,7 +243,6 @@ int
 SSLSession::rawRead(char *out, int outl)
 {
 	const Message::Result *msg;
-	const Message::ErrorBody *body;
 	int rc, resid;
 
 	resid = outl;
@@ -277,24 +276,22 @@ SSLSession::rawRead(char *out, int outl)
 		errno = EIO;
 		return (-1);
 	}
-
-	if (msg->ret == -1) {
-		body = reinterpret_cast<const Message::ErrorBody *>(msg->body);
-		if (body->sslError == SSL_ERROR_SYSCALL)
-			errno = body->error;
+	if (msg->error != SSL_ERROR_NONE) {
+		if (msg->error == SSL_ERROR_SYSCALL)
+			errno = *reinterpret_cast<const long *>(msg->body);
 		else
 			errno = EIO;
 		return (-1);
 	}
 
 	if (msg->ret < 0) {
-		syslog(LOG_DEBUG, "%s: invalid result %d", __func__,
+		syslog(LOG_DEBUG, "%s: invalid result %ld", __func__,
 		    msg->ret);
 		errno = EIO;
 		return (-1);
 	}
 	if (msg->ret > outl) {
-		syslog(LOG_DEBUG, "%s: returned too much data %d vs %d",
+		syslog(LOG_DEBUG, "%s: returned too much data %ld vs %d",
 		    __func__, msg->ret, outl);
 		errno = EIO;
 		return (-1);
@@ -309,7 +306,6 @@ int
 SSLSession::rawWrite(const char *in, int inl)
 {
 	const Message::Result *msg;
-	const Message::ErrorBody *body;
 	int rc;
 
 	if (!writeMessage(SSLPROC_WRITE_RAW, const_cast<char *>(in), inl)) {
@@ -342,24 +338,22 @@ SSLSession::rawWrite(const char *in, int inl)
 		errno = EIO;
 		return (-1);
 	}
-
-	if (msg->ret == -1) {
-		body = reinterpret_cast<const Message::ErrorBody *>(msg->body);
-		if (body->sslError == SSL_ERROR_SYSCALL)
-			errno = body->error;
+	if (msg->error != SSL_ERROR_NONE) {
+		if (msg->error == SSL_ERROR_SYSCALL)
+			errno = *reinterpret_cast<const long *>(msg->body);
 		else
 			errno = EIO;
 		return (-1);
 	}
 
 	if (msg->ret < 0) {
-		syslog(LOG_DEBUG, "%s: invalid result %d", __func__,
+		syslog(LOG_DEBUG, "%s: invalid result %ld", __func__,
 		    msg->ret);
 		errno = EIO;
 		return (-1);
 	}
 	if (msg->ret > inl) {
-		syslog(LOG_DEBUG, "%s: write too much data %d vs %d",
+		syslog(LOG_DEBUG, "%s: write too much data %ld vs %d",
 		    __func__, msg->ret, inl);
 		errno = EIO;
 		return (-1);

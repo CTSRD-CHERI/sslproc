@@ -105,17 +105,13 @@ namespace Message {
 
 	struct Result : public Header {
 		int	request;	/* SSLPROC_* */
-		int	ret;
+		int	error;		/* SSL_ERROR_* */
+		long	ret;
 		char	body[];
 
 		size_t bodyLength() const
 		{
 			return (length - sizeof(Result));
 		}
-	};
-
-	struct ErrorBody {
-		int	sslError;	/* SSL_ERROR_* */
-		long	error;		/* ERR_get_error() or errno */
 	};
 }

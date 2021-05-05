@@ -110,6 +110,9 @@ LibMessageSocket::waitForReply(int type)
 			const Message::Result *result =
 			    reinterpret_cast<const Message::Result *>(hdr);
 
+			if (result->error != SSL_ERROR_NONE)
+				setMessageError(result);
+
 			if (result->request == type)
 			    return (result);
 
@@ -126,34 +129,33 @@ LibMessageSocket::waitForReply(int type)
 }
 
 void
-setMessageError(const Message::Result *msg)
+LibMessageSocket::setMessageError(const Message::Result *msg)
 {
-	const Message::ErrorBody *body =
-	    reinterpret_cast<const Message::ErrorBody *>(msg->body);
+	long error;
 	char tmp[16], tmp2[16];
 
-	if (msg->bodyLength() != sizeof(*body)) {
+	if (msg->bodyLength() != sizeof(error)) {
 		PROCerr(PROC_F_SET_MESSAGE_ERROR, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%zu", msg->bodyLength());
 		ERR_add_error_data(2, "body length=", tmp);
 		return;
 	}
-	switch (body->sslError) {
+	error = *reinterpret_cast<const long *>(msg->body);
+	switch (msg->error) {
 	case SSL_ERROR_SSL:
-		ERR_PUT_error(ERR_GET_LIB(body->error),
-		    ERR_GET_FUNC(body->error), ERR_GET_REASON(body->error),
-		    "NA", 0);
+		ERR_PUT_error(ERR_GET_LIB(error), ERR_GET_FUNC(error),
+		    ERR_GET_REASON(error), "NA", 0);
 		break;
 	case SSL_ERROR_SYSCALL:
 		PROCerr(PROC_F_SET_MESSAGE_ERROR, ERR_R_MESSAGE_ERROR);
 		snprintf(tmp, sizeof(tmp), "%d", msg->type);
-		ERR_add_error_data(4, "type=", tmp, " ", strerror(body->error));
+		ERR_add_error_data(4, "type=", tmp, " ", strerror(error));
 		break;
 	default:
 		PROCerr(PROC_F_SET_MESSAGE_ERROR, ERR_R_MESSAGE_ERROR);
 		snprintf(tmp, sizeof(tmp), "%d", msg->type);
-		snprintf(tmp2, sizeof(tmp2), "%d", body->sslError);
-		ERR_add_error_data(4, "type=", tmp, " sslError=", tmp2);
+		snprintf(tmp2, sizeof(tmp2), "%d", msg->error);
+		ERR_add_error_data(4, "type=", tmp, " error=", tmp2);
 		break;
 	}
 }

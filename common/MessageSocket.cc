@@ -154,8 +154,8 @@ MessageSocket::writeMessage(int type, const void *payload, size_t payloadLen,
 }
 
 void
-MessageSocket::writeReplyMessage(int type, int ret, const void *payload,
-    size_t payloadLen)
+MessageSocket::writeReplyMessage(int type, long ret, int error,
+    const void *payload, size_t payloadLen)
 {
 	Message::Result result;
 	struct iovec iov[2];
@@ -164,6 +164,7 @@ MessageSocket::writeReplyMessage(int type, int ret, const void *payload,
 	result.type = SSLPROC_RESULT;
 	result.length = sizeof(result) + payloadLen;
 	result.request = type;
+	result.error = error;
 	result.ret = ret;
 	iov[0].iov_base = &result;
 	iov[0].iov_len = sizeof(result);
@@ -177,11 +178,20 @@ MessageSocket::writeReplyMessage(int type, int ret, const void *payload,
 }
 
 void
-MessageSocket::writeErrnoReply(int type, int ret, int error)
+MessageSocket::writeReplyMessage(int type, long ret, const void *payload,
+    size_t payloadLen)
 {
-	Message::ErrorBody body;
+	writeReplyMessage(type, ret, SSL_ERROR_NONE, payload, payloadLen);
+}
 
-	body.sslError = SSL_ERROR_SYSCALL;
-	body.error = error;
-	writeReplyMessage(type, ret, &body, sizeof(body));
+void
+MessageSocket::writeErrorReply(int type, long ret, int errorType, long error)
+{
+	writeReplyMessage(type, ret, errorType, &error, sizeof(error));
+}
+
+void
+MessageSocket::writeErrnoReply(int type, long ret, int error)
+{
+	writeErrorReply(type, ret, SSL_ERROR_SYSCALL, error);
 }

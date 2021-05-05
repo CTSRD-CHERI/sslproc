@@ -50,10 +50,8 @@ ControlSocket::createContext(const PSSL_METHOD *method)
 	const Message::Result *reply = waitForReply(SSLPROC_CREATE_CONTEXT);
 	if (reply == nullptr)
 		return (false);
-	if (reply->ret != 0) {
-		setMessageError(reply);
+	if (reply->ret != 0)
 		return (false);
-	}
 	return (true);
 }
 

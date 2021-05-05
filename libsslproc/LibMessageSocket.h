@@ -46,7 +46,8 @@ private:
 	virtual void observeReadError(enum ReadError error,
 	    const Message::Header *hdr);
 	virtual void observeWriteError();
+	void setMessageError(const Message::Result *msg);
+
 	MessageBuffer replyBuffer;
 };
 
-void	setMessageError(const Message::Result *msg);

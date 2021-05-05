@@ -38,5 +38,5 @@
 class ProcMessageSocket : public MessageSocket {
 protected:
 	ProcMessageSocket(int fd) : MessageSocket(fd) {}
-	void writeSSLErrorReply(int type, int ret, int error);
+	void writeSSLErrorReply(int type, long ret, int errorType);
 };
