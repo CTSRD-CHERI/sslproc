@@ -112,7 +112,7 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 }
 
 bool
-MessageSocket::writeMessage(struct iovec *iov, int iovCnt, void *control,
+MessageSocket::writeMessage(struct iovec *iov, int iovCnt, const void *control,
     size_t controlLen)
 {
 	struct msghdr msg;
@@ -121,7 +121,7 @@ MessageSocket::writeMessage(struct iovec *iov, int iovCnt, void *control,
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_iov = iov;
 	msg.msg_iovlen = iovCnt;
-	msg.msg_control = control;
+	msg.msg_control = const_cast<void *>(control);
 	msg.msg_controllen = controlLen;
 	msg.msg_flags = 0;
 	nwritten = sendmsg(fd, &msg, 0);
@@ -133,8 +133,8 @@ MessageSocket::writeMessage(struct iovec *iov, int iovCnt, void *control,
 }
 
 bool
-MessageSocket::writeMessage(int type, void *payload, size_t payloadLen,
-    void *control, size_t controlLen)
+MessageSocket::writeMessage(int type, const void *payload, size_t payloadLen,
+    const void *control, size_t controlLen)
 {
 	Message::Header hdr;
 	struct iovec iov[2];
@@ -144,7 +144,7 @@ MessageSocket::writeMessage(int type, void *payload, size_t payloadLen,
 	hdr.length = sizeof(hdr) + payloadLen;
 	iov[0].iov_base = &hdr;
 	iov[0].iov_len = sizeof(hdr);
-	iov[1].iov_base = payload;
+	iov[1].iov_base = const_cast<void *>(payload);
 	iov[1].iov_len = payloadLen;
 	if (payload == nullptr)
 		cnt = 1;
@@ -154,7 +154,7 @@ MessageSocket::writeMessage(int type, void *payload, size_t payloadLen,
 }
 
 void
-MessageSocket::writeReplyMessage(int type, int ret, void *payload,
+MessageSocket::writeReplyMessage(int type, int ret, const void *payload,
     size_t payloadLen)
 {
 	Message::Result result;
@@ -167,7 +167,7 @@ MessageSocket::writeReplyMessage(int type, int ret, void *payload,
 	result.ret = ret;
 	iov[0].iov_base = &result;
 	iov[0].iov_len = sizeof(result);
-	iov[1].iov_base = payload;
+	iov[1].iov_base = const_cast<void *>(payload);
 	iov[1].iov_len = payloadLen;
 	if (payload == nullptr)
 		cnt = 1;

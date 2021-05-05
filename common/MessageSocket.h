@@ -51,10 +51,10 @@ protected:
 
 	MessageSocket(int _fd) : fd(_fd) {};
 	int readMessage(MessageBuffer &);
-	bool writeMessage(int type, void *payload = nullptr,
-	    size_t payloadLen = 0, void *control = nullptr,
+	bool writeMessage(int type, const void *payload = nullptr,
+	    size_t payloadLen = 0, const void *control = nullptr,
 	    size_t controlLen = 0);
-	void writeReplyMessage(int type, int ret, void *payload = nullptr,
+	void writeReplyMessage(int type, int ret, const void *payload = nullptr,
 	    size_t payloadLen = 0);
 	void writeErrnoReply(int type, int ret, int error);
 	virtual void observeReadError(enum ReadError error,
@@ -62,7 +62,7 @@ protected:
 	virtual void observeWriteError() = 0;
 private:
 	bool writeMessage(struct iovec *iov, int iovCnt,
-	    void *control, size_t controlLen);
+	    const void *control, size_t controlLen);
 
 	int fd;
 };
