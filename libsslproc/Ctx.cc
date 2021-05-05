@@ -54,8 +54,11 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 
 	int fds[2];
 	if (socketpair(PF_LOCAL, SOCK_DGRAM, 0, fds) == -1) {
+		int save_error = errno;
+
 		free(ctx);
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "socketpair: ", strerror(save_error));
 		return (nullptr);
 	}
 
@@ -65,10 +68,13 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	 */
 	pid_t pid = vfork();
 	if (pid == -1) {
+		int save_error = errno;
+
 		close(fds[0]);
 		close(fds[1]);
 		free(ctx);
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "vfork: ", strerror(save_error));
 		return (nullptr);
 	}
 

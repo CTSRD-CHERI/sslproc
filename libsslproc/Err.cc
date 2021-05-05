@@ -43,10 +43,12 @@ static ERR_STRING_DATA PROC_strings[] = {
 	{ERR_PACK(0, PROC_F_READ_MESSAGE, 0), "MessageSocket::readMessage"},
 	{ERR_PACK(0, PROC_F_WRITE_MESSAGE, 0), "MessageSocket::writeMessage"},
 	{ERR_PACK(0, PROC_F_RECVMSG, 0), "recvmsg"},
+	{ERR_PACK(0, PROC_F_SET_MESSAGE_ERROR, 0), "setMessageError"},
 	{ERR_PACK(0, 0, ERR_R_IO_ERROR), "I/O error"},
 	{ERR_PACK(0, 0, ERR_R_BAD_MESSAGE), "invalid message"},
 	{ERR_PACK(0, 0, ERR_R_UNEXPECTED_EOF), "unexpected EOF"},
 	{ERR_PACK(0, 0, ERR_R_MISMATCHED_REPLY), "mismatched reply"},
+	{ERR_PACK(0, 0, ERR_R_MESSAGE_ERROR), "message error"},
 	{0, nullptr},
 };
 

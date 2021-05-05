@@ -107,6 +107,11 @@ namespace Message {
 		int	request;	/* SSLPROC_* */
 		int	ret;
 		char	body[];
+
+		size_t bodyLength() const
+		{
+			return (length - sizeof(Result));
+		}
 	};
 
 	struct ErrorBody {
