@@ -147,6 +147,45 @@ test_ctx_options(void)
 	PASS();
 }
 
+static void
+test_proto_versions(void)
+{
+	SSL_CTX *ctx;
+	int version;
+
+	ctx = SSL_CTX_new(TLS_method());
+	if (ctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create context");
+	}
+
+	version = SSL_CTX_get_min_proto_version(ctx);
+	dprintf("initial min version: %d\n", version);
+
+	version = SSL_CTX_get_max_proto_version(ctx);
+	dprintf("initial min version: %d\n", version);
+
+	if (SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION) != 1) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to set min version");
+	}
+
+	if (SSL_CTX_get_min_proto_version(ctx) != TLS1_2_VERSION)
+		FAIL("min version after set did not match");
+
+	if (SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION) != 1) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to set min version");
+	}
+
+	if (SSL_CTX_get_max_proto_version(ctx) != TLS1_3_VERSION)
+		FAIL("min version after set did not match");
+
+	SSL_CTX_free(ctx);
+
+	PASS();
+}
+
 int
 main(int ac, char **av)
 {
@@ -164,6 +203,7 @@ main(int ac, char **av)
 	test_ctx_create();
 	test_ctx_refs();
 	test_ctx_options();
+	test_proto_versions();
 
 	return (0);
 }

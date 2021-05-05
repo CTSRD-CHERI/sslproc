@@ -91,6 +91,20 @@ ControlSocket::getContextOptions()
 	return (*reinterpret_cast<const long *>(reply->body));
 }
 
+long
+ControlSocket::contextControl(int cmd, long larg)
+{
+	Message::CtrlBody body;
+
+	body.cmd = cmd;
+	body.larg = larg;
+	writeMessage(SSLPROC_CTX_CTRL, &body, sizeof(body));
+	const Message::Result *reply = waitForReply(SSLPROC_CTX_CTRL);
+	if (reply == nullptr)
+		abort();
+	return (reply->ret);
+}
+
 bool
 ControlSocket::handleMessage(const Message::Header *hdr)
 {

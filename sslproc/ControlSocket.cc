@@ -135,6 +135,31 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
 		break;
 	}
+	case SSLPROC_CTX_CTRL:
+	{
+		if (hdr->length != sizeof(Message::Ctrl)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		const Message::Ctrl *msg =
+		    reinterpret_cast<const Message::Ctrl *>(hdr);
+		long ret;
+
+		switch (msg->cmd) {
+		case SSL_CTRL_SET_MIN_PROTO_VERSION:
+		case SSL_CTRL_SET_MAX_PROTO_VERSION:
+		case SSL_CTRL_GET_MIN_PROTO_VERSION:
+		case SSL_CTRL_GET_MAX_PROTO_VERSION:
+			ret = SSL_CTX_ctrl(ctx, msg->cmd, msg->larg, nullptr);
+			writeReplyMessage(hdr->type, ret);
+			break;
+		default:
+			writeErrnoReply(hdr->type, -1, EOPNOTSUPP);
+			break;
+		}
+		break;
+	}
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||

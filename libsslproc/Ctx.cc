@@ -36,6 +36,7 @@
 #include <unistd.h>
 
 #include <openssl/err.h>
+#include <openssl/ssl.h>
 
 #include "sslproc.h"
 #include "sslproc_internal.h"
@@ -142,4 +143,18 @@ long
 PSSL_CTX_get_options(PSSL_CTX *ctx)
 {
 	return (ctx->cs->getContextOptions());
+}
+
+long
+PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
+{
+	switch (cmd) {
+	case SSL_CTRL_SET_MIN_PROTO_VERSION:
+	case SSL_CTRL_SET_MAX_PROTO_VERSION:
+	case SSL_CTRL_GET_MIN_PROTO_VERSION:
+	case SSL_CTRL_GET_MAX_PROTO_VERSION:
+		return (ctx->cs->contextControl(cmd, larg));
+	default:
+		abort();
+	}
 }

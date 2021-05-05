@@ -44,6 +44,7 @@ public:
 	long setContextOptions(long options);
 	long clearContextOptions(long options);
 	long getContextOptions();
+	long contextControl(int cmd, long larg);
 private:
 	bool handleMessage(const Message::Header *hdr);
 

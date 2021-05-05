@@ -57,6 +57,7 @@ void PSSL_CTX_free(PSSL_CTX *ctx);
 long PSSL_CTX_set_options(PSSL_CTX *ctx, long options);
 long PSSL_CTX_clear_options(PSSL_CTX *ctx, long options);
 long PSSL_CTX_get_options(PSSL_CTX *ctx);
+long PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg);
 
 /* SSL */
 

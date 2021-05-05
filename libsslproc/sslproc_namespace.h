@@ -46,5 +46,6 @@
 #define	SSL_CTX_set_options	PSSL_CTX_set_options
 #define	SSL_CTX_clear_options	PSSL_CTX_clear_options
 #define	SSL_CTX_get_options	PSSL_CTX_get_options
+#define	SSL_CTX_ctrl		PSSL_CTX_ctrl
 
 /* SSL */

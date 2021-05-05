@@ -65,6 +65,16 @@ namespace Message {
 
 #define	SSLPROC_CTX_GET_OPTIONS		5
 
+#define	SSLPROC_CTX_CTRL		6
+
+	struct CtrlBody {
+		int	cmd;
+		long	larg;
+		/* TODO: Nothing that supports parg yet. */
+	};
+
+	struct Ctrl : public Header, CtrlBody {};
+
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
 

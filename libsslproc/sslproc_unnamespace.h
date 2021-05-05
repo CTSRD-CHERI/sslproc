@@ -46,5 +46,6 @@
 #undef SSL_CTX_set_options
 #undef SSL_CTX_clear_options
 #undef SSL_CTX_get_options
+#undef SSL_CTX_ctrl
 
 /* SSL */
