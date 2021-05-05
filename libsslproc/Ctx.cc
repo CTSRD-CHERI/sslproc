@@ -53,10 +53,18 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 		return (nullptr);
 	}
 
+	if (CRYPTO_new_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx, &ctx->ex_data) !=
+	    1) {
+		free(ctx);
+		return (nullptr);
+	}
+
 	int fds[2];
 	if (socketpair(PF_LOCAL, SOCK_DGRAM, 0, fds) == -1) {
 		int save_error = errno;
 
+		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
+		    &ctx->ex_data);
 		free(ctx);
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
 		ERR_add_error_data(2, "socketpair: ", strerror(save_error));
@@ -73,6 +81,8 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 
 		close(fds[0]);
 		close(fds[1]);
+		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
+		    &ctx->ex_data);
 		free(ctx);
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
 		ERR_add_error_data(2, "vfork: ", strerror(save_error));
@@ -93,6 +103,8 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	ctx->cs = new ControlSocket(fds[0]);
 	if (!ctx->cs->init() || !ctx->cs->createContext(method)) {
 		delete ctx->cs;
+		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
+		    &ctx->ex_data);
 		free(ctx);
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
 		return (nullptr);
@@ -124,6 +136,7 @@ PSSL_CTX_free(PSSL_CTX *ctx)
 		return;
 
 	delete ctx->cs;
+	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx, &ctx->ex_data);
 	free(ctx);
 }
 
@@ -157,4 +170,16 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 	default:
 		abort();
 	}
+}
+
+int
+PSSL_CTX_set_ex_data(PSSL_CTX *ctx, int idx, void *data)
+{
+	return (CRYPTO_set_ex_data(&ctx->ex_data, idx, data));
+}
+
+void *
+PSSL_CTX_get_ex_data(const PSSL_CTX *ctx, int idx)
+{
+	return (CRYPTO_get_ex_data(&ctx->ex_data, idx));
 }

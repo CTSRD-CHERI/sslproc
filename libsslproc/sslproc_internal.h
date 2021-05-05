@@ -35,6 +35,7 @@
 #include <sys/cdefs.h>
 #include <atomic>
 
+#include <openssl/crypto.h>
 #include <openssl/err.h>
 
 __BEGIN_DECLS
@@ -75,6 +76,7 @@ class ControlSocket;
 
 struct _PSSL_CTX {
 	ControlSocket *cs;
+	CRYPTO_EX_DATA ex_data;
 	std::atomic_int refs;
 };
 

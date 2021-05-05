@@ -148,7 +148,7 @@ test_ctx_options(void)
 }
 
 static void
-test_proto_versions(void)
+test_ctx_proto_versions(void)
 {
 	SSL_CTX *ctx;
 	int version;
@@ -186,6 +186,30 @@ test_proto_versions(void)
 	PASS();
 }
 
+static void
+test_ctx_app_data(void)
+{
+	SSL_CTX *ctx;
+
+	ctx = SSL_CTX_new(TLS_method());
+	if (ctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create context");
+	}
+
+	if (SSL_CTX_set_app_data(ctx, (void *)(uintptr_t)0xdeadbeef) != 1) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to set app data");
+	}
+
+	if (SSL_CTX_get_app_data(ctx) != (void *)(uintptr_t)0xdeadbeef)
+		FAIL("returned app data did not match");
+
+	SSL_CTX_free(ctx);
+
+	PASS();
+}
+
 int
 main(int ac, char **av)
 {
@@ -203,7 +227,8 @@ main(int ac, char **av)
 	test_ctx_create();
 	test_ctx_refs();
 	test_ctx_options();
-	test_proto_versions();
+	test_ctx_proto_versions();
+	test_ctx_app_data();
 
 	return (0);
 }

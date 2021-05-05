@@ -58,6 +58,8 @@ long PSSL_CTX_set_options(PSSL_CTX *ctx, long options);
 long PSSL_CTX_clear_options(PSSL_CTX *ctx, long options);
 long PSSL_CTX_get_options(PSSL_CTX *ctx);
 long PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg);
+int PSSL_CTX_set_ex_data(PSSL_CTX *ctx, int idx, void *data);
+void *PSSL_CTX_get_ex_data(const PSSL_CTX *ctx, int idx);
 
 /* SSL */
 
