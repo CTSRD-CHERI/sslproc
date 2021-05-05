@@ -110,7 +110,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
-		if (sslCtx != nullptr) {
+		if (sslCtx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
 		}
@@ -128,7 +128,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 	}
 	case SSLPROC_CTX_GET_OPTIONS:
 	{
-		if (sslCtx != nullptr) {
+		if (sslCtx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
 		}
