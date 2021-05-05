@@ -43,7 +43,7 @@ public:
 	SSLSession(KQueue *kq, int _fd) : ProcMessageSocket(_fd),
 	    readEvent(kq, _fd, EVFILT_READ, this), fd(_fd) {}
 	~SSLSession();
-	bool init();
+	bool init(SSL_CTX *ctx);
 	virtual void onEvent(const struct kevent *);
 	int rawRead(char *out, int outl);
 	int rawWrite(const char *in, int inl);

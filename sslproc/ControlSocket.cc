@@ -43,8 +43,6 @@
 #include "ControlSocket.h"
 #include "SSLSession.h"
 
-SSL_CTX *sslCtx;
-
 bool
 ControlSocket::init()
 {
@@ -72,7 +70,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
-		if (sslCtx != nullptr) {
+		if (ctx != nullptr) {
 			writeErrnoReply(hdr->type, -1, EBUSY);
 			break;
 		}
@@ -96,8 +94,8 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			break;
 		}
 
-		sslCtx = SSL_CTX_new(method);
-		if (sslCtx == NULL)
+		ctx = SSL_CTX_new(method);
+		if (ctx == NULL)
 			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
 		else
 			writeReplyMessage(hdr->type, 0);
@@ -110,7 +108,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
-		if (sslCtx == nullptr) {
+		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
 		}
@@ -120,20 +118,20 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		long options;
 
 		if (hdr->type == SSLPROC_CTX_SET_OPTIONS)
-			options = SSL_CTX_set_options(sslCtx, msg->options);
+			options = SSL_CTX_set_options(ctx, msg->options);
 		else
-			options = SSL_CTX_clear_options(sslCtx, msg->options);
+			options = SSL_CTX_clear_options(ctx, msg->options);
 		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
 		break;
 	}
 	case SSLPROC_CTX_GET_OPTIONS:
 	{
-		if (sslCtx == nullptr) {
+		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
 		}
 
-		long options = SSL_CTX_get_options(sslCtx);
+		long options = SSL_CTX_get_options(ctx);
 		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
 		break;
 	}
@@ -150,7 +148,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 
 		fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
 		SSLSession *ss = new SSLSession(kq, fds[0]);
-		if (!ss->init()) {
+		if (!ss->init(ctx)) {
 			syslog(LOG_WARNING, "failed to init SSL sesssion");
 			delete ss;
 			writeErrnoReply(hdr->type, -1, ENXIO);

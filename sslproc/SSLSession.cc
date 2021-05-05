@@ -46,7 +46,7 @@
 static BIO_METHOD *rawBioMethod;
 
 bool
-SSLSession::init()
+SSLSession::init(SSL_CTX *ctx)
 {
 	if (!inputBuffer.grow(64) || !replyBuffer.grow(64))
 		return (false);
@@ -56,7 +56,7 @@ SSLSession::init()
 		return (false);
 	BIO_set_data(bio, this);
 
-	ssl = SSL_new(sslCtx);
+	ssl = SSL_new(ctx);
 	if (ssl == nullptr) {
 		BIO_free(bio);
 		return (false);

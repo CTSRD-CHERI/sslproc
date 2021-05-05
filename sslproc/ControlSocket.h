@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include <openssl/ssl.h>
+
 #include "KEvent.h"
 #include "MessageBuffer.h"
 #include "ProcMessageSocket.h"
@@ -48,6 +50,8 @@ private:
 	virtual void observeWriteError();
 	void handleMessage(const Message::Header *hdr,
 	    const struct cmsghdr *cmsg);
+
+	SSL_CTX *ctx = nullptr;
 
 	KQueue *kq;
 	KEvent readEvent;

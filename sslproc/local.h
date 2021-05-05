@@ -32,8 +32,4 @@
 
 #pragma once
 
-#include <openssl/ssl.h>
-
-extern SSL_CTX *sslCtx;
-
 bool	initOpenSSL();
