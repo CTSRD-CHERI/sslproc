@@ -86,15 +86,17 @@ LibMessageSocket::observeWriteError()
 }
 
 const Message::Result *
-LibMessageSocket::waitForReply(int type)
+LibMessageSocket::waitForReply(int type, const void *payload,
+    size_t payloadLen, const void *control, size_t controlLen)
 {
 	const Message::Header *hdr;
 	int rc;
 
+	if (ERR_peek_error() != 0)
+		return (nullptr);
+	if (!writeMessage(type, payload, payloadLen, control, controlLen))
+		return (nullptr);
 	for (;;) {
-		if (ERR_peek_error() != 0)
-			return (nullptr);
-
 		rc = readMessage(replyBuffer);
 
 		if (rc == 0) {

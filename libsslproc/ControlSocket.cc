@@ -45,9 +45,8 @@ ControlSocket::~ControlSocket()
 bool
 ControlSocket::createContext(const PSSL_METHOD *method)
 {
-	writeMessage(SSLPROC_CREATE_CONTEXT, &method->method,
-	    sizeof(method->method));
-	const Message::Result *reply = waitForReply(SSLPROC_CREATE_CONTEXT);
+	const Message::Result *reply = waitForReply(SSLPROC_CREATE_CONTEXT,
+	    &method->method, sizeof(method->method));
 	if (reply == nullptr)
 		return (false);
 	if (reply->ret != 0)
@@ -58,8 +57,8 @@ ControlSocket::createContext(const PSSL_METHOD *method)
 long
 ControlSocket::setContextOptions(long options)
 {
-	writeMessage(SSLPROC_CTX_SET_OPTIONS, &options, sizeof(options));
-	const Message::Result *reply = waitForReply(SSLPROC_CTX_SET_OPTIONS);
+	const Message::Result *reply = waitForReply(SSLPROC_CTX_SET_OPTIONS,
+	    &options, sizeof(options));
 	if (reply == nullptr)
 		abort();
 	if (reply->ret != 0)
@@ -70,8 +69,8 @@ ControlSocket::setContextOptions(long options)
 long
 ControlSocket::clearContextOptions(long options)
 {
-	writeMessage(SSLPROC_CTX_CLEAR_OPTIONS, &options, sizeof(options));
-	const Message::Result *reply = waitForReply(SSLPROC_CTX_CLEAR_OPTIONS);
+	const Message::Result *reply = waitForReply(SSLPROC_CTX_CLEAR_OPTIONS,
+	    &options, sizeof(options));
 	if (reply == nullptr)
 		abort();
 	if (reply->ret != 0)
@@ -82,7 +81,6 @@ ControlSocket::clearContextOptions(long options)
 long
 ControlSocket::getContextOptions()
 {
-	writeMessage(SSLPROC_CTX_GET_OPTIONS);
 	const Message::Result *reply = waitForReply(SSLPROC_CTX_GET_OPTIONS);
 	if (reply == nullptr)
 		abort();
@@ -98,8 +96,8 @@ ControlSocket::contextControl(int cmd, long larg)
 
 	body.cmd = cmd;
 	body.larg = larg;
-	writeMessage(SSLPROC_CTX_CTRL, &body, sizeof(body));
-	const Message::Result *reply = waitForReply(SSLPROC_CTX_CTRL);
+	const Message::Result *reply = waitForReply(SSLPROC_CTX_CTRL, &body,
+	    sizeof(body));
 	if (reply == nullptr)
 		abort();
 	return (reply->ret);
