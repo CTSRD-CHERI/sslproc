@@ -60,7 +60,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	}
 
 	int fds[2];
-	if (socketpair(PF_LOCAL, SOCK_DGRAM, 0, fds) == -1) {
+	if (socketpair(PF_LOCAL, SOCK_SEQPACKET, 0, fds) == -1) {
 		int save_error = errno;
 
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
