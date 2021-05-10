@@ -50,6 +50,7 @@
  * sockets are defined in Messages.h.
  */
 
+#include <capsicum_helpers.h>
 #include <syslog.h>
 
 #include "local.h"
@@ -59,7 +60,7 @@
 int
 main(int ac, char **av)
 {
-	openlog("sslproc", LOG_PID, LOG_DAEMON);
+	openlog("sslproc", LOG_PID | LOG_NDELAY, LOG_DAEMON);
 
 	KQueue kq;
 	if (!kq.init())
@@ -67,6 +68,23 @@ main(int ac, char **av)
 
 	if (!initOpenSSL()) {
 		syslog(LOG_ERR, "failed to initialize OpenSSL");
+		return (1);
+	}
+
+	if (caph_limit_stdio() < 0) {
+		syslog(LOG_ERR, "failed to restrict stdio: %m");
+		return (1);
+	}
+
+	cap_rights_t rights;
+	cap_rights_init(&rights, CAP_EVENT, CAP_READ, CAP_WRITE);
+	if (caph_rights_limit(3, &rights) < 0) {
+		syslog(LOG_ERR, "failed to restrict control socket: %m");
+		return (false);
+	}
+
+	if (caph_enter() < 0) {
+		syslog(LOG_ERR, "failed to enter capability mode: %m");
 		return (1);
 	}
 

@@ -31,6 +31,7 @@
  */
 
 #include <assert.h>
+#include <capsicum_helpers.h>
 #include <errno.h>
 #include <syslog.h>
 
@@ -172,6 +173,18 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		}
 
 		fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
+
+		cap_rights_t rights;
+		cap_rights_init(&rights, CAP_EVENT, CAP_READ, CAP_WRITE);
+		if (caph_rights_limit(fds[0], &rights) < 0) {
+			int error = errno;
+			close(fds[0]);
+			syslog(LOG_WARNING,
+			    "failed to restrict session socket: %m");
+			writeErrnoReply(hdr->type, -1, error);
+			break;
+		}
+
 		SSLSession *ss = new SSLSession(kq, fds[0]);
 		if (!ss->init(ctx)) {
 			syslog(LOG_WARNING, "failed to init SSL sesssion");

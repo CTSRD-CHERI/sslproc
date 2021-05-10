@@ -31,6 +31,7 @@
  */
 
 #include <sys/event.h>
+#include <capsicum_helpers.h>
 #include <stdlib.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -50,6 +51,14 @@ KQueue::init()
 		syslog(LOG_ERR, "failed to create kqueue: %m");
 		return (false);
 	}
+
+	cap_rights_t rights;
+	cap_rights_init(&rights, CAP_KQUEUE);
+	if (caph_rights_limit(fd, &rights) < 0) {
+		syslog(LOG_ERR, "failed to restrict kqueue: %m");
+		return (false);
+	}
+
 	return (true);
 }
 
