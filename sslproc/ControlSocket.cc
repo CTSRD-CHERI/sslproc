@@ -152,6 +152,8 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		case SSL_CTRL_SET_MAX_PROTO_VERSION:
 		case SSL_CTRL_GET_MIN_PROTO_VERSION:
 		case SSL_CTRL_GET_MAX_PROTO_VERSION:
+		case SSL_CTRL_MODE:
+		case SSL_CTRL_CLEAR_MODE:
 			ret = SSL_CTX_ctrl(ctx, msg->cmd, msg->larg, nullptr);
 			writeReplyMessage(hdr->type, ret);
 			break;

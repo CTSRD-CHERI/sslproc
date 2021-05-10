@@ -166,6 +166,8 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 	case SSL_CTRL_SET_MAX_PROTO_VERSION:
 	case SSL_CTRL_GET_MIN_PROTO_VERSION:
 	case SSL_CTRL_GET_MAX_PROTO_VERSION:
+	case SSL_CTRL_MODE:
+	case SSL_CTRL_CLEAR_MODE:
 		return (ctx->cs->contextControl(cmd, larg));
 	default:
 		abort();

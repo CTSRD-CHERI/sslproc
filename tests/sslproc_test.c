@@ -210,6 +210,47 @@ test_ctx_app_data(void)
 	PASS();
 }
 
+static void
+test_ctx_mode(void)
+{
+	SSL_CTX *ctx;
+	long mode, new;
+
+	ctx = SSL_CTX_new(TLS_method());
+	if (ctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create context");
+	}
+
+	mode = SSL_CTX_get_mode(ctx);
+	dprintf("initial mode: %#lx\n", mode);
+
+	new = SSL_CTX_set_mode(ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
+	dprintf("mode after set: %#lx\n", new);
+
+	if (SSL_CTX_get_mode(ctx) != new) {
+		SSL_CTX_free(ctx);
+		FAIL("failed to get updated mode after set");
+	}
+
+	new = SSL_CTX_clear_mode(ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
+	dprintf("mode after clear: %#lx\n", new);
+
+	if (SSL_CTX_get_mode(ctx) != new) {
+		SSL_CTX_free(ctx);
+		FAIL("failed to get updated mode after clear");
+	}
+
+	if (new != mode) {
+		SSL_CTX_free(ctx);
+		FAIL("final mode doesn't match initial mode\n");
+	}
+
+	SSL_CTX_free(ctx);
+
+	PASS();
+}
+
 int
 main(int ac, char **av)
 {
@@ -229,6 +270,7 @@ main(int ac, char **av)
 	test_ctx_options();
 	test_ctx_proto_versions();
 	test_ctx_app_data();
+	test_ctx_mode();
 
 	return (0);
 }
