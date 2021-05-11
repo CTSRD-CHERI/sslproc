@@ -176,7 +176,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			    SSL_get_error(ssl, ret));
 		break;
 	default:
-		syslog(LOG_WARNING, "unknown app request %d", hdr->type);
+		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);
 	}
 
