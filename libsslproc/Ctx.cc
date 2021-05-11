@@ -55,7 +55,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 
 	if (CRYPTO_new_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx, &ctx->ex_data) !=
 	    1) {
-		free(ctx);
+		delete ctx;
 		return (nullptr);
 	}
 
@@ -65,7 +65,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
 		    &ctx->ex_data);
-		free(ctx);
+		delete ctx;
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
 		ERR_add_error_data(2, "socketpair: ", strerror(save_error));
 		return (nullptr);
@@ -83,7 +83,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 		close(fds[1]);
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
 		    &ctx->ex_data);
-		free(ctx);
+		delete ctx;
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
 		ERR_add_error_data(2, "vfork: ", strerror(save_error));
 		return (nullptr);
@@ -105,7 +105,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 		delete ctx->cs;
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
 		    &ctx->ex_data);
-		free(ctx);
+		delete ctx;
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
 		return (nullptr);
 	}
@@ -137,7 +137,7 @@ PSSL_CTX_free(PSSL_CTX *ctx)
 
 	delete ctx->cs;
 	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx, &ctx->ex_data);
-	free(ctx);
+	delete ctx;
 }
 
 long
