@@ -78,12 +78,11 @@ namespace Message {
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
 
-/* Per-session messages from client -> sslproc over the 'app' fd. */
+/* Per-session messages from client -> sslproc over the 'session' fd. */
 
 /*
  * The result of these messages return the return value of the
- * associated SSL_* function in 'ret'.  If 'ret' indicates failure,
- * the return value of SSL_get_error() is appended as an int.
+ * associated SSL_* function in 'ret'.
  */
 #define	SSLPROC_CONNECT		0x40
 #define	SSLPROC_ACCEPT		0x42
@@ -95,21 +94,27 @@ namespace Message {
 		int	resid;		/* Max amount of data requested. */
 	};
 
+/*
+ * The payload of this message is the data to write.  The length is
+ * implicit from the length of the payload.
+ */
 #define	SSLPROC_WRITE		0x45
 
-/* Per-session messages from sslproc -> client over the 'raw' fd. */
+/* Per-session messages from sslproc -> client over the 'session' fd. */
 
 /*
  * The result of these messages return the number of bytes
- * transferred in 'ret'.  If an error occurs, 'ret' is set to -1, and
- * the 'errno' value is returned as 'data' as an int.
+ * transferred in 'ret'.
  */
 #define	SSLPROC_READ_RAW	0x80
 #define	SSLPROC_WRITE_RAW	0x81
 
 /*
  * The receiver always returns a Result message to the sender at the
- * completion of each operation.
+ * completion of each operation.  'error' is set to SSL_ERROR_NONE on
+ * success, or another value for an error.  For results with an error,
+ * the body contains a single long with a more specific error value
+ * (errno for SSL_ERROR_SYSTEM, ERR_get_error() value for SSL_ERROR_SSL).
  */
 #define	SSLPROC_RESULT		0x100
 
