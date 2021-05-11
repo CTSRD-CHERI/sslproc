@@ -40,6 +40,16 @@ namespace Message {
 	struct Header {
 		int	type;
 		int	length;
+
+		size_t bodyLength() const
+		{
+			return (length - sizeof(Header));
+		}
+
+		const void *body() const
+		{
+			return (reinterpret_cast<const void *>(this + 1));
+		}
 	};
 
 /* Global messages from client -> sslproc over the 'control' socket. */
@@ -122,11 +132,15 @@ namespace Message {
 		int	request;	/* SSLPROC_* */
 		int	error;		/* SSL_ERROR_* */
 		long	ret;
-		char	body[];
 
 		size_t bodyLength() const
 		{
 			return (length - sizeof(Result));
+		}
+
+		const void *body() const
+		{
+			return (reinterpret_cast<const void *>(this + 1));
 		}
 	};
 }

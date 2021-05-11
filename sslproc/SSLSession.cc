@@ -166,7 +166,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			    hdr->length);
 			return (false);
 		}
-		ret = SSL_write(ssl, hdr + 1, hdr->length - sizeof(*hdr));
+		ret = SSL_write(ssl, hdr->body(), hdr->bodyLength());
 		if (ret > 0)
 			writeReplyMessage(hdr->type, ret);
 		else
@@ -278,7 +278,7 @@ SSLSession::rawRead(char *out, int outl)
 	}
 	if (msg->error != SSL_ERROR_NONE) {
 		if (msg->error == SSL_ERROR_SYSCALL)
-			errno = *reinterpret_cast<const long *>(msg->body);
+			errno = *reinterpret_cast<const long *>(msg->body());
 		else
 			errno = EIO;
 		return (-1);
@@ -298,7 +298,7 @@ SSLSession::rawRead(char *out, int outl)
 	}
 
 	/* Copy, ugh */
-	memcpy(out, msg->body, msg->ret);
+	memcpy(out, msg->body(), msg->ret);
 	return (msg->ret);
 }
 
@@ -340,7 +340,7 @@ SSLSession::rawWrite(const char *in, int inl)
 	}
 	if (msg->error != SSL_ERROR_NONE) {
 		if (msg->error == SSL_ERROR_SYSCALL)
-			errno = *reinterpret_cast<const long *>(msg->body);
+			errno = *reinterpret_cast<const long *>(msg->body());
 		else
 			errno = EIO;
 		return (-1);

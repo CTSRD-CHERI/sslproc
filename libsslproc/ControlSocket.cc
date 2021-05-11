@@ -63,7 +63,7 @@ ControlSocket::setContextOptions(long options)
 		abort();
 	if (reply->ret != 0)
 		abort();
-	return (*reinterpret_cast<const long *>(reply->body));
+	return (*reinterpret_cast<const long *>(reply->body()));
 }
 
 long
@@ -75,7 +75,7 @@ ControlSocket::clearContextOptions(long options)
 		abort();
 	if (reply->ret != 0)
 		abort();
-	return (*reinterpret_cast<const long *>(reply->body));
+	return (*reinterpret_cast<const long *>(reply->body()));
 }
 
 long
@@ -86,7 +86,7 @@ ControlSocket::getContextOptions()
 		abort();
 	if (reply->ret != 0)
 		abort();
-	return (*reinterpret_cast<const long *>(reply->body));
+	return (*reinterpret_cast<const long *>(reply->body()));
 }
 
 long

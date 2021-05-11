@@ -142,7 +142,7 @@ LibMessageSocket::setMessageError(const Message::Result *msg)
 		ERR_add_error_data(2, "body length=", tmp);
 		return;
 	}
-	error = *reinterpret_cast<const long *>(msg->body);
+	error = *reinterpret_cast<const long *>(msg->body());
 	switch (msg->error) {
 	case SSL_ERROR_SSL:
 		ERR_PUT_error(ERR_GET_LIB(error), ERR_GET_FUNC(error),
