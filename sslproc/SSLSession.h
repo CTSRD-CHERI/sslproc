@@ -45,8 +45,8 @@ public:
 	~SSLSession();
 	bool init(SSL_CTX *ctx);
 	virtual void onEvent(const struct kevent *);
-	int rawRead(char *out, int outl);
-	int rawWrite(const char *in, int inl);
+	const Message::Result *sendBioRequest(int type,
+	    const void *payload, size_t payloadLen);
 
 private:
 	bool handleMessage(const Message::Header *hdr);

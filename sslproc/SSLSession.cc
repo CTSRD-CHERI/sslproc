@@ -43,7 +43,7 @@
 #include "Messages.h"
 #include "SSLSession.h"
 
-static BIO_METHOD *rawBioMethod;
+static BIO_METHOD *readBioMethod, *writeBioMethod;
 
 bool
 SSLSession::init(SSL_CTX *ctx)
@@ -51,17 +51,25 @@ SSLSession::init(SSL_CTX *ctx)
 	if (!inputBuffer.grow(64) || !replyBuffer.grow(64))
 		return (false);
 
-	BIO *bio = BIO_new(rawBioMethod);
-	if (bio == nullptr)
+	BIO *rbio = BIO_new(readBioMethod);
+	if (rbio == nullptr)
 		return (false);
-	BIO_set_data(bio, this);
+	BIO_set_data(rbio, this);
+
+	BIO *wbio = BIO_new(writeBioMethod);
+	if (wbio == nullptr) {
+		BIO_free(rbio);
+		return (false);
+	}
+	BIO_set_data(wbio, this);
 
 	ssl = SSL_new(ctx);
 	if (ssl == nullptr) {
-		BIO_free(bio);
+		BIO_free(rbio);
+		BIO_free(wbio);
 		return (false);
 	}
-	SSL_set_bio(ssl, bio, bio);
+	SSL_set_bio(ssl, rbio, wbio);
 
 	/*
 	 * Since inputBuffer's pointer can move due to realloc()'s,
@@ -233,184 +241,224 @@ SSLSession::observeWriteError()
 	writeFailed = true;
 }
 
-int
-SSLSession::rawRead(char *out, int outl)
-{
-	const Message::Result *msg;
-	int rc, resid;
-
-	resid = outl;
-	if (!writeMessage(SSLPROC_READ_RAW, &resid, sizeof(resid))) {
-		syslog(LOG_DEBUG,
-		    "failed to send SSLPROC_READ_RAW request: %m");
-		errno = EIO;
-		return (-1);
-	}
-
-	rc = readMessage(replyBuffer);
-	if (rc == 0) {
-		syslog(LOG_DEBUG, "%s: EOF from session fd", __func__);
-		errno = EIO;
-		return (-1);
-	}
-	if (rc == -1) {
-		syslog(LOG_DEBUG, "%s: failed to read reply: %m", __func__);
-		errno = EIO;
-		return (-1);
-	}
-	msg = reinterpret_cast<const Message::Result *>(replyBuffer.hdr());
-	if (msg->type != SSLPROC_RESULT) {
-		syslog(LOG_DEBUG, "%s: unexpected reply message %d", __func__,
-		    msg->type);
-		errno = EIO;
-		return (-1);
-	}
-	if (msg->request != SSLPROC_READ_RAW) {
-		syslog(LOG_DEBUG, "%s: reply mismatch", __func__);
-		errno = EIO;
-		return (-1);
-	}
-	if (msg->error != SSL_ERROR_NONE) {
-		if (msg->error == SSL_ERROR_SYSCALL)
-			errno = *reinterpret_cast<const long *>(msg->body());
-		else
-			errno = EIO;
-		return (-1);
-	}
-
-	if (msg->ret < 0) {
-		syslog(LOG_DEBUG, "%s: invalid result %ld", __func__,
-		    msg->ret);
-		errno = EIO;
-		return (-1);
-	}
-	if (msg->ret > outl) {
-		syslog(LOG_DEBUG, "%s: returned too much data %ld vs %d",
-		    __func__, msg->ret, outl);
-		errno = EIO;
-		return (-1);
-	}
-
-	/* Copy, ugh */
-	memcpy(out, msg->body(), msg->ret);
-	return (msg->ret);
-}
-
-int
-SSLSession::rawWrite(const char *in, int inl)
+const Message::Result *
+SSLSession::sendBioRequest(int type, const void *payload, size_t payloadLen)
 {
 	const Message::Result *msg;
 	int rc;
 
-	if (!writeMessage(SSLPROC_WRITE_RAW, const_cast<char *>(in), inl)) {
-		syslog(LOG_DEBUG,
-		    "failed to send SSLPROC_WRITE_RAW request: %m");
-		errno = EIO;
-		return (-1);
+	if (!writeMessage(type, payload, payloadLen)) {
+		syslog(LOG_DEBUG, "%s: failed to send request %d: %m", __func__,
+		    type);
+		return (nullptr);
 	}
 
 	rc = readMessage(replyBuffer);
 	if (rc == 0) {
 		syslog(LOG_DEBUG, "%s: EOF from session fd", __func__);
-		errno = EIO;
-		return (-1);
+		return (nullptr);
 	}
 	if (rc == -1) {
 		syslog(LOG_DEBUG, "%s: failed to read reply: %m", __func__);
-		errno = EIO;
-		return (-1);
+		return (nullptr);
 	}
 	msg = reinterpret_cast<const Message::Result *>(replyBuffer.hdr());
 	if (msg->type != SSLPROC_RESULT) {
 		syslog(LOG_DEBUG, "%s: unexpected reply message %d", __func__,
 		    msg->type);
-		errno = EIO;
-		return (-1);
+		return (nullptr);
 	}
-	if (msg->request != SSLPROC_WRITE_RAW) {
+	if (msg->request != type) {
 		syslog(LOG_DEBUG, "%s: reply mismatch", __func__);
-		errno = EIO;
-		return (-1);
+		return (nullptr);
 	}
-	if (msg->error != SSL_ERROR_NONE) {
-		if (msg->error == SSL_ERROR_SYSCALL)
-			errno = *reinterpret_cast<const long *>(msg->body());
-		else
-			errno = EIO;
-		return (-1);
-	}
-
-	if (msg->ret < 0) {
-		syslog(LOG_DEBUG, "%s: invalid result %ld", __func__,
-		    msg->ret);
-		errno = EIO;
-		return (-1);
-	}
-	if (msg->ret > inl) {
-		syslog(LOG_DEBUG, "%s: write too much data %ld vs %d",
-		    __func__, msg->ret, inl);
-		errno = EIO;
-		return (-1);
-	}
-
-	return (msg->ret);
+	return (msg);
 }
 
+/*
+ * BIO flags to copy from the other end.
+ */
+#define	BIO_FLAGS_RETRY	(BIO_FLAGS_RWS | BIO_FLAGS_SHOULD_RETRY)
+
 static int
-rawBioRead(BIO *bio, char *out, int outl)
+readBioRead(BIO *bio, char *out, int outl)
 {
 	SSLSession *ss = reinterpret_cast<SSLSession *>(BIO_get_data(bio));
-	int ret;
+	const Message::Result *msg;
+	int resid;
 
 	if (out == nullptr || outl == 0)
 		return (0);
 
-	ret = ss->rawRead(out, outl);
-
 	BIO_clear_retry_flags(bio);
-	if (ret == 0)
+
+	resid = outl;
+	msg = ss->sendBioRequest(SSLPROC_BIO_READ, &resid, sizeof(resid));
+	if (msg == nullptr) {
+		/* XXX: Do we need to terminate the session? */
+		return (-1);
+	}
+	if (msg->ret == 0)
 		BIO_set_flags(bio, BIO_FLAGS_IN_EOF);
-	else if (ret == -1 && (errno == EAGAIN || errno == EINTR))
-		BIO_set_retry_read(bio);
-	return (ret);
+	else if (msg->ret == -1) {
+		int flags;
+
+		if (msg->bodyLength() == sizeof(flags)) {
+			flags = *reinterpret_cast<const int *>(msg->body());
+			BIO_set_flags(bio, flags & BIO_FLAGS_RETRY);
+		} else {
+			syslog(LOG_DEBUG, "%s: no flags in error reply", __func__);
+			/* XXX: Do we need to terminate the session? */
+		}
+	} else if (msg->ret > 0) {
+		if (msg->ret > outl) {
+			syslog(LOG_DEBUG,
+			    "%s: returned too much data %ld vs %d", __func__,
+			    msg->ret, outl);
+			return (-1);
+		}
+
+		if (msg->ret != msg->bodyLength()) {
+			syslog(LOG_DEBUG,
+			    "%s: body length mismatch %ld vs %zu", __func__,
+			    msg->ret, msg->bodyLength());
+			return (-1);
+		}
+
+		/* Copy, ugh */
+		memcpy(out, msg->body(), msg->ret);
+	}
+	return (msg->ret);
 }
 
 static int
-rawBioWrite(BIO *bio, const char *in, int inl)
+readBioWrite(BIO *bio, const char *in, int inl)
 {
-	SSLSession *ss = reinterpret_cast<SSLSession *>(BIO_get_data(bio));
-	int ret;
+	syslog(LOG_DEBUG, "%s should not be called", __func__);
+	return (-2);
+}
 
-	if (in == nullptr || inl == 0)
-		return (0);
-
-	ret = ss->rawWrite(in, inl);
-
-	BIO_clear_retry_flags(bio);
-	if (ret == 0)
-		BIO_set_flags(bio, BIO_FLAGS_IN_EOF);
-	else if (ret == -1 && (errno == EAGAIN || errno == EINTR))
-		BIO_set_retry_write(bio);
-	return (ret);
+static int
+readBioPuts(BIO *bio, const char *str)
+{
+	syslog(LOG_DEBUG, "%s should not be called", __func__);
+	return (-2);
 }
 
 static long
-rawBioCtrl(BIO *bio, int cmd, long num, void *ptr)
+readBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 {
+	SSLSession *ss = reinterpret_cast<SSLSession *>(BIO_get_data(bio));
+	Message::CtrlBody body;
+	const Message::Result *msg;
 	long ret;
 
 	switch (cmd) {
 	case BIO_CTRL_GET_CLOSE:
-		ret = (long)BIO_get_shutdown(bio);
-		break;
 	case BIO_CTRL_SET_CLOSE:
-		BIO_set_shutdown(bio, (int)num);
+		body.cmd = cmd;
+		body.larg = num;
+		msg = ss->sendBioRequest(SSLPROC_BIO_CTRL_READ, &body,
+		    sizeof(body));
+		if (msg == nullptr) {
+			syslog(LOG_DEBUG, "%s: failed to get a reply",
+			    __func__);
+
+			/* XXX: Only terminate session instead? */
+			abort();
+		}
+		ret = msg->ret;
 		break;
 	case BIO_CTRL_EOF:
 		ret = (BIO_get_flags(bio) & BIO_FLAGS_IN_EOF) ? 1 : 0;
 		break;
 	default:
-		syslog(LOG_DEBUG, "rawBioCtrl: cmd = %d, num = %ld", cmd, num);
+		syslog(LOG_DEBUG, "%s: cmd = %d, num = %ld", __func__, cmd,
+		    num);
+		ret = 0;
+	}
+	return (ret);
+}
+
+static int
+writeBioRead(BIO *bio, char *out, int outl)
+{
+	syslog(LOG_DEBUG, "%s should not be called", __func__);
+	return (-2);
+}
+
+static int
+writeBioWrite(BIO *bio, const char *in, int inl)
+{
+	SSLSession *ss = reinterpret_cast<SSLSession *>(BIO_get_data(bio));
+	const Message::Result *msg;
+
+	if (in == nullptr || inl == 0)
+		return (0);
+
+	BIO_clear_retry_flags(bio);
+
+	msg = ss->sendBioRequest(SSLPROC_BIO_WRITE, const_cast<char *>(in), inl);
+	if (msg == nullptr) {
+		/* XXX: Do we need to terminate the session? */
+		return (-1);
+	}
+	if (msg->ret == 0)
+		BIO_set_flags(bio, BIO_FLAGS_IN_EOF);
+	else if (msg->ret == -1) {
+		int flags;
+
+		if (msg->bodyLength() == sizeof(flags)) {
+			flags = *reinterpret_cast<const int *>(msg->body());
+			BIO_set_flags(bio, flags & BIO_FLAGS_RETRY);
+		} else {
+			syslog(LOG_DEBUG, "%s: no flags in error reply", __func__);
+			/* XXX: Do we need to terminate the session? */
+		}
+	} else if (msg->ret > inl) {
+		syslog(LOG_DEBUG, "%s: wrote too much data %ld vs %d",
+		    __func__, msg->ret, inl);
+		return (-1);
+	}
+	return (msg->ret);
+}
+
+static int
+writeBioPuts(BIO *bio, const char *str)
+{
+	return (writeBioWrite(bio, str, strlen(str)));
+}
+
+static long
+writeBioCtrl(BIO *bio, int cmd, long num, void *ptr)
+{
+	SSLSession *ss = reinterpret_cast<SSLSession *>(BIO_get_data(bio));
+	Message::CtrlBody body;
+	const Message::Result *msg;
+	long ret;
+
+	switch (cmd) {
+	case BIO_CTRL_GET_CLOSE:
+	case BIO_CTRL_SET_CLOSE:
+		body.cmd = cmd;
+		body.larg = num;
+		msg = ss->sendBioRequest(SSLPROC_BIO_CTRL_WRITE, &body,
+		    sizeof(body));
+		if (msg == nullptr) {
+			syslog(LOG_DEBUG, "%s: failed to get a reply",
+			    __func__);
+
+			/* XXX: Only terminate session instead? */
+			abort();
+		}
+		ret = msg->ret;
+		break;
+	case BIO_CTRL_EOF:
+		ret = (BIO_get_flags(bio) & BIO_FLAGS_IN_EOF) ? 1 : 0;
+		break;
+	default:
+		syslog(LOG_DEBUG, "%s: cmd = %d, num = %ld", __func__, cmd,
+		    num);
 		ret = 0;
 	}
 	return (ret);
@@ -420,12 +468,23 @@ bool
 initOpenSSL()
 {
 	OPENSSL_init_ssl(OPENSSL_INIT_ENGINE_ALL_BUILTIN, nullptr);
-	rawBioMethod = BIO_meth_new(BIO_get_new_index() | BIO_TYPE_SOURCE_SINK,
-		"sslproc raw");
-	if (rawBioMethod == nullptr)
+
+	readBioMethod = BIO_meth_new(BIO_get_new_index() | BIO_TYPE_SOURCE_SINK,
+		"sslproc read");
+	if (readBioMethod == nullptr)
 		return (false);
-	BIO_meth_set_read(rawBioMethod, rawBioRead);
-	BIO_meth_set_write(rawBioMethod, rawBioWrite);
-	BIO_meth_set_ctrl(rawBioMethod, rawBioCtrl);
+	BIO_meth_set_read(readBioMethod, readBioRead);
+	BIO_meth_set_write(readBioMethod, readBioWrite);
+	BIO_meth_set_puts(readBioMethod, readBioPuts);
+	BIO_meth_set_ctrl(readBioMethod, readBioCtrl);
+
+	writeBioMethod = BIO_meth_new(BIO_get_new_index() |
+	    BIO_TYPE_SOURCE_SINK, "sslproc write");
+	if (writeBioMethod == nullptr)
+		return (false);
+	BIO_meth_set_read(writeBioMethod, writeBioRead);
+	BIO_meth_set_write(writeBioMethod, writeBioWrite);
+	BIO_meth_set_puts(writeBioMethod, writeBioPuts);
+	BIO_meth_set_ctrl(writeBioMethod, writeBioCtrl);
 	return (true);
 }

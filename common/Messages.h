@@ -112,12 +112,10 @@ namespace Message {
 
 /* Per-session messages from sslproc -> client over the 'session' fd. */
 
-/*
- * The result of these messages return the number of bytes
- * transferred in 'ret'.
- */
-#define	SSLPROC_READ_RAW	0x80
-#define	SSLPROC_WRITE_RAW	0x81
+#define	SSLPROC_BIO_READ	0x80
+#define	SSLPROC_BIO_WRITE	0x81
+#define	SSLPROC_BIO_CTRL_READ	0x82
+#define	SSLPROC_BIO_CTRL_WRITE	0x83
 
 /*
  * The receiver always returns a Result message to the sender at the
