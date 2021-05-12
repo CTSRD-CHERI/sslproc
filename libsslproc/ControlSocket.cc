@@ -114,6 +114,22 @@ ControlSocket::useCertificate(const void *buf, int len)
 }
 
 bool
+ControlSocket::usePrivateKey(int type, const void *buf, int len)
+{
+	struct iovec iov[2];
+
+	iov[0].iov_base = &type;
+	iov[0].iov_len = sizeof(type);
+	iov[1].iov_base = const_cast<void *>(buf);
+	iov[1].iov_len = len;
+	const Message::Result *reply = waitForReply(
+	    SSLPROC_CTX_USE_PRIVATEKEY_ASN1, iov, 2);
+	if (reply == nullptr)
+		return (false);
+	return (reply->ret == 1);
+}
+
+bool
 ControlSocket::createSession(int sessionFd)
 {
 	union {

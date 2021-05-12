@@ -52,6 +52,9 @@
 #undef SSL_CTX_use_certificate
 #undef SSL_CTX_use_certificate_ASN1
 #undef SSL_CTX_use_certificate_file
+#undef SSL_CTX_use_PrivateKey
+#undef SSL_CTX_use_PrivateKey_ASN1
+#undef SSL_CTX_use_PrivateKey_file
 
 /* SSL */
 

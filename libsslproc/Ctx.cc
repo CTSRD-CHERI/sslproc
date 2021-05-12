@@ -262,3 +262,82 @@ PSSL_CTX_use_certificate_file(PSSL_CTX *ctx, const char *file, int type)
 	X509_free(x);
 	return (ret);
 }
+
+int
+PSSL_CTX_use_PrivateKey(PSSL_CTX *ctx, EVP_PKEY *pkey)
+{
+	unsigned char *buf;
+	int len, ret;
+
+	buf = NULL;
+	len = i2d_PrivateKey(pkey, &buf);
+	if (len < 0) {
+		PROCerr(PROC_F_SSL_CTX_USE_PRIVATEKEY, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "failed to encode private key");
+		return (0);
+	}
+
+	ret = PSSL_CTX_use_PrivateKey_ASN1(EVP_PKEY_base_id(pkey), ctx, buf,
+	    len);
+	OPENSSL_free(buf);
+	return (ret);
+}
+
+int
+PSSL_CTX_use_PrivateKey_ASN1(int type, PSSL_CTX *ctx, const unsigned char *d,
+    int len)
+{
+	if (d == NULL) {
+		PROCerr(PROC_F_SSL_CTX_USE_PRIVATEKEY_ASN1,
+		    ERR_R_PASSED_NULL_PARAMETER);
+		return (0);
+	}
+	if (!ctx->cs->usePrivateKey(type, d, len))
+		return (0);
+	return (1);
+}
+
+int
+PSSL_CTX_use_PrivateKey_file(PSSL_CTX *ctx, const char *file, int type)
+{
+	BIO *bio;
+	EVP_PKEY *pkey;
+	char tmp[16];
+	int ret;
+
+	bio = BIO_new_file(file, "r");
+	if (bio == NULL) {
+		PROCerr(PROC_F_SSL_CTX_USE_PRIVATEKEY_FILE,
+		    ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "failed to open file ", file);
+		return (0);
+	}
+
+	switch (type) {
+	case SSL_FILETYPE_PEM:
+		pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+		if (pkey == NULL)
+			PROCerr(PROC_F_SSL_CTX_USE_PRIVATEKEY_FILE,
+			    ERR_R_PEM_LIB);
+		break;
+	case SSL_FILETYPE_ASN1:
+		pkey = d2i_PrivateKey_bio(bio, NULL);
+		if (pkey == NULL)
+			PROCerr(PROC_F_SSL_CTX_USE_PRIVATEKEY_FILE,
+			    ERR_R_ASN1_LIB);
+		break;
+	default:
+		pkey = NULL;
+		PROCerr(PROC_F_SSL_CTX_USE_PRIVATEKEY_FILE,
+		    ERR_R_PASSED_INVALID_ARGUMENT);
+		snprintf(tmp, sizeof(tmp), "%d", type);
+		ERR_add_error_data(2, "type=", tmp);
+		break;
+	}
+	BIO_free_all(bio);
+	if (pkey == NULL)
+		return (0);
+	ret = PSSL_CTX_use_PrivateKey(ctx, pkey);
+	EVP_PKEY_free(pkey);
+	return (ret);
+}

@@ -66,6 +66,10 @@ void *PSSL_CTX_get_ex_data(const PSSL_CTX *ctx, int idx);
 int PSSL_CTX_use_certificate(PSSL_CTX *ctx, X509 *x);
 int PSSL_CTX_use_certificate_ASN1(PSSL_CTX *ctx, int len, unsigned char *d);
 int PSSL_CTX_use_certificate_file(PSSL_CTX *ctx, const char *file, int type);
+int PSSL_CTX_use_PrivateKey(PSSL_CTX *ctx, EVP_PKEY *pkey);
+int PSSL_CTX_use_PrivateKey_ASN1(int type, PSSL_CTX *ctx,
+    const unsigned char *d, int len);
+int PSSL_CTX_use_PrivateKey_file(PSSL_CTX *ctx, const char *file, int type);
 
 /* SSL */
 

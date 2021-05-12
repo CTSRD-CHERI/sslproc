@@ -52,6 +52,9 @@
 #define	SSL_CTX_use_certificate	PSSL_CTX_use_certificate
 #define	SSL_CTX_use_certificate_ASN1	PSSL_CTX_use_certificate_ASN1
 #define	SSL_CTX_use_certificate_file	PSSL_CTX_use_certificate_file
+#define	SSL_CTX_use_PrivateKey	PSSL_CTX_use_PrivateKey
+#define	SSL_CTX_use_PrivateKey_ASN1	PSSL_CTX_use_PrivateKey_ASN1
+#define	SSL_CTX_use_PrivateKey_file	PSSL_CTX_use_PrivateKey_file
 
 /* SSL */
 

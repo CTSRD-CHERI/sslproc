@@ -182,6 +182,28 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeReplyMessage(hdr->type, 1);
 		break;
 	}
+	case SSLPROC_CTX_USE_PRIVATEKEY_ASN1:
+	{
+		if (hdr->length <= sizeof(Message::PKey)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		const Message::PKey *msg =
+		    reinterpret_cast<const Message::PKey *>(hdr);
+		int ret = SSL_CTX_use_PrivateKey_ASN1(msg->pktype, ctx,
+		    reinterpret_cast<const unsigned char *>(msg->key()),
+		    msg->keyLength());
+		if (ret != 1)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, 1);
+		break;
+	}
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||

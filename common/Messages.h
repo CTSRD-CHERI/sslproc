@@ -88,6 +88,22 @@ namespace Message {
 /* Message body is a ASN1-serialized X509 object. */
 #define	SSLPROC_CTX_USE_CERTIFICATE_ASN1	7
 
+#define	SSLPROC_CTX_USE_PRIVATEKEY_ASN1	8
+
+	struct PKey : public Header {
+		int	pktype;
+
+		size_t keyLength() const
+		{
+			return (length - sizeof(PKey));
+		}
+
+		const void *key() const
+		{
+			return (reinterpret_cast<const void *>(this + 1));
+		}
+	};
+
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
 
