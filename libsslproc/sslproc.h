@@ -70,6 +70,7 @@ int PSSL_CTX_use_PrivateKey(PSSL_CTX *ctx, EVP_PKEY *pkey);
 int PSSL_CTX_use_PrivateKey_ASN1(int type, PSSL_CTX *ctx,
     const unsigned char *d, int len);
 int PSSL_CTX_use_PrivateKey_file(PSSL_CTX *ctx, const char *file, int type);
+int PSSL_CTX_check_private_key(PSSL_CTX *ctx);
 
 /* SSL */
 

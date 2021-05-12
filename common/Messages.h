@@ -104,6 +104,8 @@ namespace Message {
 		}
 	};
 
+#define	SSLPROC_CTX_CHECK_PRIVATE_KEY	9
+
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
 

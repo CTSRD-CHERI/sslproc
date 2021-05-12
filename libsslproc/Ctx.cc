@@ -341,3 +341,13 @@ PSSL_CTX_use_PrivateKey_file(PSSL_CTX *ctx, const char *file, int type)
 	EVP_PKEY_free(pkey);
 	return (ret);
 }
+
+int
+PSSL_CTX_check_private_key(PSSL_CTX *ctx)
+{
+	const Message::Result *reply = ctx->cs->waitForReply(
+	    SSLPROC_CTX_CHECK_PRIVATE_KEY);
+	if (reply == nullptr)
+		return (0);
+	return (reply->ret == 1);
+}

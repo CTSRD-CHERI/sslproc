@@ -55,6 +55,7 @@
 #undef SSL_CTX_use_PrivateKey
 #undef SSL_CTX_use_PrivateKey_ASN1
 #undef SSL_CTX_use_PrivateKey_file
+#undef SSL_CTX_check_private_key
 
 /* SSL */
 

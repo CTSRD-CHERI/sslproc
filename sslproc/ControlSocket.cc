@@ -204,6 +204,20 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeReplyMessage(hdr->type, 1);
 		break;
 	}
+	case SSLPROC_CTX_CHECK_PRIVATE_KEY:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		int ret = SSL_CTX_check_private_key(ctx);
+		if (ret != 1)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, 1);
+		break;
+	}
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
