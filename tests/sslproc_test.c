@@ -99,7 +99,7 @@ test_ctx_refs(void)
 		SSL_CTX_free(ctx);
 		FAIL("failed to increment ref count");
 	}
-	
+
 	SSL_CTX_free(ctx);
 	SSL_CTX_free(ctx);
 
@@ -251,6 +251,64 @@ test_ctx_mode(void)
 	PASS();
 }
 
+static void
+test_ssl_create(void)
+{
+	SSL_CTX *ctx;
+	SSL *ssl;
+
+	ctx = SSL_CTX_new(TLS_method());
+	if (ctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create context");
+	}
+
+	ssl = SSL_new(ctx);
+	if (ssl == NULL) {
+		ERR_print_errors_fp(stdout);
+		SSL_CTX_free(ctx);
+		FAIL("failed to create session");
+	}
+
+	SSL_free(ssl);
+
+	SSL_CTX_free(ctx);
+
+	PASS();
+}
+
+static void
+test_ssl_refs(void)
+{
+	SSL_CTX *ctx;
+	SSL *ssl;
+
+	ctx = SSL_CTX_new(TLS_method());
+	if (ctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create context");
+	}
+
+	ssl = SSL_new(ctx);
+	if (ssl == NULL) {
+		ERR_print_errors_fp(stdout);
+		SSL_CTX_free(ctx);
+		FAIL("failed to create session");
+	}
+	SSL_CTX_free(ctx);
+
+	if (SSL_up_ref(ssl) != 1) {
+		ERR_print_errors_fp(stdout);
+		SSL_free(ssl);
+		FAIL("failed to increment ref count");
+	}
+
+	SSL_free(ssl);
+	SSL_free(ssl);
+
+	PASS();
+}
+
 int
 main(int ac, char **av)
 {
@@ -271,6 +329,8 @@ main(int ac, char **av)
 	test_ctx_proto_versions();
 	test_ctx_app_data();
 	test_ctx_mode();
+	test_ssl_create();
+	test_ssl_refs();
 
 	return (0);
 }

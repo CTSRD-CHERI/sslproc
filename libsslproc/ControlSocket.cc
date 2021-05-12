@@ -104,6 +104,29 @@ ControlSocket::contextControl(int cmd, long larg)
 }
 
 bool
+ControlSocket::createSession(int sessionFd)
+{
+	union {
+		struct cmsghdr hdr;
+		char buf[CMSG_SPACE(sizeof(int))];
+	} cmsgbuf;
+	struct cmsghdr *cmsg;
+	int *fds;
+
+	cmsg = &cmsgbuf.hdr;
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_RIGHTS;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+	fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
+	fds[0] = sessionFd;
+	const Message::Result *reply = waitForReply(SSLPROC_CREATE_SESSION,
+	    nullptr, 0, &cmsgbuf, sizeof(cmsgbuf));
+	if (reply == nullptr)
+		return (false);
+	return (reply->ret == 0);
+}
+
+bool
 ControlSocket::handleMessage(const Message::Header *hdr)
 {
 	return (false);

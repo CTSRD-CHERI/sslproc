@@ -45,6 +45,7 @@ public:
 	long clearContextOptions(long options);
 	long getContextOptions();
 	long contextControl(int cmd, long larg);
+	bool createSession(int sessionFd);
 private:
 	bool handleMessage(const Message::Header *hdr);
 

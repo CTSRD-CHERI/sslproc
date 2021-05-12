@@ -30,35 +30,95 @@
  * SUCH DAMAGE.
  */
 
-#include <openssl/err.h>
+#include <unistd.h>
 
 #include "sslproc.h"
 #include "sslproc_internal.h"
+#include "ControlSocket.h"
+#include "SSLSession.h"
 
-int PROC_lib;
+PSSL *
+PSSL_new(PSSL_CTX *ctx)
+{
+	POPENSSL_init_ssl();
 
-static ERR_STRING_DATA PROC_strings[] = {
-	{0, "sslproc"},
-	{ERR_PACK(0, PROC_F_SSL_CTX_NEW, 0), "PSSL_CTX_new"},
-	{ERR_PACK(0, PROC_F_READ_MESSAGE, 0), "MessageSocket::readMessage"},
-	{ERR_PACK(0, PROC_F_WRITE_MESSAGE, 0), "MessageSocket::writeMessage"},
-	{ERR_PACK(0, PROC_F_RECVMSG, 0), "recvmsg"},
-	{ERR_PACK(0, PROC_F_SET_MESSAGE_ERROR, 0), "setMessageError"},
-	{ERR_PACK(0, PROC_F_SSL_NEW, 0), "PSSL_new"},
-	{ERR_PACK(0, 0, ERR_R_IO_ERROR), "I/O error"},
-	{ERR_PACK(0, 0, ERR_R_BAD_MESSAGE), "invalid message"},
-	{ERR_PACK(0, 0, ERR_R_UNEXPECTED_EOF), "unexpected EOF"},
-	{ERR_PACK(0, 0, ERR_R_MISMATCHED_REPLY), "mismatched reply"},
-	{ERR_PACK(0, 0, ERR_R_MESSAGE_ERROR), "message error"},
-	{0, nullptr},
-};
+	if (ctx == nullptr) {
+		PROCerr(PROC_F_SSL_NEW, ERR_R_PASSED_NULL_PARAMETER);
+		return (nullptr);
+	}
+
+	if (PSSL_CTX_up_ref(ctx) != 1) {
+		PROCerr(PROC_F_SSL_NEW, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "failed to add context reference");
+		return (nullptr);
+	}
+
+	PSSL *ssl = new PSSL();
+	if (ssl == nullptr) {
+		PSSL_CTX_free(ctx);
+		PROCerr(PROC_F_SSL_NEW, ERR_R_MALLOC_FAILURE);
+		return (nullptr);
+	}
+
+	int fds[2];
+	if (socketpair(PF_LOCAL, SOCK_SEQPACKET, 0, fds) == -1) {
+		int save_error = errno;
+
+		delete ssl;
+		PSSL_CTX_free(ctx);
+		PROCerr(PROC_F_SSL_NEW, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "socketpair: ", strerror(save_error));
+		return (nullptr);
+	}
+
+	if (!ctx->cs->createSession(fds[1])) {
+		close(fds[0]);
+		close(fds[1]);
+		delete ssl;
+		PSSL_CTX_free(ctx);
+		PROCerr(PROC_F_SSL_NEW, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "failed to create remote session");
+		return (nullptr);
+	}
+	close(fds[1]);
+
+	ssl->ss = new SSLSession(fds[0]);
+	if (!ssl->ss->init()) {
+		delete ssl->ss;
+		delete ssl;
+		PSSL_CTX_free(ctx);
+		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
+		return (nullptr);
+	}
+
+	ssl->ctx = ctx;
+	ssl->refs = 1;
+	return (ssl);
+}
+
+int
+PSSL_up_ref(PSSL *ssl)
+{
+	int refs;
+
+	refs = ssl->refs;
+	for (;;) {
+		if (refs == INT_MAX)
+			return (0);
+		if (ssl->refs.compare_exchange_weak(refs, refs + 1,
+		    std::memory_order_relaxed))
+			return (1);
+	}
+}
 
 void
-PERR_init(void)
+PSSL_free(PSSL *ssl)
 {
-	PROC_lib = ERR_get_next_error_library();
+	if (ssl->refs.fetch_sub(1, std::memory_order_relaxed) > 1)
+		return;
 
-	/* We have to patch the library-wide entry by hand. */
-	PROC_strings[0].error = ERR_PACK(PROC_lib, 0, 0);
-	ERR_load_strings(PROC_lib, PROC_strings);
+	PSSL_CTX *ctx = ssl->ctx;
+	delete ssl->ss;
+	delete ssl;
+	PSSL_CTX_free(ctx);
 }

@@ -51,3 +51,8 @@
 #undef SSL_CTX_get_ex_data
 
 /* SSL */
+
+#undef SSL
+#undef SSL_new
+#undef SSL_up_ref
+#undef SSL_free

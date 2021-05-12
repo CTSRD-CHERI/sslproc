@@ -51,6 +51,7 @@ const PSSL_METHOD *PTLS_client_method(void);
 
 struct _PSSL_CTX;
 typedef struct _PSSL_CTX PSSL_CTX;
+
 PSSL_CTX *PSSL_CTX_new(const PSSL_METHOD *method);
 int PSSL_CTX_up_ref(PSSL_CTX *ctx);
 void PSSL_CTX_free(PSSL_CTX *ctx);
@@ -62,5 +63,12 @@ int PSSL_CTX_set_ex_data(PSSL_CTX *ctx, int idx, void *data);
 void *PSSL_CTX_get_ex_data(const PSSL_CTX *ctx, int idx);
 
 /* SSL */
+
+struct _PSSL;
+typedef struct _PSSL PSSL;
+
+PSSL *PSSL_new(PSSL_CTX *ctx);
+int PSSL_up_ref(PSSL *ssl);
+void PSSL_free(PSSL *ssl);
 
 __END_DECLS

@@ -32,63 +32,16 @@
 
 #pragma once
 
-#include <sys/cdefs.h>
-#include <atomic>
+#include "LibMessageSocket.h"
+#include "sslproc.h"
 
-#include <openssl/crypto.h>
-#include <openssl/err.h>
+class SSLSession : public LibMessageSocket {
+public:
+	SSLSession(int _fd) : LibMessageSocket(_fd), fd(_fd) {};
+	~SSLSession();
 
-__BEGIN_DECLS
+private:
+	bool handleMessage(const Message::Header *hdr);
 
-/* OPENSSL_init */
-
-int	POPENSSL_init_ssl(void);
-
-/* ERR */
-
-extern int PROC_lib;
-void	PERR_init(void);
-
-#define	PROCerr(f,r)	ERR_PUT_error(PROC_lib, (f), (r), __FILE__, __LINE__)
-
-#define	PROC_F_SSL_CTX_NEW		1
-#define	PROC_F_READ_MESSAGE		2
-#define	PROC_F_WRITE_MESSAGE		3
-#define	PROC_F_RECVMSG			4
-#define	PROC_F_WAIT_FOR_REPLY		5
-#define	PROC_F_SET_MESSAGE_ERROR	6
-#define	PROC_F_SSL_NEW			7
-
-#define	ERR_R_IO_ERROR		(128|ERR_R_FATAL)
-#define	ERR_R_BAD_MESSAGE	(129|ERR_R_FATAL)
-#define	ERR_R_UNEXPECTED_EOF	(130|ERR_R_FATAL)
-#define	ERR_R_MISMATCHED_REPLY	(131|ERR_R_FATAL)
-#define	ERR_R_MESSAGE_ERROR	(132)
-
-/* SSL_METHOD */
-
-struct _PSSL_METHOD {
-	int method;	/* SSL_METHOD_* */
+	int fd;
 };
-
-/* SSL_CTX */
-
-class ControlSocket;
-
-struct _PSSL_CTX {
-	ControlSocket *cs;
-	CRYPTO_EX_DATA ex_data;
-	std::atomic_int refs;
-};
-
-/* SSL */
-
-class SSLSession;
-
-struct _PSSL {
-	struct _PSSL_CTX *ctx;
-	SSLSession *ss;
-	std::atomic_int refs;
-};
-
-__END_DECLS

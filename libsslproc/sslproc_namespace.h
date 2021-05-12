@@ -51,3 +51,8 @@
 #define	SSL_CTX_get_ex_data	PSSL_CTX_get_ex_data
 
 /* SSL */
+
+#define	SSL			PSSL
+#define	SSL_new			PSSL_new
+#define	SSL_up_ref		PSSL_up_ref
+#define	SSL_free		PSSL_free
