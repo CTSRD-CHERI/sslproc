@@ -71,6 +71,8 @@ KQueue::run()
 	for (;;) {
 		rc = ::kevent(fd, nullptr, 0, &kevent, 1, nullptr);
 		if (rc == -1) {
+			if (errno == EINTR)
+				continue;
 			syslog(LOG_ERR, "kevent failed: %m");
 			exit(1);
 		}
