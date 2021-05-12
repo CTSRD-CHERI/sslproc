@@ -41,12 +41,6 @@ public:
 	~ControlSocket();
 
 	bool createContext(const PSSL_METHOD *method);
-	long setContextOptions(long options);
-	long clearContextOptions(long options);
-	long getContextOptions();
-	long contextControl(int cmd, long larg);
-	bool useCertificate(const void *buf, int len);
-	bool usePrivateKey(int type, const void *buf, int len);
 	bool createSession(int sessionFd);
 private:
 	bool handleMessage(const Message::Header *hdr);

@@ -143,24 +143,53 @@ PSSL_CTX_free(PSSL_CTX *ctx)
 long
 PSSL_CTX_set_options(PSSL_CTX *ctx, long options)
 {
-	return (ctx->cs->setContextOptions(options));
+	const Message::Result *reply = ctx->cs->waitForReply(
+	    SSLPROC_CTX_SET_OPTIONS, &options, sizeof(options));
+
+	/* No way to return errors. */
+	if (reply == nullptr)
+		abort();
+	if (reply->ret != 0)
+		abort();
+	return (*reinterpret_cast<const long *>(reply->body()));
 }
 
 long
 PSSL_CTX_clear_options(PSSL_CTX *ctx, long options)
 {
-	return (ctx->cs->clearContextOptions(options));
+	const Message::Result *reply = ctx->cs->waitForReply(
+	    SSLPROC_CTX_CLEAR_OPTIONS, &options, sizeof(options));
+
+	/* No way to return errors. */
+	if (reply == nullptr)
+		abort();
+	if (reply->ret != 0)
+		abort();
+	return (*reinterpret_cast<const long *>(reply->body()));
 }
 
 long
 PSSL_CTX_get_options(PSSL_CTX *ctx)
 {
-	return (ctx->cs->getContextOptions());
+	const Message::Result *reply = ctx->cs->waitForReply(
+	    SSLPROC_CTX_GET_OPTIONS);
+
+	/* No way to return errors. */
+	if (reply == nullptr)
+		abort();
+	if (reply->ret != 0)
+		abort();
+	return (*reinterpret_cast<const long *>(reply->body()));
 }
 
 long
 PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 {
+	Message::CtrlBody body;
+	const Message::Result *reply;
+
+	body.cmd = cmd;
+	body.larg = larg;
 	switch (cmd) {
 	case SSL_CTRL_SET_MIN_PROTO_VERSION:
 	case SSL_CTRL_SET_MAX_PROTO_VERSION:
@@ -168,7 +197,11 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 	case SSL_CTRL_GET_MAX_PROTO_VERSION:
 	case SSL_CTRL_MODE:
 	case SSL_CTRL_CLEAR_MODE:
-		return (ctx->cs->contextControl(cmd, larg));
+		reply = ctx->cs->waitForReply(SSLPROC_CTX_CTRL, &body,
+		    sizeof(body));
+		if (reply == nullptr)
+			abort();
+		return (reply->ret);
 	default:
 		abort();
 	}
@@ -213,9 +246,12 @@ PSSL_CTX_use_certificate_ASN1(PSSL_CTX *ctx, int len, unsigned char *d)
 		    ERR_R_PASSED_NULL_PARAMETER);
 		return (0);
 	}
-	if (!ctx->cs->useCertificate(d, len))
+
+	const Message::Result *reply = ctx->cs->waitForReply(
+	    SSLPROC_CTX_USE_CERTIFICATE_ASN1, d, len);
+	if (reply == nullptr)
 		return (0);
-	return (1);
+	return (reply->ret);
 }
 
 int
@@ -287,14 +323,23 @@ int
 PSSL_CTX_use_PrivateKey_ASN1(int type, PSSL_CTX *ctx, const unsigned char *d,
     int len)
 {
+	struct iovec iov[2];
+
 	if (d == NULL) {
 		PROCerr(PROC_F_SSL_CTX_USE_PRIVATEKEY_ASN1,
 		    ERR_R_PASSED_NULL_PARAMETER);
 		return (0);
 	}
-	if (!ctx->cs->usePrivateKey(type, d, len))
+
+	iov[0].iov_base = &type;
+	iov[0].iov_len = sizeof(type);
+	iov[1].iov_base = const_cast<unsigned char *>(d);
+	iov[1].iov_len = len;
+	const Message::Result *reply = ctx->cs->waitForReply(
+	    SSLPROC_CTX_USE_PRIVATEKEY_ASN1, iov, 2);
+	if (reply == nullptr)
 		return (0);
-	return (1);
+	return (reply->ret);
 }
 
 int
@@ -349,5 +394,5 @@ PSSL_CTX_check_private_key(PSSL_CTX *ctx)
 	    SSLPROC_CTX_CHECK_PRIVATE_KEY);
 	if (reply == nullptr)
 		return (0);
-	return (reply->ret == 1);
+	return (reply->ret);
 }
