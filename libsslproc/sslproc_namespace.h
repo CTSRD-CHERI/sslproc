@@ -49,6 +49,9 @@
 #define	SSL_CTX_ctrl		PSSL_CTX_ctrl
 #define	SSL_CTX_set_ex_data	PSSL_CTX_set_ex_data
 #define	SSL_CTX_get_ex_data	PSSL_CTX_get_ex_data
+#define	SSL_CTX_use_certificate	PSSL_CTX_use_certificate
+#define	SSL_CTX_use_certificate_ASN1	PSSL_CTX_use_certificate_ASN1
+#define	SSL_CTX_use_certificate_file	PSSL_CTX_use_certificate_file
 
 /* SSL */
 

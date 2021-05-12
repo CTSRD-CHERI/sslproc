@@ -185,3 +185,80 @@ PSSL_CTX_get_ex_data(const PSSL_CTX *ctx, int idx)
 {
 	return (CRYPTO_get_ex_data(&ctx->ex_data, idx));
 }
+
+int
+PSSL_CTX_use_certificate(PSSL_CTX *ctx, X509 *x)
+{
+	unsigned char *buf;
+	int len, ret;
+
+	buf = NULL;
+	len = i2d_X509(x, &buf);
+	if (len < 0) {
+		PROCerr(PROC_F_SSL_CTX_USE_CERTIFICATE, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "failed to encode X509");
+		return (0);
+	}
+
+	ret = PSSL_CTX_use_certificate_ASN1(ctx, len, buf);
+	OPENSSL_free(buf);
+	return (ret);
+}
+
+int
+PSSL_CTX_use_certificate_ASN1(PSSL_CTX *ctx, int len, unsigned char *d)
+{
+	if (d == NULL) {
+		PROCerr(PROC_F_SSL_CTX_USE_CERTIFICATE_ASN1,
+		    ERR_R_PASSED_NULL_PARAMETER);
+		return (0);
+	}
+	if (!ctx->cs->useCertificate(d, len))
+		return (0);
+	return (1);
+}
+
+int
+PSSL_CTX_use_certificate_file(PSSL_CTX *ctx, const char *file, int type)
+{
+	BIO *bio;
+	X509 *x;
+	char tmp[16];
+	int ret;
+
+	bio = BIO_new_file(file, "r");
+	if (bio == NULL) {
+		PROCerr(PROC_F_SSL_CTX_USE_CERTIFICATE_FILE,
+		    ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "failed to open file ", file);
+		return (0);
+	}
+
+	switch (type) {
+	case SSL_FILETYPE_PEM:
+		x = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+		if (x == NULL)
+			PROCerr(PROC_F_SSL_CTX_USE_CERTIFICATE_FILE,
+			    ERR_R_PEM_LIB);
+		break;
+	case SSL_FILETYPE_ASN1:
+		x = d2i_X509_bio(bio, NULL);
+		if (x == NULL)
+			PROCerr(PROC_F_SSL_CTX_USE_CERTIFICATE_FILE,
+			    ERR_R_ASN1_LIB);
+		break;
+	default:
+		x = NULL;
+		PROCerr(PROC_F_SSL_CTX_USE_CERTIFICATE_FILE,
+		    ERR_R_PASSED_INVALID_ARGUMENT);
+		snprintf(tmp, sizeof(tmp), "%d", type);
+		ERR_add_error_data(2, "type=", tmp);
+		break;
+	}
+	BIO_free_all(bio);
+	if (x == NULL)
+		return (0);
+	ret = PSSL_CTX_use_certificate(ctx, x);
+	X509_free(x);
+	return (ret);
+}

@@ -85,6 +85,9 @@ namespace Message {
 
 	struct Ctrl : public Header, CtrlBody {};
 
+/* Message body is a ASN1-serialized X509 object. */
+#define	SSLPROC_CTX_USE_CERTIFICATE_ASN1	7
+
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
 

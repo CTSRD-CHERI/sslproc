@@ -34,6 +34,8 @@
 
 #include <sys/cdefs.h>
 
+#include <openssl/x509.h>
+
 __BEGIN_DECLS
 
 /* OPENSSL_init? */
@@ -61,6 +63,9 @@ long PSSL_CTX_get_options(PSSL_CTX *ctx);
 long PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg);
 int PSSL_CTX_set_ex_data(PSSL_CTX *ctx, int idx, void *data);
 void *PSSL_CTX_get_ex_data(const PSSL_CTX *ctx, int idx);
+int PSSL_CTX_use_certificate(PSSL_CTX *ctx, X509 *x);
+int PSSL_CTX_use_certificate_ASN1(PSSL_CTX *ctx, int len, unsigned char *d);
+int PSSL_CTX_use_certificate_file(PSSL_CTX *ctx, const char *file, int type);
 
 /* SSL */
 

@@ -104,6 +104,16 @@ ControlSocket::contextControl(int cmd, long larg)
 }
 
 bool
+ControlSocket::useCertificate(const void *buf, int len)
+{
+	const Message::Result *reply = waitForReply(
+	    SSLPROC_CTX_USE_CERTIFICATE_ASN1, buf, len);
+	if (reply == nullptr)
+		return (false);
+	return (reply->ret == 1);
+}
+
+bool
 ControlSocket::createSession(int sessionFd)
 {
 	union {

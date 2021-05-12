@@ -49,6 +49,9 @@
 #undef SSL_CTX_ctrl
 #undef SSL_CTX_set_ex_data
 #undef SSL_CTX_get_ex_data
+#undef SSL_CTX_use_certificate
+#undef SSL_CTX_use_certificate_ASN1
+#undef SSL_CTX_use_certificate_file
 
 /* SSL */
 

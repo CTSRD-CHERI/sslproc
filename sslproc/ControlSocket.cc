@@ -163,6 +163,25 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		}
 		break;
 	}
+	case SSLPROC_CTX_USE_CERTIFICATE_ASN1:
+	{
+		if (hdr->bodyLength() == 0) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		int ret = SSL_CTX_use_certificate_ASN1(ctx, hdr->bodyLength(),
+		    reinterpret_cast<const unsigned char *>(hdr->body()));
+		if (ret != 1)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, 1);
+		break;
+	}
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
