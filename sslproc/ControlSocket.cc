@@ -167,7 +167,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
 		    cmsg->cmsg_type != SCM_RIGHTS ||
-		    cmsg->cmsg_len != CMSG_SPACE(sizeof(int))) {
+		    cmsg->cmsg_len != CMSG_LEN(sizeof(int))) {
 			syslog(LOG_WARNING,
 		    "invalid control message for SSLPROC_CREATE_SESSION");
 			writeErrnoReply(hdr->type, -1, EBADMSG);
