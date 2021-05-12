@@ -30,7 +30,9 @@
  * SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <openssl/err.h>
@@ -61,11 +63,15 @@
 } while (0)
 
 static int verbose;
+static const char *short_message = "this is a test message";
+static const char *cert;
+static const char *privkey;
 
 static void
 usage(void)
 {
-	fprintf(stderr, "Usage: sslproc_test [-v]\n");
+	fprintf(stderr,
+	    "Usage: sslproc_test [-c certfile] [-k keyfile] [-v]\n");
 	exit(1);
 }
 
@@ -311,13 +317,240 @@ test_ssl_refs(void)
 	PASS();
 }
 
+#ifndef USE_SSLPROC
+static bool
+create_ssl_contexts(SSL_CTX **cctx, SSL_CTX **sctx)
+{
+	SSL_CTX *ctx1, *ctx2;
+
+	ctx1 = NULL;
+	ctx2 = NULL;
+
+	ctx1 = SSL_CTX_new(TLS_client_method());
+	if (ctx1 == NULL)
+		goto error;
+	ctx2 = SSL_CTX_new(TLS_server_method());
+	if (ctx2 == NULL)
+		goto error;
+
+	if (cert != NULL && privkey != NULL) {
+		if (SSL_CTX_use_certificate_file(ctx2, cert,
+		    SSL_FILETYPE_PEM) != 1)
+			goto error;
+		if (SSL_CTX_use_PrivateKey_file(ctx2, privkey,
+		    SSL_FILETYPE_PEM) != 1)
+			goto error;
+		if (SSL_CTX_check_private_key(ctx2) != 1)
+			goto error;
+	}
+
+	*cctx = ctx1;
+	*sctx = ctx2;
+	return (true);
+
+error:
+	SSL_CTX_free(ctx1);
+	SSL_CTX_free(ctx2);
+	return (false);
+}
+
+static bool
+create_ssl_memory_sessions(SSL_CTX *cctx, SSL_CTX *sctx, SSL **cssl, SSL **sssl)
+{
+	BIO *bio1, *bio2;
+	SSL *ssl1, *ssl2;
+
+	bio1 = NULL;
+	bio2 = NULL;
+	ssl1 = NULL;
+	ssl2 = NULL;
+
+	bio1 = BIO_new(BIO_s_mem());
+	if (bio1 == NULL)
+		goto error;
+	BIO_set_mem_eof_return(bio1, -1);
+
+	bio2 = BIO_new(BIO_s_mem());
+	if (bio2 == NULL)
+		goto error;
+	BIO_set_mem_eof_return(bio2, -1);
+
+	ssl1 = SSL_new(cctx);
+	if (ssl1 == NULL)
+		goto error;
+	if (BIO_up_ref(bio1) != 1)
+		goto error;
+	SSL_set0_rbio(ssl1, bio1);
+	if (BIO_up_ref(bio2) != 1)
+		goto error;
+	SSL_set0_wbio(ssl1, bio2);
+
+	ssl2 = SSL_new(sctx);
+	if (ssl2 == NULL)
+		goto error;
+	SSL_set0_rbio(ssl2, bio2);
+	SSL_set0_wbio(ssl2, bio1);
+
+	*cssl = ssl1;
+	*sssl = ssl2;
+	return (true);
+
+error:
+	SSL_free(ssl2);
+	SSL_free(ssl1);
+	BIO_free(bio2);
+	BIO_free(bio1);
+	return (false);
+}
+
+static bool
+establish_sessions(SSL *cssl, SSL *sssl)
+{
+	bool connected, accepted;
+	int error, ret;
+
+	connected = false;
+	accepted = false;
+	while (!connected && !accepted) {
+		while (!connected) {
+			ret = SSL_connect(cssl);
+			if (ret == 1) {
+				connected = true;
+				break;
+			}
+			error = SSL_get_error(cssl, ret);
+			if (error == SSL_ERROR_WANT_WRITE)
+				continue;
+			if (error == SSL_ERROR_WANT_READ)
+				break;
+			dprintf("error from SSL_connect\n");
+			return (false);
+		}
+
+		while (!accepted) {
+			ret = SSL_accept(sssl);
+			if (ret == 1) {
+				accepted = true;
+				break;
+			}
+			error = SSL_get_error(sssl, ret);
+			if (error == SSL_ERROR_WANT_WRITE)
+				continue;
+			if (error == SSL_ERROR_WANT_READ)
+				break;
+			dprintf("error from SSL_accept\n");
+			return (false);
+		}
+	}
+	return (true);
+}
+
+static bool
+send_message(SSL *source, SSL *dest, const char *source_name,
+    const char *dest_name, const void *message, size_t len)
+{
+	char buf[len];
+	int error, ret;
+
+	ret = SSL_write(source, message, len);
+	if (ret <= 0) {
+		dprintf("unexpected error %d from %s write\n",
+		    SSL_get_error(source, ret), source_name);
+		return (false);
+	}
+	if (ret != len) {
+		dprintf("short write to %s\n", dest_name);
+		return (false);
+	}
+
+	memset(buf, 0xa5, len);
+	for (;;) {
+		ret = SSL_read(dest, buf, len);
+		if (ret <= 0) {
+			error = SSL_get_error(dest, ret);
+			if (error == SSL_ERROR_WANT_READ)
+				continue;
+			dprintf("unexpected error %d from %s read\n", error,
+			    dest_name);
+			return (false);
+		}
+		if (ret != len) {
+			dprintf("short read from %s\n", source_name);
+			return (false);
+		}
+		break;
+	}
+	if (memcmp(buf, message, len) != 0) {
+		dprintf("%s received incorrect data\n", dest_name);
+		return (false);
+	}
+	return (true);
+}
+
+static bool
+ping_pong_message(SSL *cssl, SSL *sssl, const void *message, size_t len)
+{
+
+	if (!send_message(cssl, sssl, "client", "server", message, len))
+		return (false);
+	return (send_message(sssl, cssl, "server", "client", message, len));
+}
+
+static void
+test_ssl_memory_ping_pong(void)
+{
+	SSL_CTX *cctx, *sctx;
+	SSL *cssl, *sssl;
+
+	if (!create_ssl_contexts(&cctx, &sctx)) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create contexts");
+	}
+
+	if (!create_ssl_memory_sessions(cctx, sctx, &cssl, &sssl)) {
+		ERR_print_errors_fp(stdout);
+		SSL_CTX_free(cctx);
+		SSL_CTX_free(sctx);
+		FAIL("failed to create sessions");
+	}
+	SSL_CTX_free(cctx);
+	SSL_CTX_free(sctx);
+
+	if (!establish_sessions(cssl, sssl)) {
+		ERR_print_errors_fp(stdout);
+		SSL_free(cssl);
+		SSL_free(sssl);
+		FAIL("failed to establish sessions");
+	}
+
+	if (!ping_pong_message(cssl, sssl, short_message,
+	    strlen(short_message))) {
+		ERR_print_errors_fp(stdout);
+		SSL_free(cssl);
+		SSL_free(sssl);
+		FAIL("failed to pass messages");
+	}
+
+	SSL_free(cssl);
+	SSL_free(sssl);
+
+	PASS();
+}
+#endif
+
 int
 main(int ac, char **av)
 {
 	int ch;
 
-	while ((ch = getopt(ac, av, "v")) != -1)
+	while ((ch = getopt(ac, av, "c:k:v")) != -1)
 		switch (ch) {
+		case 'c':
+			cert = optarg;
+			break;
+		case 'k':
+			privkey = optarg;
+			break;
 		case 'v':
 			verbose++;
 			break;
@@ -333,6 +566,9 @@ main(int ac, char **av)
 	test_ctx_mode();
 	test_ssl_create();
 	test_ssl_refs();
+#ifndef USE_SSLPROC
+	test_ssl_memory_ping_pong();
+#endif
 
 	return (0);
 }
