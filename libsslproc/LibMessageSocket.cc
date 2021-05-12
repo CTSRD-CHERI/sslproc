@@ -86,18 +86,31 @@ LibMessageSocket::observeWriteError()
 }
 
 const Message::Result *
+LibMessageSocket::waitForReply(int type, const struct iovec *iov, int iovCnt)
+{
+	if (ERR_peek_error() != 0)
+		return (nullptr);
+	if (!writeMessage(type, iov, iovCnt))
+		return (nullptr);
+	return (_waitForReply(type));
+}
+
+const Message::Result *
 LibMessageSocket::waitForReply(int type, const void *payload,
     size_t payloadLen, const void *control, size_t controlLen)
 {
-	const Message::Header *hdr;
-	int rc;
-
 	if (ERR_peek_error() != 0)
 		return (nullptr);
 	if (!writeMessage(type, payload, payloadLen, control, controlLen))
 		return (nullptr);
+	return (_waitForReply(type));
+}
+
+const Message::Result *
+LibMessageSocket::_waitForReply(int type)
+{
 	for (;;) {
-		rc = readMessage(replyBuffer);
+		int rc = readMessage(replyBuffer);
 
 		if (rc == 0) {
 			PROCerr(PROC_F_WAIT_FOR_REPLY, ERR_R_UNEXPECTED_EOF);
@@ -106,7 +119,7 @@ LibMessageSocket::waitForReply(int type, const void *payload,
 		if (rc == -1)
 			return (nullptr);
 
-		hdr = replyBuffer.hdr();
+		const Message::Header *hdr = replyBuffer.hdr();
 		if (hdr->type == SSLPROC_RESULT) {
 			char tmp[16], tmp2[16];
 			const Message::Result *result =

@@ -153,6 +153,23 @@ MessageSocket::writeMessage(int type, const void *payload, size_t payloadLen,
 	return (writeMessage(iov, cnt, control, controlLen));
 }
 
+bool
+MessageSocket::writeMessage(int type, const struct iovec *iov, int iovCnt)
+{
+	Message::Header hdr;
+	struct iovec iov2[iovCnt + 1];
+	int i;
+
+	hdr.type = type;
+	hdr.length = sizeof(hdr);
+	for (i = 0; i < iovCnt; i++)
+		hdr.length += iov[i].iov_len;
+	iov2[0].iov_base = &hdr;
+	iov2[0].iov_len = sizeof(hdr);
+	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
+	return (writeMessage(iov2, iovCnt + 1, NULL, 0));
+}
+
 void
 MessageSocket::writeReplyMessage(int type, long ret, int error,
     const void *payload, size_t payloadLen)
@@ -182,6 +199,27 @@ MessageSocket::writeReplyMessage(int type, long ret, const void *payload,
     size_t payloadLen)
 {
 	writeReplyMessage(type, ret, SSL_ERROR_NONE, payload, payloadLen);
+}
+
+void
+MessageSocket::writeReplyMessage(int type, long ret, const struct iovec *iov,
+    int iovCnt)
+{
+	Message::Result result;
+	struct iovec iov2[iovCnt + 1];
+	int i;
+
+	result.type = SSLPROC_RESULT;
+	result.length = sizeof(result);
+	result.request = type;
+	result.error = SSL_ERROR_NONE;
+	result.ret = ret;
+	for (i = 0; i < iovCnt; i++)
+		result.length += iov[i].iov_len;
+	iov2[0].iov_base = &result;
+	iov2[0].iov_len = sizeof(result);
+	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
+	writeMessage(iov2, iovCnt + 1, nullptr, 0);
 }
 
 void
