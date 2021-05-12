@@ -36,8 +36,10 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#ifdef USE_SSLPROC
 #include <sslproc.h>
 #include <sslproc_namespace.h>
+#endif
 
 #define	dprintf(...) do {			\
 	if (verbose) {				\
