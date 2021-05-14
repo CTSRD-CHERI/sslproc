@@ -98,6 +98,7 @@ struct _PSSL {
 	BIO *wbio;
 	SSLSession *ss;
 	std::atomic_int refs;
+	int last_error;
 };
 
 __END_DECLS

@@ -68,3 +68,4 @@
 #undef SSL_set_bio
 #undef SSL_set0_rbio
 #undef SSL_set0_wbio
+#undef SSL_get_error

@@ -201,3 +201,9 @@ PSSL_set0_wbio(PSSL *ssl, BIO *wbio)
 	BIO_free_all(ssl->wbio);
 	ssl->wbio = wbio;
 }
+
+int
+PSSL_get_error(const PSSL *ssl, int i)
+{
+	return (ssl->last_error);
+}

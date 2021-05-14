@@ -68,3 +68,4 @@
 #define	SSL_set_bio		PSSL_set_bio
 #define	SSL_set0_rbio		PSSL_set0_rbio
 #define	SSL_set0_wbio		PSSL_set0_wbio
+#define	SSL_get_error		PSSL_get_error
