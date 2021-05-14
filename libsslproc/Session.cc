@@ -32,6 +32,8 @@
 
 #include <unistd.h>
 
+#include <openssl/ssl.h>
+
 #include "sslproc.h"
 #include "sslproc_internal.h"
 #include "ControlSocket.h"
@@ -206,4 +208,78 @@ int
 PSSL_get_error(const PSSL *ssl, int i)
 {
 	return (ssl->last_error);
+}
+
+int
+PSSL_accept(PSSL *ssl)
+{
+	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_ACCEPT);
+	if (msg == nullptr) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	ssl->last_error = msg->error;
+	return (msg->ret);
+}
+
+int
+PSSL_connect(PSSL *ssl)
+{
+	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_CONNECT);
+	if (msg == nullptr) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	ssl->last_error = msg->error;
+	return (msg->ret);
+}
+
+int
+PSSL_read(PSSL *ssl, void *buf, int len)
+{
+	int resid = len;
+	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_READ,
+	    &resid, sizeof(resid));
+	if (msg == nullptr) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	if (msg->ret > 0) {
+		char tmp[16], tmp2[16];
+
+		if (msg->ret != msg->bodyLength()) {
+			PROCerr(PROC_F_SSL_READ, ERR_R_BAD_MESSAGE);
+			snprintf(tmp, sizeof(tmp), "%ld", msg->ret);
+			snprintf(tmp2, sizeof(tmp2), "%zu", msg->bodyLength());
+			ERR_add_error_data(4, "ret=", tmp, " bodyLength=",
+			    tmp2);
+			ssl->last_error = SSL_ERROR_SSL;
+			return (-1);
+		}
+		if (msg->ret > len) {
+			PROCerr(PROC_F_SSL_READ, ERR_R_BAD_MESSAGE);
+			snprintf(tmp, sizeof(tmp), "%ld", msg->ret);
+			snprintf(tmp2, sizeof(tmp2), "%d", len);
+			ERR_add_error_data(4, "long read ret=", tmp, " len=",
+			    tmp2);
+			ssl->last_error = SSL_ERROR_SSL;
+			return (-1);
+		}
+		memcpy(buf, msg->body(), msg->ret);
+	}
+	ssl->last_error = msg->error;
+	return (msg->ret);
+}
+
+int
+PSSL_write(PSSL *ssl, const void *buf, int len)
+{
+	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_WRITE, buf,
+	    len);
+	if (msg == nullptr) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	ssl->last_error = msg->error;
+	return (msg->ret);
 }

@@ -86,5 +86,9 @@ void PSSL_set_bio(PSSL *ssl, BIO *rbio, BIO *wbio);
 void PSSL_set0_rbio(PSSL *ssl, BIO *rbio);
 void PSSL_set0_wbio(PSSL *ssl, BIO *wbio);
 int PSSL_get_error(const PSSL *ssl, int i);
+int PSSL_accept(PSSL *ssl);
+int PSSL_connect(PSSL *ssl);
+int PSSL_read(PSSL *ssl, void *buf, int len);
+int PSSL_write(PSSL *ssl, const void *buf, int len);
 
 __END_DECLS

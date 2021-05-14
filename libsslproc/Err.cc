@@ -59,6 +59,7 @@ static ERR_STRING_DATA PROC_strings[] = {
 	 "PSSL_CTX_use_PrivateKey_file"},
 	{ERR_PACK(0, PROC_F_SSL_HANDLE_MESSAGE, 0),
 	 "SSLSession::handleMessage"},
+	{ERR_PACK(0, PROC_F_SSL_READ, 0), "PSSL_read"},
 	{ERR_PACK(0, 0, ERR_R_IO_ERROR), "I/O error"},
 	{ERR_PACK(0, 0, ERR_R_BAD_MESSAGE), "invalid message"},
 	{ERR_PACK(0, 0, ERR_R_UNEXPECTED_EOF), "unexpected EOF"},

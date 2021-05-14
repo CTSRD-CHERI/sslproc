@@ -69,3 +69,7 @@
 #undef SSL_set0_rbio
 #undef SSL_set0_wbio
 #undef SSL_get_error
+#undef SSL_accept
+#undef SSL_connect
+#undef SSL_read
+#undef SSL_write

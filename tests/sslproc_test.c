@@ -317,7 +317,6 @@ test_ssl_refs(void)
 	PASS();
 }
 
-#ifndef USE_SSLPROC
 static bool
 create_ssl_contexts(SSL_CTX **cctx, SSL_CTX **sctx)
 {
@@ -536,7 +535,6 @@ test_ssl_memory_ping_pong(void)
 
 	PASS();
 }
-#endif
 
 int
 main(int ac, char **av)
@@ -566,9 +564,7 @@ main(int ac, char **av)
 	test_ctx_mode();
 	test_ssl_create();
 	test_ssl_refs();
-#ifndef USE_SSLPROC
 	test_ssl_memory_ping_pong();
-#endif
 
 	return (0);
 }
