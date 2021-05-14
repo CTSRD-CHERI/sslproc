@@ -160,12 +160,6 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			    SSL_get_error(ssl, ret));
 		break;
 	case SSLPROC_WRITE:
-		if (hdr->length < sizeof(*hdr)) {
-			syslog(LOG_WARNING,
-			    "invalid message length %d for SSLPROC_WRITE",
-			    hdr->length);
-			return (false);
-		}
 		ret = SSL_write(ssl, hdr->body(), hdr->bodyLength());
 		if (ret > 0)
 			writeReplyMessage(hdr->type, ret);
