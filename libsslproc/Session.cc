@@ -82,7 +82,7 @@ PSSL_new(PSSL_CTX *ctx)
 	}
 	close(fds[1]);
 
-	ssl->ss = new SSLSession(fds[0]);
+	ssl->ss = new SSLSession(ssl, fds[0]);
 	if (!ssl->ss->init()) {
 		delete ssl->ss;
 		delete ssl;
@@ -92,6 +92,8 @@ PSSL_new(PSSL_CTX *ctx)
 	}
 
 	ssl->ctx = ctx;
+	ssl->rbio = nullptr;
+	ssl->wbio = nullptr;
 	ssl->refs = 1;
 	return (ssl);
 }
@@ -119,6 +121,83 @@ PSSL_free(PSSL *ssl)
 
 	PSSL_CTX *ctx = ssl->ctx;
 	delete ssl->ss;
+	BIO_free_all(ssl->wbio);
+	BIO_free_all(ssl->rbio);
 	delete ssl;
 	PSSL_CTX_free(ctx);
+}
+
+BIO *
+PSSL_get_rbio(PSSL *ssl)
+{
+	return (ssl->rbio);
+}
+
+BIO *
+PSSL_get_wbio(PSSL *ssl)
+{
+	return (ssl->wbio);
+}
+
+void
+PSSL_set_bio(PSSL *ssl, BIO *rbio, BIO *wbio)
+{
+
+	/* Rule 1 */
+	if (ssl->rbio == rbio && ssl->wbio == wbio)
+		return;
+
+	/* Rule 2 */
+	if (rbio != wbio && rbio != ssl->rbio && wbio != ssl->wbio) {
+		PSSL_set0_rbio(ssl, rbio);
+		PSSL_set0_wbio(ssl, wbio);
+		return;
+	}
+
+	if (rbio == wbio) {
+		/* Rule 3 */
+		if (rbio != ssl->rbio) {
+			if (rbio != NULL)
+				BIO_up_ref(rbio);
+			PSSL_set0_rbio(ssl, rbio);
+			PSSL_set0_wbio(ssl, wbio);
+			return;
+		}
+
+		/* Rule 4 */
+		if (wbio != NULL)
+			BIO_up_ref(wbio);
+		PSSL_set0_wbio(ssl, wbio);
+		return;
+	}
+
+	/* Rule 5 */
+	if (rbio == ssl->rbio) {
+		PSSL_set0_wbio(ssl, wbio);
+		return;
+	}
+
+	/* Rule 6 */
+	if (wbio == ssl->wbio && ssl->rbio == ssl->wbio) {
+		PSSL_set0_rbio(ssl, wbio);
+		return;
+	}
+
+	/* Rule 7 */
+	PSSL_set0_rbio(ssl, rbio);
+	PSSL_set0_wbio(ssl, wbio);
+}
+
+void
+PSSL_set0_rbio(PSSL *ssl, BIO *rbio)
+{
+	BIO_free_all(ssl->rbio);
+	ssl->rbio = rbio;
+}
+
+void
+PSSL_set0_wbio(PSSL *ssl, BIO *wbio)
+{
+	BIO_free_all(ssl->wbio);
+	ssl->wbio = wbio;
 }

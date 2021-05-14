@@ -44,5 +44,104 @@ SSLSession::~SSLSession()
 bool
 SSLSession::handleMessage(const Message::Header *hdr)
 {
-	return (false);
+	char tmp[16];
+	long ret;
+
+	switch (hdr->type) {
+	case SSLPROC_BIO_READ:
+	{
+		if (hdr->length != sizeof(Message::Read)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
+			snprintf(tmp, sizeof(tmp), "%d", hdr->length);
+			ERR_add_error_data(2, "SSLPROC_BIO_READ bad length=",
+			    tmp);
+			return (false);
+		}
+
+		const Message::Read *msg =
+		    reinterpret_cast<const Message::Read *>(hdr);
+		if (msg->resid > 0) {
+			/*
+			 * XXX: We could perhaps just perform a
+			 * short read with whatever capacity we
+			 * have if it is not zero.
+			 */
+			if (!readBuffer.grow(msg->resid)) {
+				PROCerr(PROC_F_SSL_HANDLE_MESSAGE,
+				    ERR_R_MALLOC_FAILURE);
+				ERR_add_error_data(1,
+				    "failed to grow read buffer");
+				return (false);
+			}
+		}
+
+		ret = BIO_read(ssl->rbio, readBuffer.data(), msg->resid);
+		if (ret > 0)
+			writeReplyMessage(hdr->type, ret, readBuffer.data(),
+			    ret);
+		else {
+			int flags = BIO_get_flags(ssl->rbio);
+			writeReplyMessage(hdr->type, ret, &flags,
+			    sizeof(flags));
+		}
+		break;
+	}
+	case SSLPROC_BIO_WRITE:
+	{
+		ret = BIO_write(ssl->wbio, hdr->body(), hdr->bodyLength());
+		int flags = BIO_get_flags(ssl->wbio);
+		writeReplyMessage(hdr->type, ret, &flags, sizeof(flags));
+		break;
+	}
+	case SSLPROC_BIO_CTRL_READ:
+	case SSLPROC_BIO_CTRL_WRITE:
+	{
+		if (hdr->length != sizeof(Message::Ctrl)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
+			snprintf(tmp, sizeof(tmp), "%d", hdr->length);
+			ERR_add_error_data(3,
+			    hdr->type == SSLPROC_BIO_CTRL_READ ?
+			    "SSLPROC_BIO_CTRL_READ" : "SSLPROC_BIO_CTRL_WRITE",
+			    " bad length=", tmp);
+			return (false);
+		}
+
+		const Message::Ctrl *msg =
+		    reinterpret_cast<const Message::Ctrl *>(hdr);
+		long ret;
+		BIO *bio;
+
+		if (hdr->type == SSLPROC_BIO_CTRL_READ)
+			bio = ssl->rbio;
+		else
+			bio = ssl->wbio;
+
+		switch (msg->cmd) {
+		case BIO_CTRL_GET_CLOSE:
+		case BIO_CTRL_SET_CLOSE:
+			ret = BIO_ctrl(bio, msg->cmd, msg->larg, nullptr);
+			writeReplyMessage(hdr->type, ret);
+			break;
+		default:
+			writeErrnoReply(hdr->type, -1, EOPNOTSUPP);
+			PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
+			snprintf(tmp, sizeof(tmp), "%d", msg->cmd);
+			ERR_add_error_data(3,
+			    hdr->type == SSLPROC_BIO_CTRL_READ ?
+			    "SSLPROC_BIO_CTRL_READ" : "SSLPROC_BIO_CTRL_WRITE",
+			    " unsupported cmd=", tmp);
+			return (false);
+		}
+		break;
+	}
+	default:
+		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
+		snprintf(tmp, sizeof(tmp), "%d", hdr->type);
+		ERR_add_error_data(2, "unknown message type=", tmp);
+		return (false);
+	}
+
+	return (true);
 }

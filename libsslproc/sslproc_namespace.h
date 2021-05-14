@@ -63,3 +63,8 @@
 #define	SSL_new			PSSL_new
 #define	SSL_up_ref		PSSL_up_ref
 #define	SSL_free		PSSL_free
+#define	SSL_get_rbio		PSSL_get_rbio
+#define	SSL_get_wbio		PSSL_get_wbio
+#define	SSL_set_bio		PSSL_set_bio
+#define	SSL_set0_rbio		PSSL_set0_rbio
+#define	SSL_set0_wbio		PSSL_set0_wbio

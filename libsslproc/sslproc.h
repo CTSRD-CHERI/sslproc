@@ -80,5 +80,10 @@ typedef struct _PSSL PSSL;
 PSSL *PSSL_new(PSSL_CTX *ctx);
 int PSSL_up_ref(PSSL *ssl);
 void PSSL_free(PSSL *ssl);
+BIO *PSSL_get_rbio(PSSL *ssl);
+BIO *PSSL_get_wbio(PSSL *ssl);
+void PSSL_set_bio(PSSL *ssl, BIO *rbio, BIO *wbio);
+void PSSL_set0_rbio(PSSL *ssl, BIO *rbio);
+void PSSL_set0_wbio(PSSL *ssl, BIO *wbio);
 
 __END_DECLS

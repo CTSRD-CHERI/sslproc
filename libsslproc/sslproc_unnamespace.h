@@ -63,3 +63,8 @@
 #undef SSL_new
 #undef SSL_up_ref
 #undef SSL_free
+#undef SSL_get_rbio
+#undef SSL_get_wbio
+#undef SSL_set_bio
+#undef SSL_set0_rbio
+#undef SSL_set0_wbio

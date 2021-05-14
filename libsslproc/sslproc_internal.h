@@ -64,6 +64,7 @@ void	PERR_init(void);
 #define	PROC_F_SSL_CTX_USE_PRIVATEKEY	11
 #define	PROC_F_SSL_CTX_USE_PRIVATEKEY_ASN1	12
 #define	PROC_F_SSL_CTX_USE_PRIVATEKEY_FILE	13
+#define	PROC_F_SSL_HANDLE_MESSAGE	14
 
 #define	ERR_R_IO_ERROR		(128|ERR_R_FATAL)
 #define	ERR_R_BAD_MESSAGE	(129|ERR_R_FATAL)
@@ -93,6 +94,8 @@ class SSLSession;
 
 struct _PSSL {
 	struct _PSSL_CTX *ctx;
+	BIO *rbio;
+	BIO *wbio;
 	SSLSession *ss;
 	std::atomic_int refs;
 };

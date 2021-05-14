@@ -37,11 +37,16 @@
 
 class SSLSession : public LibMessageSocket {
 public:
-	SSLSession(int _fd) : LibMessageSocket(_fd), fd(_fd) {};
+	SSLSession(PSSL *_ssl, int _fd) : LibMessageSocket(_fd), ssl(_ssl),
+					  fd(_fd) {};
 	~SSLSession();
 
 private:
 	bool handleMessage(const Message::Header *hdr);
+
+	DataBuffer readBuffer;
+
+	PSSL *ssl;
 
 	int fd;
 };
