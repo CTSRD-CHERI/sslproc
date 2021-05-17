@@ -51,7 +51,6 @@ DataBuffer::grow(size_t newCapacity)
 	if (newBuffer == nullptr)
 		return (false);
 
-	free(buffer);
 	buffer = newBuffer;
 	cap = malloc_usable_size(newBuffer);
 	return (true);
