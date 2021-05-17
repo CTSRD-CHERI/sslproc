@@ -137,6 +137,22 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		}
 		break;
 	}
+	case SSLPROC_MSG_CB:
+	{
+		if (hdr->length < sizeof(Message::MsgCb)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		const Message::MsgCb *msg =
+		    reinterpret_cast<const Message::MsgCb *>(hdr);
+
+		if (ssl->msg_cb != NULL)
+			ssl->msg_cb(msg->write_p, msg->version, msg->content_type,
+			    msg->body(), msg->bodyLength(), ssl, ssl->msg_cb_arg);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	default:
 		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

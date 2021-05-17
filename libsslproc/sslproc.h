@@ -80,6 +80,9 @@ typedef struct _PSSL PSSL;
 PSSL *PSSL_new(PSSL_CTX *ctx);
 int PSSL_up_ref(PSSL *ssl);
 void PSSL_free(PSSL *ssl);
+long PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg);
+void PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
+    size_t, PSSL *, void *));
 BIO *PSSL_get_rbio(PSSL *ssl);
 BIO *PSSL_get_wbio(PSSL *ssl);
 void PSSL_set_bio(PSSL *ssl, BIO *rbio, BIO *wbio);

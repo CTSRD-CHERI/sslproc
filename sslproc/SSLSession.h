@@ -47,6 +47,8 @@ public:
 	virtual void onEvent(const struct kevent *);
 	const Message::Result *sendBioRequest(int type,
 	    const void *payload, size_t payloadLen);
+	void sendMsgCb(int write_p, int version, int content_type,
+	    const void *buf, size_t len);
 
 private:
 	bool handleMessage(const Message::Header *hdr);

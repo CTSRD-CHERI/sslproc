@@ -45,6 +45,15 @@
 
 static BIO_METHOD *readBioMethod, *writeBioMethod;
 
+static void
+msg_cb(int write_p, int version, int content_type, const void *buf,
+    size_t len, SSL *ssl, void *arg)
+{
+	SSLSession *ss = reinterpret_cast<SSLSession *>(arg);
+
+	ss->sendMsgCb(write_p, version, content_type, buf, len);
+}
+
 bool
 SSLSession::init(SSL_CTX *ctx)
 {
@@ -175,6 +184,15 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
+	case SSLPROC_ENABLE_MSG_CB:
+		SSL_set_msg_callback_arg(ssl, this);
+		SSL_set_msg_callback(ssl, msg_cb);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_DISABLE_MSG_CB:
+		SSL_set_msg_callback(ssl, NULL);
+		writeReplyMessage(hdr->type, 0);
+		break;
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);
@@ -239,6 +257,31 @@ SSLSession::observeWriteError()
 {
 	syslog(LOG_WARNING, "failed to write message on session socket: %m");
 	writeFailed = true;
+}
+
+void
+SSLSession::sendMsgCb(int write_p, int version, int content_type, const void *buf,
+    size_t len)
+{
+	struct {
+		int write_p;
+		int version;
+		int content_type;
+	} args;
+	struct iovec iov[2];
+
+	args.write_p = write_p;
+	args.version = version;
+	args.content_type = content_type;
+
+	iov[0].iov_base = &args;
+	iov[0].iov_len = sizeof(args);
+	iov[1].iov_base = const_cast<void *>(buf);
+	iov[1].iov_len = len;
+	if (!writeMessage(SSLPROC_MSG_CB, iov, 2))
+		return;
+
+	(void)readMessage(replyBuffer);
 }
 
 const Message::Result *

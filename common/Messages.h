@@ -131,12 +131,34 @@ namespace Message {
  */
 #define	SSLPROC_WRITE		0x45
 
+#define	SSLPROC_ENABLE_MSG_CB	0x46
+#define	SSLPROC_DISABLE_MSG_CB	0x47
+
 /* Per-session messages from sslproc -> client over the 'session' fd. */
 
 #define	SSLPROC_BIO_READ	0x80
 #define	SSLPROC_BIO_WRITE	0x81
 #define	SSLPROC_BIO_CTRL_READ	0x82
 #define	SSLPROC_BIO_CTRL_WRITE	0x83
+
+/* The message buffer is stored in the body. */
+#define	SSLPROC_MSG_CB		0x84
+
+	struct MsgCb : public Header {
+		int	write_p;
+		int	version;
+		int	content_type;
+
+		size_t bodyLength() const
+		{
+			return (length - sizeof(MsgCb));
+		}
+
+		const void *body() const
+		{
+			return (reinterpret_cast<const void *>(this + 1));
+		}
+	};
 
 /*
  * The receiver always returns a Result message to the sender at the

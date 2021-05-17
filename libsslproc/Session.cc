@@ -129,6 +129,38 @@ PSSL_free(PSSL *ssl)
 	PSSL_CTX_free(ctx);
 }
 
+long
+PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
+{
+	long ret;
+
+	switch (cmd) {
+	case SSL_CTRL_SET_MSG_CALLBACK_ARG:
+		ssl->msg_cb_arg = parg;
+		ret = 1;
+		break;
+	default:
+		abort();
+	}
+	return (ret);
+}
+
+void
+PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
+    size_t, PSSL *, void *))
+{
+	if (ssl->msg_cb == cb)
+		return;
+	if (ssl->msg_cb == NULL) {
+		ssl->msg_cb = cb;
+		ssl->ss->waitForReply(SSLPROC_ENABLE_MSG_CB);
+	} else if (cb == NULL) {
+		ssl->ss->waitForReply(SSLPROC_DISABLE_MSG_CB);
+		ssl->msg_cb = NULL;
+	} else
+		ssl->msg_cb = cb;
+}
+
 BIO *
 PSSL_get_rbio(PSSL *ssl)
 {
