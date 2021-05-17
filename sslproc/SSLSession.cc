@@ -356,6 +356,7 @@ readBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 	switch (cmd) {
 	case BIO_CTRL_GET_CLOSE:
 	case BIO_CTRL_SET_CLOSE:
+	case BIO_CTRL_FLUSH:
 		body.cmd = cmd;
 		body.larg = num;
 		msg = ss->sendBioRequest(SSLPROC_BIO_CTRL_READ, &body,
@@ -371,6 +372,10 @@ readBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 		break;
 	case BIO_CTRL_EOF:
 		ret = (BIO_get_flags(bio) & BIO_FLAGS_IN_EOF) ? 1 : 0;
+		break;
+	case BIO_CTRL_PUSH:
+	case BIO_CTRL_POP:
+		ret = 0;
 		break;
 	default:
 		syslog(LOG_DEBUG, "%s: cmd = %d, num = %ld", __func__, cmd,
@@ -440,6 +445,7 @@ writeBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 	switch (cmd) {
 	case BIO_CTRL_GET_CLOSE:
 	case BIO_CTRL_SET_CLOSE:
+	case BIO_CTRL_FLUSH:
 		body.cmd = cmd;
 		body.larg = num;
 		msg = ss->sendBioRequest(SSLPROC_BIO_CTRL_WRITE, &body,
@@ -455,6 +461,10 @@ writeBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 		break;
 	case BIO_CTRL_EOF:
 		ret = (BIO_get_flags(bio) & BIO_FLAGS_IN_EOF) ? 1 : 0;
+		break;
+	case BIO_CTRL_PUSH:
+	case BIO_CTRL_POP:
+		ret = 0;
 		break;
 	default:
 		syslog(LOG_DEBUG, "%s: cmd = %d, num = %ld", __func__, cmd,

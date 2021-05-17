@@ -121,6 +121,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		switch (msg->cmd) {
 		case BIO_CTRL_GET_CLOSE:
 		case BIO_CTRL_SET_CLOSE:
+		case BIO_CTRL_FLUSH:
 			ret = BIO_ctrl(bio, msg->cmd, msg->larg, nullptr);
 			writeReplyMessage(hdr->type, ret);
 			break;
