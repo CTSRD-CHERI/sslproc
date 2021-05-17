@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/param.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -42,6 +43,8 @@
 #include <sslproc.h>
 #include <sslproc_namespace.h>
 #endif
+
+#include "sslproc_test_cb.h"
 
 #define	dprintf(...) do {			\
 	if (verbose) {				\
@@ -62,7 +65,7 @@
 	return;						\
 } while (0)
 
-static int verbose;
+static int show_messages, verbose;
 static const char *short_message = "this is a test message";
 static const char *cert;
 static const char *privkey;
@@ -71,7 +74,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "Usage: sslproc_test [-c certfile] [-k keyfile] [-v]\n");
+	    "Usage: sslproc_test [-c certfile] [-k keyfile] [-mv]\n");
 	exit(1);
 }
 
@@ -515,6 +518,13 @@ test_ssl_memory_ping_pong(void)
 	SSL_CTX_free(cctx);
 	SSL_CTX_free(sctx);
 
+	if (show_messages) {
+		SSL_set_msg_callback(cssl, msg_cb);
+		SSL_set_msg_callback_arg(cssl, "C");
+		SSL_set_msg_callback(sssl, msg_cb);
+		SSL_set_msg_callback_arg(sssl, "S");
+	}
+
 	if (!establish_sessions(cssl, sssl)) {
 		ERR_print_errors_fp(stdout);
 		SSL_free(cssl);
@@ -541,13 +551,16 @@ main(int ac, char **av)
 {
 	int ch;
 
-	while ((ch = getopt(ac, av, "c:k:v")) != -1)
+	while ((ch = getopt(ac, av, "c:k:mv")) != -1)
 		switch (ch) {
 		case 'c':
 			cert = optarg;
 			break;
 		case 'k':
 			privkey = optarg;
+			break;
+		case 'm':
+			show_messages = 1;
 			break;
 		case 'v':
 			verbose++;
