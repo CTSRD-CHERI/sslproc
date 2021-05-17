@@ -149,23 +149,24 @@ LibMessageSocket::setMessageError(const Message::Result *msg)
 	long error;
 	char tmp[16], tmp2[16];
 
-	if (msg->bodyLength() != sizeof(error)) {
-		PROCerr(PROC_F_SET_MESSAGE_ERROR, ERR_R_BAD_MESSAGE);
-		snprintf(tmp, sizeof(tmp), "%zu", msg->bodyLength());
-		ERR_add_error_data(2, "body length=", tmp);
-		return;
-	}
 	error = *reinterpret_cast<const long *>(msg->body());
 	switch (msg->error) {
 	case SSL_ERROR_SSL:
-		ERR_PUT_error(ERR_GET_LIB(error), ERR_GET_FUNC(error),
-		    ERR_GET_REASON(error), "NA", 0);
+		PROCerr(PROC_F_SET_MESSAGE_ERROR, ERR_R_MESSAGE_ERROR);
+		if (msg->bodyLength() != 0)
+			ERR_add_error_data(1, msg->body());
 		break;
 	case SSL_ERROR_SYSCALL:
+	{
 		PROCerr(PROC_F_SET_MESSAGE_ERROR, ERR_R_MESSAGE_ERROR);
 		snprintf(tmp, sizeof(tmp), "%d", msg->type);
-		ERR_add_error_data(4, "type=", tmp, " ", strerror(error));
+		if (msg->bodyLength() == sizeof(int)) {
+			int error = *reinterpret_cast<const int *>(msg->body());
+			ERR_add_error_data(4, "type=", tmp, " ", strerror(error));
+		} else
+			ERR_add_error_data(2, "type=", tmp);
 		break;
+	}
 	case SSL_ERROR_WANT_READ:
 	case SSL_ERROR_WANT_WRITE:
 	case SSL_ERROR_WANT_X509_LOOKUP:

@@ -55,7 +55,8 @@ protected:
 	    size_t payloadLen = 0, const void *control = nullptr,
 	    size_t controlLen = 0);
 	bool writeMessage(int type, const struct iovec *iov, int iovCnt);
-	void writeErrorReply(int type, long ret, int errorType, long error);
+	void writeErrorReply(int type, long ret, int errorType,
+	    const void *payload = NULL, size_t payloadLen = 0);
 	void writeReplyMessage(int type, long ret,
 	    const void *payload = nullptr, size_t payloadLen = 0);
 	void writeReplyMessage(int type, long ret,

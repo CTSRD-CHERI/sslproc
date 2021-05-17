@@ -30,6 +30,8 @@
  * SUCH DAMAGE.
  */
 
+#include <string.h>
+
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
@@ -40,17 +42,33 @@
 void
 ProcMessageSocket::writeSSLErrorReply(int type, long ret, int errorType)
 {
-	long error;
-
 	switch (errorType) {
 	case SSL_ERROR_SYSCALL:
-		error = errno;
+	{
+		int error = errno;
+		writeErrorReply(type, ret, errorType, &error, sizeof(error));
 		break;
-	case SSL_ERROR_SSL:
-		error = ERR_get_error();
-		break;
-	default:
-		error = 0;
 	}
-	writeErrorReply(type, ret, errorType, error);
+	case SSL_ERROR_SSL:
+	{
+		char *buf = NULL;
+		size_t len = 0;
+		FILE *fp = open_memstream(&buf, &len);
+		if (fp == NULL) {
+			writeErrorReply(type, ret, errorType, "internal error",
+			    strlen("internal error"));
+			break;
+		}
+		ERR_print_errors_fp(fp);
+		fclose(fp);
+		while (len > 0 && buf[len - 1] == '\n')
+			len--;
+		writeErrorReply(type, ret, errorType, buf, len);
+		free(buf);
+		break;
+	}
+	default:
+		writeErrorReply(type, ret, errorType);
+		break;
+	}
 }

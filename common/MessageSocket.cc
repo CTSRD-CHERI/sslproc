@@ -223,13 +223,14 @@ MessageSocket::writeReplyMessage(int type, long ret, const struct iovec *iov,
 }
 
 void
-MessageSocket::writeErrorReply(int type, long ret, int errorType, long error)
+MessageSocket::writeErrorReply(int type, long ret, int errorType,
+    const void *payload, size_t payloadLen)
 {
-	writeReplyMessage(type, ret, errorType, &error, sizeof(error));
+	writeReplyMessage(type, ret, errorType, payload, payloadLen);
 }
 
 void
 MessageSocket::writeErrnoReply(int type, long ret, int error)
 {
-	writeErrorReply(type, ret, SSL_ERROR_SYSCALL, error);
+	writeErrorReply(type, ret, SSL_ERROR_SYSCALL, &error, sizeof(error));
 }
