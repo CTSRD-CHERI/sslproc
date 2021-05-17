@@ -166,6 +166,13 @@ LibMessageSocket::setMessageError(const Message::Result *msg)
 		snprintf(tmp, sizeof(tmp), "%d", msg->type);
 		ERR_add_error_data(4, "type=", tmp, " ", strerror(error));
 		break;
+	case SSL_ERROR_WANT_READ:
+	case SSL_ERROR_WANT_WRITE:
+	case SSL_ERROR_WANT_X509_LOOKUP:
+	case SSL_ERROR_ZERO_RETURN:
+	case SSL_ERROR_WANT_CONNECT:
+	case SSL_ERROR_WANT_ACCEPT:
+		break;
 	default:
 		PROCerr(PROC_F_SET_MESSAGE_ERROR, ERR_R_MESSAGE_ERROR);
 		snprintf(tmp, sizeof(tmp), "%d", msg->type);
