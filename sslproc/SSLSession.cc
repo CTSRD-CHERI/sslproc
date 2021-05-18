@@ -120,6 +120,20 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
+	case SSLPROC_DO_HANDSHAKE:
+		if (hdr->length != sizeof(*hdr)) {
+			syslog(LOG_WARNING,
+		    "invalid message length %d for SSLPROC_DO_HANDSHAKE",
+			    hdr->length);
+			return (false);
+		}
+		ret = SSL_do_handshake(ssl);
+		if (ret == 1)
+			writeReplyMessage(hdr->type, ret);
+		else
+			writeSSLErrorReply(hdr->type, ret,
+			    SSL_get_error(ssl, ret));
+		break;
 	case SSLPROC_ACCEPT:
 		if (hdr->length != sizeof(*hdr)) {
 			syslog(LOG_WARNING,
@@ -192,6 +206,18 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	case SSLPROC_DISABLE_MSG_CB:
 		SSL_set_msg_callback(ssl, NULL);
 		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_SET_CONNECT_STATE:
+		SSL_set_connect_state(ssl);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_SET_ACCEPT_STATE:
+		SSL_set_accept_state(ssl);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_IS_SERVER:
+		ret = SSL_is_server(ssl);
+		writeReplyMessage(hdr->type, ret);
 		break;
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);

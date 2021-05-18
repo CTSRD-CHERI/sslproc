@@ -73,6 +73,10 @@
 #undef SSL_set0_rbio
 #undef SSL_set0_wbio
 #undef SSL_get_error
+#undef SSL_set_connect_state
+#undef SSL_set_accept_state
+#undef SSL_is_server
+#undef SSL_do_handshake
 #undef SSL_accept
 #undef SSL_connect
 #undef SSL_read

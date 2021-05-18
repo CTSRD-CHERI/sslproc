@@ -264,6 +264,47 @@ PSSL_get_error(const PSSL *ssl, int i)
 	return (ssl->last_error);
 }
 
+void
+PSSL_set_connect_state(PSSL *ssl)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_SET_CONNECT_STATE);
+	if (msg == nullptr)
+		abort();
+}
+
+void
+PSSL_set_accept_state(PSSL *ssl)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_SET_ACCEPT_STATE);
+	if (msg == nullptr)
+		abort();
+}
+
+int
+PSSL_is_server(PSSL *ssl)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_IS_SERVER);
+	if (msg == nullptr)
+		abort();
+	return (msg->ret);
+}
+
+int
+PSSL_do_handshake(PSSL *ssl)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_DO_HANDSHAKE);
+	if (msg == nullptr) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	ssl->last_error = msg->error;
+	return (msg->ret);
+}
+
 int
 PSSL_accept(PSSL *ssl)
 {

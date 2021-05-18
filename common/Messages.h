@@ -116,6 +116,7 @@ namespace Message {
  * associated SSL_* function in 'ret'.
  */
 #define	SSLPROC_CONNECT		0x40
+#define	SSLPROC_DO_HANDSHAKE	0x41
 #define	SSLPROC_ACCEPT		0x42
 #define	SSLPROC_SHUTDOWN	0x43
 
@@ -133,6 +134,10 @@ namespace Message {
 
 #define	SSLPROC_ENABLE_MSG_CB	0x46
 #define	SSLPROC_DISABLE_MSG_CB	0x47
+
+#define	SSLPROC_SET_ACCEPT_STATE	0x48
+#define	SSLPROC_SET_CONNECT_STATE	0x49
+#define	SSLPROC_IS_SERVER	0x4a
 
 /* Per-session messages from sslproc -> client over the 'session' fd. */
 

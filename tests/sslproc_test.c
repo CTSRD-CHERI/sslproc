@@ -352,6 +352,48 @@ test_ssl_app_data(void)
 	PASS();
 }
 
+static void
+test_ssl_handshake_states(void)
+{
+	SSL_CTX *ctx;
+	SSL *ssl;
+
+	ctx = SSL_CTX_new(TLS_method());
+	if (ctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create context");
+	}
+
+	ssl = SSL_new(ctx);
+	if (ssl == NULL) {
+		ERR_print_errors_fp(stdout);
+		SSL_CTX_free(ctx);
+		FAIL("failed to create session");
+	}
+	SSL_CTX_free(ctx);
+
+	if (SSL_is_server(ssl) != 1) {
+		SSL_free(ssl);
+		FAIL("initial state is not server");
+	}
+
+	SSL_set_connect_state(ssl);
+	if (SSL_is_server(ssl) != 0) {
+		SSL_free(ssl);
+		FAIL("state after set_connect_state is not client");
+	}
+
+	SSL_set_accept_state(ssl);
+	if (SSL_is_server(ssl) != 1) {
+		SSL_free(ssl);
+		FAIL("state after set_accept_state is not server");
+	}
+
+	SSL_free(ssl);
+
+	PASS();
+}
+
 static bool
 create_ssl_contexts(SSL_CTX **cctx, SSL_CTX **sctx)
 {
@@ -610,6 +652,7 @@ main(int ac, char **av)
 	test_ssl_create();
 	test_ssl_refs();
 	test_ssl_app_data();
+	test_ssl_handshake_states();
 	test_ssl_memory_ping_pong();
 
 	return (0);
