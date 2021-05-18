@@ -64,6 +64,8 @@
 #define	SSL_up_ref		PSSL_up_ref
 #define	SSL_free		PSSL_free
 #define	SSL_ctrl		PSSL_ctrl
+#define	SSL_set_ex_data		PSSL_set_ex_data
+#define	SSL_get_ex_data		PSSL_get_ex_data
 #define	SSL_set_msg_callback	PSSL_set_msg_callback
 #define	SSL_get_rbio		PSSL_get_rbio
 #define	SSL_get_wbio		PSSL_get_wbio

@@ -64,6 +64,8 @@
 #undef SSL_up_ref
 #undef SSL_free
 #undef SSL_ctrl
+#undef SSL_set_ex_data
+#undef SSL_get_ex_data
 #undef SSL_set_msg_callback
 #undef SSL_get_rbio
 #undef SSL_get_wbio

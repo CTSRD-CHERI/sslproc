@@ -319,6 +319,39 @@ test_ssl_refs(void)
 	PASS();
 }
 
+static void
+test_ssl_app_data(void)
+{
+	SSL_CTX *ctx;
+	SSL *ssl;
+
+	ctx = SSL_CTX_new(TLS_method());
+	if (ctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create context");
+	}
+
+	ssl = SSL_new(ctx);
+	if (ssl == NULL) {
+		ERR_print_errors_fp(stdout);
+		SSL_CTX_free(ctx);
+		FAIL("failed to create session");
+	}
+	SSL_CTX_free(ctx);
+
+	if (SSL_set_app_data(ssl, (void *)(uintptr_t)0xdeadbeef) != 1) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to set app data");
+	}
+
+	if (SSL_get_app_data(ssl) != (void *)(uintptr_t)0xdeadbeef)
+		FAIL("returned app data did not match");
+
+	SSL_free(ssl);
+
+	PASS();
+}
+
 static bool
 create_ssl_contexts(SSL_CTX **cctx, SSL_CTX **sctx)
 {
@@ -576,6 +609,7 @@ main(int ac, char **av)
 	test_ctx_mode();
 	test_ssl_create();
 	test_ssl_refs();
+	test_ssl_app_data();
 	test_ssl_memory_ping_pong();
 
 	return (0);

@@ -62,10 +62,17 @@ PSSL_new(PSSL_CTX *ctx)
 		return (nullptr);
 	}
 
+	if (CRYPTO_new_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data) != 1) {
+		delete ssl;
+		PSSL_CTX_free(ctx);
+		return (nullptr);
+	}
+
 	int fds[2];
 	if (socketpair(PF_LOCAL, SOCK_SEQPACKET, 0, fds) == -1) {
 		int save_error = errno;
 
+		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
 		delete ssl;
 		PSSL_CTX_free(ctx);
 		PROCerr(PROC_F_SSL_NEW, ERR_R_INTERNAL_ERROR);
@@ -76,6 +83,7 @@ PSSL_new(PSSL_CTX *ctx)
 	if (!ctx->cs->createSession(fds[1])) {
 		close(fds[0]);
 		close(fds[1]);
+		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
 		delete ssl;
 		PSSL_CTX_free(ctx);
 		PROCerr(PROC_F_SSL_NEW, ERR_R_INTERNAL_ERROR);
@@ -87,6 +95,7 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->ss = new SSLSession(ssl, fds[0]);
 	if (!ssl->ss->init()) {
 		delete ssl->ss;
+		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
 		delete ssl;
 		PSSL_CTX_free(ctx);
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
@@ -125,6 +134,7 @@ PSSL_free(PSSL *ssl)
 	delete ssl->ss;
 	BIO_free_all(ssl->wbio);
 	BIO_free_all(ssl->rbio);
+	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
 	delete ssl;
 	PSSL_CTX_free(ctx);
 }
@@ -143,6 +153,18 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 		abort();
 	}
 	return (ret);
+}
+
+int
+PSSL_set_ex_data(PSSL *ssl, int idx, void *data)
+{
+	return (CRYPTO_set_ex_data(&ssl->ex_data, idx, data));
+}
+
+void *
+PSSL_get_ex_data(const PSSL *ssl, int idx)
+{
+	return (CRYPTO_get_ex_data(&ssl->ex_data, idx));
 }
 
 void

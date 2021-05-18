@@ -81,6 +81,8 @@ PSSL *PSSL_new(PSSL_CTX *ctx);
 int PSSL_up_ref(PSSL *ssl);
 void PSSL_free(PSSL *ssl);
 long PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg);
+int PSSL_set_ex_data(PSSL *ssl, int idx, void *data);
+void *PSSL_get_ex_data(const PSSL *ssl, int idx);
 void PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *));
 BIO *PSSL_get_rbio(PSSL *ssl);

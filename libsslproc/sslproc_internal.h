@@ -95,6 +95,7 @@ class SSLSession;
 
 struct _PSSL {
 	struct _PSSL_CTX *ctx;
+	CRYPTO_EX_DATA ex_data;
 	BIO *rbio;
 	BIO *wbio;
 	SSLSession *ss;
