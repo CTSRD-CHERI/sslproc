@@ -330,6 +330,34 @@ PSSL_connect(PSSL *ssl)
 }
 
 int
+PSSL_in_init(const PSSL *ssl)
+{
+	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_IN_INIT);
+	if (msg == nullptr)
+		abort();
+	return (msg->ret);
+}
+
+int
+PSSL_in_before(const PSSL *ssl)
+{
+	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_IN_BEFORE);
+	if (msg == nullptr)
+		abort();
+	return (msg->ret);
+}
+
+int
+PSSL_is_init_finished(const PSSL *ssl)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_IS_INIT_FINISHED);
+	if (msg == nullptr)
+		abort();
+	return (msg->ret);
+}
+
+int
 PSSL_read(PSSL *ssl, void *buf, int len)
 {
 	int resid = len;

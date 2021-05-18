@@ -79,5 +79,8 @@
 #undef SSL_do_handshake
 #undef SSL_accept
 #undef SSL_connect
+#undef SSL_in_init
+#undef SSL_in_before
+#undef SSL_is_init_finished
 #undef SSL_read
 #undef SSL_write

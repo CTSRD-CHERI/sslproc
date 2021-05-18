@@ -97,6 +97,9 @@ int PSSL_is_server(PSSL *ssl);
 int PSSL_do_handshake(PSSL *ssl);
 int PSSL_accept(PSSL *ssl);
 int PSSL_connect(PSSL *ssl);
+int PSSL_in_init(const PSSL *ssl);
+int PSSL_in_before(const PSSL *ssl);
+int PSSL_is_init_finished(const PSSL *ssl);
 int PSSL_read(PSSL *ssl, void *buf, int len);
 int PSSL_write(PSSL *ssl, const void *buf, int len);
 

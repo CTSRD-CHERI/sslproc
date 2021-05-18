@@ -138,6 +138,9 @@ namespace Message {
 #define	SSLPROC_SET_ACCEPT_STATE	0x48
 #define	SSLPROC_SET_CONNECT_STATE	0x49
 #define	SSLPROC_IS_SERVER	0x4a
+#define	SSLPROC_IN_INIT		0x4b
+#define	SSLPROC_IN_BEFORE	0x4c
+#define	SSLPROC_IS_INIT_FINISHED	0x4d
 
 /* Per-session messages from sslproc -> client over the 'session' fd. */
 
