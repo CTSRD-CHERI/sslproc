@@ -100,6 +100,8 @@ int PSSL_connect(PSSL *ssl);
 int PSSL_in_init(const PSSL *ssl);
 int PSSL_in_before(const PSSL *ssl);
 int PSSL_is_init_finished(const PSSL *ssl);
+const char *PSSL_get_servername(const PSSL *ssl, const int type);
+int PSSL_get_servername_type(const PSSL *ssl);
 int PSSL_read(PSSL *ssl, void *buf, int len);
 int PSSL_write(PSSL *ssl, const void *buf, int len);
 

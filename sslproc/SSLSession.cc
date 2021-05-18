@@ -231,6 +231,66 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		ret = SSL_is_init_finished(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
+	case SSLPROC_GET_SERVERNAME:
+	{
+		int type;
+
+		if (hdr->bodyLength() != sizeof(type)) {
+			syslog(LOG_WARNING,
+		    "invalid message length %d for SSLPROC_GET_SERVERNAME",
+			    hdr->length);
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		type = *reinterpret_cast<const int *>(hdr->body());
+		const char *servername = SSL_get_servername(ssl, type);
+		if (servername == nullptr)
+			writeReplyMessage(hdr->type, 0);
+		else
+			writeReplyMessage(hdr->type, 0, servername,
+			    strlen(servername));
+		break;
+	}
+	case SSLPROC_GET_SERVERNAME_TYPE:
+		ret = SSL_get_servername_type(ssl);
+		writeReplyMessage(hdr->type, ret);
+		break;
+	case SSLPROC_CTRL:
+	{
+		if (hdr->length < sizeof(Message::Ctrl)) {
+			syslog(LOG_WARNING,
+			    "invalid message length %d for SSLPROC_CTRL",
+			    hdr->length);
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		const Message::Ctrl *msg =
+		    reinterpret_cast<const Message::Ctrl *>(hdr);
+		long ret;
+
+		switch (msg->cmd) {
+		case SSL_CTRL_SET_TLSEXT_HOSTNAME:
+		{
+			char *name;
+
+			if (msg->bodyLength() == 0)
+				name = NULL;
+			else
+				name = strndup(
+				    reinterpret_cast<const char *>(msg->body()),
+				    msg->bodyLength());
+			ret = SSL_ctrl(ssl, msg->cmd, msg->larg, name);
+			free(name);
+			writeReplyMessage(hdr->type, ret);
+			break;
+		}
+		default:
+			writeErrnoReply(hdr->type, -1, EOPNOTSUPP);
+			break;
+		}
+		break;
+	}
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

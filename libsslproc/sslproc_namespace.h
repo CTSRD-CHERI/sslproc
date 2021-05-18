@@ -82,5 +82,7 @@
 #define	SSL_in_init		PSSL_in_init
 #define	SSL_in_before		PSSL_in_before
 #define	SSL_is_init_finished	PSSL_is_init_finished
+#define	SSL_get_servername	PSSL_get_servername
+#define	SSL_get_servername_type	PSSL_get_servername_type
 #define	SSL_read		PSSL_read
 #define	SSL_write		PSSL_write

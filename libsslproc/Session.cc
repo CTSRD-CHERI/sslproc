@@ -105,6 +105,7 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->ctx = ctx;
 	ssl->rbio = nullptr;
 	ssl->wbio = nullptr;
+	ssl->servername = nullptr;
 	ssl->refs = 1;
 	return (ssl);
 }
@@ -131,6 +132,7 @@ PSSL_free(PSSL *ssl)
 		return;
 
 	PSSL_CTX *ctx = ssl->ctx;
+	free(ssl->servername);
 	delete ssl->ss;
 	BIO_free_all(ssl->wbio);
 	BIO_free_all(ssl->rbio);
@@ -142,13 +144,37 @@ PSSL_free(PSSL *ssl)
 long
 PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 {
+	Message::CtrlBody body;
+	const Message::Result *msg;
 	long ret;
 
+	body.cmd = cmd;
+	body.larg = larg;
 	switch (cmd) {
 	case SSL_CTRL_SET_MSG_CALLBACK_ARG:
 		ssl->msg_cb_arg = parg;
 		ret = 1;
 		break;
+	case SSL_CTRL_SET_TLSEXT_HOSTNAME:
+	{
+		struct iovec iov[2];
+		int cnt;
+
+		iov[0].iov_base = &body;
+		iov[0].iov_len = sizeof(body);
+		cnt = 1;
+		if (parg != NULL) {
+			iov[1].iov_base = parg;
+			iov[1].iov_len = strlen(reinterpret_cast<char *>(parg));
+			cnt++;
+		}
+
+		msg = ssl->ss->waitForReply(SSLPROC_CTRL, iov, cnt);
+		if (msg == nullptr)
+			return (0);
+		ret = msg->ret;
+		break;
+	}
 	default:
 		abort();
 	}
@@ -352,6 +378,39 @@ PSSL_is_init_finished(const PSSL *ssl)
 {
 	const Message::Result *msg =
 	    ssl->ss->waitForReply(SSLPROC_IS_INIT_FINISHED);
+	if (msg == nullptr)
+		abort();
+	return (msg->ret);
+}
+
+const char *
+PSSL_get_servername(const PSSL *sslc, const int type)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_GET_SERVERNAME_TYPE, &type,
+		sizeof(type));
+	if (msg == nullptr)
+		return (nullptr);
+	if (msg->error != SSL_ERROR_NONE)
+		return (nullptr);
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+	const char *name = reinterpret_cast<const char *>(msg->body());
+	if (ssl->servername != NULL &&
+	    strlen(ssl->servername) == msg->bodyLength() &&
+	    strncmp(ssl->servername, name, msg->bodyLength()) == 0)
+		return (ssl->servername);
+	free(ssl->servername);
+	ssl->servername = strndup(name, msg->bodyLength());
+	return (ssl->servername);
+}
+
+int
+PSSL_get_servername_type(const PSSL *ssl)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_GET_SERVERNAME_TYPE);
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);

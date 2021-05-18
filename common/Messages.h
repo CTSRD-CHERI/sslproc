@@ -80,10 +80,20 @@ namespace Message {
 	struct CtrlBody {
 		int	cmd;
 		long	larg;
-		/* TODO: Nothing that supports parg yet. */
 	};
 
-	struct Ctrl : public Header, CtrlBody {};
+	struct Ctrl : public Header, CtrlBody {
+
+		size_t bodyLength() const
+		{
+			return (length - sizeof(Ctrl));
+		}
+
+		const void *body() const
+		{
+			return (reinterpret_cast<const void *>(this + 1));
+		}
+	};
 
 /* Message body is a ASN1-serialized X509 object. */
 #define	SSLPROC_CTX_USE_CERTIFICATE_ASN1	7
@@ -141,6 +151,9 @@ namespace Message {
 #define	SSLPROC_IN_INIT		0x4b
 #define	SSLPROC_IN_BEFORE	0x4c
 #define	SSLPROC_IS_INIT_FINISHED	0x4d
+#define	SSLPROC_GET_SERVERNAME	0x4e
+#define	SSLPROC_GET_SERVERNAME_TYPE	0x4f
+#define	SSLPROC_CTRL		0x50
 
 /* Per-session messages from sslproc -> client over the 'session' fd. */
 
