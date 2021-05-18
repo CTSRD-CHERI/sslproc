@@ -465,3 +465,35 @@ PSSL_write(PSSL *ssl, const void *buf, int len)
 	ssl->last_error = msg->error;
 	return (msg->ret);
 }
+
+void
+PSSL_set_shutdown(PSSL *ssl, int mode)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_SET_SHUTDOWN, &mode, sizeof(mode));
+	if (msg == nullptr)
+		abort();
+}
+
+int
+PSSL_get_shutdown(const PSSL *sslc)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_GET_SHUTDOWN);
+	if (msg == nullptr)
+		abort();
+	return (msg->ret);
+}
+
+int
+PSSL_shutdown(PSSL *ssl)
+{
+	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_SHUTDOWN);
+	if (msg == nullptr) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	ssl->last_error = msg->error;
+	return (msg->ret);
+}

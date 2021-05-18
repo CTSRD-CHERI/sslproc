@@ -291,6 +291,26 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		}
 		break;
 	}
+	case SSLPROC_SET_SHUTDOWN:
+	{
+		int mode;
+
+		if (hdr->bodyLength() != sizeof(mode)) {
+			syslog(LOG_WARNING,
+		    "invalid message length %d for SSLPROC_SET_SHUTDOWN",
+			    hdr->length);
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		mode = *reinterpret_cast<const int *>(hdr->body());
+		SSL_set_shutdown(ssl, mode);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case SSLPROC_GET_SHUTDOWN:
+		ret = SSL_get_shutdown(ssl);
+		writeReplyMessage(hdr->type, ret);
+		break;
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

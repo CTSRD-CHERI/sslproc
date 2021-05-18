@@ -154,6 +154,8 @@ namespace Message {
 #define	SSLPROC_GET_SERVERNAME	0x4e
 #define	SSLPROC_GET_SERVERNAME_TYPE	0x4f
 #define	SSLPROC_CTRL		0x50
+#define	SSLPROC_SET_SHUTDOWN	0x51
+#define	SSLPROC_GET_SHUTDOWN	0x52
 
 /* Per-session messages from sslproc -> client over the 'session' fd. */
 
