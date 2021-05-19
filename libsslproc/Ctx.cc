@@ -110,6 +110,8 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 		return (nullptr);
 	}
 
+	ctx->servername_cb = nullptr;
+	ctx->servername_cb_arg = nullptr;
 	ctx->refs = 1;
 	return (ctx);
 }
@@ -202,6 +204,28 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 		if (reply == nullptr)
 			abort();
 		return (reply->ret);
+	case SSL_CTRL_SET_TLSEXT_SERVERNAME_ARG:
+		ctx->servername_cb_arg = parg;
+		return (1);
+	default:
+		abort();
+	}
+}
+
+long
+PSSL_CTX_callback_ctrl(PSSL_CTX *ctx, int cmd, void (*cb)(void))
+{
+	const Message::Result *msg;
+
+	switch (cmd) {
+	case SSL_CTRL_SET_TLSEXT_SERVERNAME_CB:
+		ctx->servername_cb = (int (*)(PSSL *, int *, void *))cb;
+		msg = ctx->cs->waitForReply(cb == NULL ?
+		    SSLPROC_CTX_DISABLE_SERVERNAME_CB :
+		    SSLPROC_CTX_ENABLE_SERVERNAME_CB);
+		if (msg == nullptr)
+			abort();
+		return (msg->ret);
 	default:
 		abort();
 	}

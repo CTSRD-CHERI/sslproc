@@ -47,6 +47,7 @@
 #define	SSL_CTX_clear_options	PSSL_CTX_clear_options
 #define	SSL_CTX_get_options	PSSL_CTX_get_options
 #define	SSL_CTX_ctrl		PSSL_CTX_ctrl
+#define	SSL_CTX_callback_ctrl	PSSL_CTX_callback_ctrl
 #define	SSL_CTX_set_ex_data	PSSL_CTX_set_ex_data
 #define	SSL_CTX_get_ex_data	PSSL_CTX_get_ex_data
 #define	SSL_CTX_use_certificate	PSSL_CTX_use_certificate

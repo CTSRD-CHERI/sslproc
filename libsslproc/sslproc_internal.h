@@ -82,10 +82,13 @@ struct _PSSL_METHOD {
 /* SSL_CTX */
 
 class ControlSocket;
+struct _PSSL;
 
 struct _PSSL_CTX {
 	ControlSocket *cs;
 	CRYPTO_EX_DATA ex_data;
+	int (*servername_cb)(struct _PSSL *, int *, void *);
+	void *servername_cb_arg;
 	std::atomic_int refs;
 };
 

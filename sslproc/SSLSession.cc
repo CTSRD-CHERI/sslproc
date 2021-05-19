@@ -37,12 +37,15 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include <unordered_map>
+
 #include <openssl/ssl.h>
 
 #include "local.h"
 #include "Messages.h"
 #include "SSLSession.h"
 
+static std::unordered_map<SSL *, SSLSession *> sessions;
 static BIO_METHOD *readBioMethod, *writeBioMethod;
 
 static void
@@ -66,6 +69,25 @@ msg_cb(int write_p, int version, int content_type, const void *buf,
 	iov[1].iov_base = const_cast<void *>(buf);
 	iov[1].iov_len = len;
 	(void)ss->sendRequest(SSLPROC_MSG_CB, iov, 2);
+}
+
+int
+servername_cb(SSL *ssl, int *al, void *arg)
+{
+	auto it = sessions.find(ssl);
+	if (it == sessions.end()) {
+		syslog(LOG_WARNING, "%s: unable to locate session", __func__);
+		return (SSL_TLSEXT_ERR_ALERT_FATAL);
+	}
+
+	SSLSession *ss = it->second;
+	const Message::Result *msg = ss->sendRequest(SSLPROC_SERVERNAME_CB,
+	    al, sizeof(*al));
+	if (msg == nullptr)
+		return (SSL_TLSEXT_ERR_ALERT_FATAL);
+	if (msg->bodyLength() == sizeof(*al))
+		*al = *reinterpret_cast<const int *>(msg->body());
+	return (msg->ret);
 }
 
 bool
@@ -92,6 +114,7 @@ SSLSession::init(SSL_CTX *ctx)
 		BIO_free(wbio);
 		return (false);
 	}
+	sessions.insert({ssl, this});
 	SSL_set_bio(ssl, rbio, wbio);
 
 	/*
@@ -108,6 +131,9 @@ SSLSession::init(SSL_CTX *ctx)
 
 SSLSession::~SSLSession()
 {
+	if (ssl != nullptr)
+		sessions.erase(ssl);
+
 	SSL_free(ssl);
 
 	close(fd);

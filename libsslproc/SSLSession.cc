@@ -32,6 +32,8 @@
 
 #include <unistd.h>
 
+#include <openssl/ssl.h>
+
 #include <Messages.h>
 #include "SSLSession.h"
 #include "sslproc_internal.h"
@@ -151,6 +153,24 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			ssl->msg_cb(msg->write_p, msg->version, msg->content_type,
 			    msg->body(), msg->bodyLength(), ssl, ssl->msg_cb_arg);
 		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case SSLPROC_SERVERNAME_CB:
+	{
+		int al;
+
+		if (hdr->bodyLength() != sizeof(al)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		al = *reinterpret_cast<const int *>(hdr->body());
+		if (ssl->ctx->servername_cb == NULL)
+			ret = SSL_TLSEXT_ERR_ALERT_FATAL;
+		else
+			ret = ssl->ctx->servername_cb(ssl, &al,
+			    ssl->ctx->servername_cb_arg);
+		writeReplyMessage(hdr->type, ret, &al, sizeof(al));
 		break;
 	}
 	default:

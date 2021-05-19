@@ -32,4 +32,7 @@
 
 #pragma once
 
+#include <openssl/ssl.h>
+
 bool	initOpenSSL();
+int	servername_cb(SSL *, int *, void *);

@@ -37,6 +37,7 @@
 
 #include <openssl/ssl.h>
 
+#include "local.h"
 #include "KEvent.h"
 #include "Messages.h"
 #include "MessageBuffer.h"
@@ -216,6 +217,29 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
 		else
 			writeReplyMessage(hdr->type, 1);
+		break;
+	}
+	case SSLPROC_CTX_ENABLE_SERVERNAME_CB:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		int ret = SSL_CTX_set_tlsext_servername_callback(ctx,
+		    servername_cb);
+		writeReplyMessage(hdr->type, ret);
+		break;
+	}
+	case SSLPROC_CTX_DISABLE_SERVERNAME_CB:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		int ret = SSL_CTX_set_tlsext_servername_callback(ctx, nullptr);
+		writeReplyMessage(hdr->type, ret);
 		break;
 	}
 	case SSLPROC_CREATE_SESSION:

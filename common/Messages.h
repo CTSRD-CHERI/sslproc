@@ -115,6 +115,8 @@ namespace Message {
 	};
 
 #define	SSLPROC_CTX_CHECK_PRIVATE_KEY	9
+#define	SSLPROC_CTX_ENABLE_SERVERNAME_CB	10
+#define	SSLPROC_CTX_DISABLE_SERVERNAME_CB	11
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
@@ -182,6 +184,13 @@ namespace Message {
 			return (reinterpret_cast<const void *>(this + 1));
 		}
 	};
+
+/*
+ * While this callback is registered in the context, it is invoked on
+ * a session.  The message body contains the '*al' alert value.  The
+ * message reply can contain an updated value of '*al' in its body.
+ */
+#define	SSLPROC_SERVERNAME_CB	0x85
 
 /*
  * The receiver always returns a Result message to the sender at the
