@@ -45,12 +45,13 @@ public:
 	~SSLSession();
 	bool init(SSL_CTX *ctx);
 	virtual void onEvent(const struct kevent *);
-	const Message::Result *sendBioRequest(int type,
+	const Message::Result *sendRequest(int type, struct iovec *iov,
+	    int iovCnt);
+	const Message::Result *sendRequest(int type,
 	    const void *payload, size_t payloadLen);
-	void sendMsgCb(int write_p, int version, int content_type,
-	    const void *buf, size_t len);
 
 private:
+	const Message::Result *_waitForReply(int type);
 	bool handleMessage(const Message::Header *hdr);
 	virtual void observeReadError(enum ReadError,
 	    const Message::Header *hdr);

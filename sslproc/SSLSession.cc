@@ -50,8 +50,22 @@ msg_cb(int write_p, int version, int content_type, const void *buf,
     size_t len, SSL *ssl, void *arg)
 {
 	SSLSession *ss = reinterpret_cast<SSLSession *>(arg);
+	struct {
+		int write_p;
+		int version;
+		int content_type;
+	} args;
+	struct iovec iov[2];
 
-	ss->sendMsgCb(write_p, version, content_type, buf, len);
+	args.write_p = write_p;
+	args.version = version;
+	args.content_type = content_type;
+
+	iov[0].iov_base = &args;
+	iov[0].iov_len = sizeof(args);
+	iov[1].iov_base = const_cast<void *>(buf);
+	iov[1].iov_len = len;
+	(void)ss->sendRequest(SSLPROC_MSG_CB, iov, 2);
 }
 
 bool
@@ -377,42 +391,35 @@ SSLSession::observeWriteError()
 	writeFailed = true;
 }
 
-void
-SSLSession::sendMsgCb(int write_p, int version, int content_type, const void *buf,
-    size_t len)
+const Message::Result *
+SSLSession::sendRequest(int type, struct iovec *iov, int iovCnt)
 {
-	struct {
-		int write_p;
-		int version;
-		int content_type;
-	} args;
-	struct iovec iov[2];
+	if (!writeMessage(type, iov, iovCnt)) {
+		syslog(LOG_DEBUG, "%s: failed to send request %d: %m", __func__,
+		    type);
+		return (nullptr);
+	}
 
-	args.write_p = write_p;
-	args.version = version;
-	args.content_type = content_type;
-
-	iov[0].iov_base = &args;
-	iov[0].iov_len = sizeof(args);
-	iov[1].iov_base = const_cast<void *>(buf);
-	iov[1].iov_len = len;
-	if (!writeMessage(SSLPROC_MSG_CB, iov, 2))
-		return;
-
-	(void)readMessage(replyBuffer);
+	return (_waitForReply(type));
 }
 
 const Message::Result *
-SSLSession::sendBioRequest(int type, const void *payload, size_t payloadLen)
+SSLSession::sendRequest(int type, const void *payload, size_t payloadLen)
 {
-	const Message::Result *msg;
-	int rc;
-
 	if (!writeMessage(type, payload, payloadLen)) {
 		syslog(LOG_DEBUG, "%s: failed to send request %d: %m", __func__,
 		    type);
 		return (nullptr);
 	}
+
+	return (_waitForReply(type));
+}
+
+const Message::Result *
+SSLSession::_waitForReply(int type)
+{
+	const Message::Result *msg;
+	int rc;
 
 	rc = readMessage(replyBuffer);
 	if (rc == 0) {
@@ -454,7 +461,7 @@ readBioRead(BIO *bio, char *out, int outl)
 	BIO_clear_retry_flags(bio);
 
 	resid = outl;
-	msg = ss->sendBioRequest(SSLPROC_BIO_READ, &resid, sizeof(resid));
+	msg = ss->sendRequest(SSLPROC_BIO_READ, &resid, sizeof(resid));
 	if (msg == nullptr) {
 		/* XXX: Do we need to terminate the session? */
 		return (-1);
@@ -520,7 +527,7 @@ readBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 	case BIO_CTRL_FLUSH:
 		body.cmd = cmd;
 		body.larg = num;
-		msg = ss->sendBioRequest(SSLPROC_BIO_CTRL_READ, &body,
+		msg = ss->sendRequest(SSLPROC_BIO_CTRL_READ, &body,
 		    sizeof(body));
 		if (msg == nullptr) {
 			syslog(LOG_DEBUG, "%s: failed to get a reply",
@@ -564,7 +571,7 @@ writeBioWrite(BIO *bio, const char *in, int inl)
 
 	BIO_clear_retry_flags(bio);
 
-	msg = ss->sendBioRequest(SSLPROC_BIO_WRITE, const_cast<char *>(in), inl);
+	msg = ss->sendRequest(SSLPROC_BIO_WRITE, const_cast<char *>(in), inl);
 	if (msg == nullptr) {
 		/* XXX: Do we need to terminate the session? */
 		return (-1);
@@ -609,7 +616,7 @@ writeBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 	case BIO_CTRL_FLUSH:
 		body.cmd = cmd;
 		body.larg = num;
-		msg = ss->sendBioRequest(SSLPROC_BIO_CTRL_WRITE, &body,
+		msg = ss->sendRequest(SSLPROC_BIO_CTRL_WRITE, &body,
 		    sizeof(body));
 		if (msg == nullptr) {
 			syslog(LOG_DEBUG, "%s: failed to get a reply",
