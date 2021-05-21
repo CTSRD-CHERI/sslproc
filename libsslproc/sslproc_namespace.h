@@ -85,6 +85,7 @@
 #define	SSL_get_srp_userinfo	PSSL_get_srp_userinfo
 #define	SSL_get_current_cipher	PSSL_get_current_cipher
 #define	SSL_get_pending_cipher	PSSL_get_pending_cipher
+#define	SSL_set_session_id_context	PSSL_set_session_id_context
 #define	SSL_set_msg_callback	PSSL_set_msg_callback
 #define	SSL_get_rbio		PSSL_get_rbio
 #define	SSL_get_wbio		PSSL_get_wbio

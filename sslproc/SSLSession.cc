@@ -472,6 +472,21 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0, iov, 2);
 		break;
 	}
+	case SSLPROC_SET_SESSION_ID_CONTEXT:
+		const unsigned char *ctx_id;
+
+		if (hdr->bodyLength() == 0)
+			ctx_id = nullptr;
+		else
+			ctx_id = reinterpret_cast<const unsigned char *>
+			    (hdr->body());
+		ret = SSL_set_session_id_context(ssl, ctx_id,
+		    hdr->bodyLength());
+		if (ret != 0)
+			writeSSLErrorReply(hdr->type, ret, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, ret);
+		break;
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

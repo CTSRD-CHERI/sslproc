@@ -85,6 +85,7 @@
 #undef SSL_get_srp_userinfo
 #undef SSL_get_current_cipher
 #undef SSL_get_pending_cipher
+#undef SSL_set_session_id_context
 #undef SSL_set_msg_callback
 #undef SSL_get_rbio
 #undef SSL_get_wbio

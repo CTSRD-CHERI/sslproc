@@ -351,6 +351,17 @@ PSSL_get_pending_cipher(const PSSL *sslc)
 	    &ssl->pending_cipher));
 }
 
+int
+PSSL_set_session_id_context(PSSL *ssl, const unsigned char *ctx,
+    unsigned int len)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_SET_SESSION_ID_CONTEXT, ctx, len);
+	if (msg == nullptr)
+		return (0);
+	return (msg->ret);
+}
+
 void
 PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *))

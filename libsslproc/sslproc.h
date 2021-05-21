@@ -106,6 +106,8 @@ char *PSSL_get_srp_username(PSSL *ssl);
 char *PSSL_get_srp_userinfo(PSSL *ssl);
 const PSSL_CIPHER *PSSL_get_current_cipher(const PSSL *ssl);
 const PSSL_CIPHER *PSSL_get_pending_cipher(const PSSL *ssl);
+int PSSL_set_session_id_context(PSSL *ssl, const unsigned char *ctx,
+    unsigned int len);
 void PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *));
 BIO *PSSL_get_rbio(PSSL *ssl);
