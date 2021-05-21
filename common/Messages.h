@@ -164,6 +164,8 @@ namespace Message {
 #define	SSLPROC_SET_ALPN_PROTOS	0x56
 #define	SSLPROC_GET_SRP_USERNAME	0x57
 #define	SSLPROC_GET_SRP_USERINFO	0x58
+#define	SSLPROC_GET_CURRENT_CIPHER	0x59
+#define	SSLPROC_GET_PENDING_CIPHER	0x5a
 
 /* Per-session messages from sslproc -> client over the 'session' fd. */
 
@@ -221,6 +223,24 @@ namespace Message {
 		const void *body() const
 		{
 			return (reinterpret_cast<const void *>(this + 1));
+		}
+	};
+
+	/* Returned by SSLPROC_GET_*_CIPHER. */
+	struct CipherResultBody {
+		int	bits;
+		int	alg_bits;
+	};
+
+	struct CipherResult : public Result, CipherResultBody {
+		size_t nameLength() const
+		{
+			return (length - sizeof(CipherResult));
+		}
+
+		const char *name() const
+		{
+			return (reinterpret_cast<const char *>(this + 1));
 		}
 	};
 }

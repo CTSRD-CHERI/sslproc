@@ -108,6 +108,8 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->servername = nullptr;
 	ssl->srp_username = nullptr;
 	ssl->srp_userinfo = nullptr;
+	memset(&ssl->current_cipher, 0, sizeof(ssl->current_cipher));
+	memset(&ssl->pending_cipher, 0, sizeof(ssl->pending_cipher));
 	ssl->refs = 1;
 	return (ssl);
 }
@@ -134,6 +136,8 @@ PSSL_free(PSSL *ssl)
 		return;
 
 	PSSL_CTX *ctx = ssl->ctx;
+	free(ssl->pending_cipher.name);
+	free(ssl->current_cipher.name);
 	free(ssl->srp_userinfo);
 	free(ssl->srp_username);
 	free(ssl->servername);
@@ -308,6 +312,43 @@ PSSL_get_srp_userinfo(PSSL *ssl)
 	const char *info = reinterpret_cast<const char *>(msg->body());
 	ssl->srp_userinfo = strndup(info, msg->bodyLength());
 	return (ssl->srp_userinfo);
+}
+
+static const PSSL_CIPHER *
+PSSL_fetch_cipher(PSSL *ssl, int request, PSSL_CIPHER *cipher)
+{
+	const Message::Result *msg = ssl->ss->waitForReply(request);
+	if (msg == nullptr)
+		return (nullptr);
+	if (msg->length < sizeof(Message::CipherResult))
+		return (nullptr);
+	const Message::CipherResult *cipherMsg =
+	    reinterpret_cast<const Message::CipherResult *>(msg);
+	cipher->bits = cipherMsg->bits;
+	cipher->alg_bits = cipherMsg->alg_bits;
+	free(cipher->name);
+	if (cipherMsg->nameLength() == 0)
+		cipher->name = nullptr;
+	else
+		cipher->name = strndup(cipherMsg->name(),
+		    cipherMsg->nameLength());
+	return (cipher);
+}
+
+const PSSL_CIPHER *
+PSSL_get_current_cipher(const PSSL *sslc)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+	return (PSSL_fetch_cipher(ssl, SSLPROC_GET_CURRENT_CIPHER,
+	    &ssl->current_cipher));
+}
+
+const PSSL_CIPHER *
+PSSL_get_pending_cipher(const PSSL *sslc)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+	return (PSSL_fetch_cipher(ssl, SSLPROC_GET_PENDING_CIPHER,
+	    &ssl->pending_cipher));
 }
 
 void

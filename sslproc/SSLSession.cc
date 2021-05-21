@@ -424,6 +424,32 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case SSLPROC_GET_CURRENT_CIPHER:
+	case SSLPROC_GET_PENDING_CIPHER:
+	{
+		const SSL_CIPHER *cipher;
+
+		if (hdr->type == SSLPROC_GET_CURRENT_CIPHER)
+			cipher = SSL_get_current_cipher(ssl);
+		else
+			cipher = SSL_get_pending_cipher(ssl);
+		if (cipher == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		Message::CipherResultBody body;
+		body.bits = SSL_CIPHER_get_bits(cipher, &body.alg_bits);
+		const char *name = SSL_CIPHER_get_name(cipher);
+
+		struct iovec iov[2];
+		iov[0].iov_base = &body;
+		iov[0].iov_len = sizeof(body);
+		iov[1].iov_base = const_cast<char *>(name);
+		iov[1].iov_len = name == nullptr ? 0 : strlen(name);
+		writeReplyMessage(hdr->type, 0, iov, 2);
+		break;
+	}
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

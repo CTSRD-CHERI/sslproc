@@ -37,6 +37,12 @@
 #undef TLS_server_method
 #undef TLS_client_method
 
+/* SSL_CIPHER */
+
+#undef SSL_CIPHER
+#undef SSL_CIPHER_get_name
+#undef SSL_CIPHER_get_bits
+
 /* SSL_CTX */
 
 #undef SSL_CTX
@@ -75,6 +81,8 @@
 #undef SSL_set_alpn_protos
 #undef SSL_get_srp_username
 #undef SSL_get_srp_userinfo
+#undef SSL_get_current_cipher
+#undef SSL_get_pending_cipher
 #undef SSL_set_msg_callback
 #undef SSL_get_rbio
 #undef SSL_get_wbio

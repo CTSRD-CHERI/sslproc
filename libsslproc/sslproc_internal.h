@@ -79,6 +79,14 @@ struct _PSSL_METHOD {
 	int method;	/* SSL_METHOD_* */
 };
 
+/* SSL_CIPHER */
+
+struct _PSSL_CIPHER {
+	char *name;
+	int alg_bits;
+	int bits;
+};
+
 /* SSL_CTX */
 
 class ControlSocket;
@@ -105,6 +113,8 @@ struct _PSSL {
 	char *servername;
 	char *srp_username;
 	char *srp_userinfo;
+	struct _PSSL_CIPHER current_cipher;
+	struct _PSSL_CIPHER pending_cipher;
 	void (*msg_cb)(int, int, int, const void *, size_t, struct _PSSL *, void *);
 	void *msg_cb_arg;
 	std::atomic_int refs;

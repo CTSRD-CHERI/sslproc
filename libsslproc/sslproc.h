@@ -49,6 +49,14 @@ const PSSL_METHOD *PTLS_method(void);
 const PSSL_METHOD *PTLS_server_method(void);
 const PSSL_METHOD *PTLS_client_method(void);
 
+/* SSL_CIPHER */
+
+struct _PSSL_CIPHER;
+typedef struct _PSSL_CIPHER PSSL_CIPHER;
+
+const char *PSSL_CIPHER_get_name(const PSSL_CIPHER *c);
+int PSSL_CIPHER_get_bits(const PSSL_CIPHER *c, int *alg_bits);
+
 /* SSL_CTX */
 
 struct _PSSL_CTX;
@@ -93,6 +101,8 @@ int PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos,
     unsigned int len);
 char *PSSL_get_srp_username(PSSL *ssl);
 char *PSSL_get_srp_userinfo(PSSL *ssl);
+const PSSL_CIPHER *PSSL_get_current_cipher(const PSSL *ssl);
+const PSSL_CIPHER *PSSL_get_pending_cipher(const PSSL *ssl);
 void PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *));
 BIO *PSSL_get_rbio(PSSL *ssl);

@@ -37,6 +37,12 @@
 #define	TLS_server_method	PTLS_server_method
 #define	TLS_client_method	PTLS_client_method
 
+/* SSL_CIPHER */
+
+#define	SSL_CIPHER		PSSL_CIPHER
+#define	SSL_CIPHER_get_name	PSSL_CIPHER_get_name
+#define	SSL_CIPHER_get_bits	PSSL_CIPHER_get_bits
+
 /* SSL_CTX */
 
 #define	SSL_CTX			PSSL_CTX
@@ -75,6 +81,8 @@
 #define	SSL_set_alpn_protos	PSSL_set_alpn_protos
 #define	SSL_get_srp_username	PSSL_get_srp_username
 #define	SSL_get_srp_userinfo	PSSL_get_srp_userinfo
+#define	SSL_get_current_cipher	PSSL_get_current_cipher
+#define	SSL_get_pending_cipher	PSSL_get_pending_cipher
 #define	SSL_set_msg_callback	PSSL_set_msg_callback
 #define	SSL_get_rbio		PSSL_get_rbio
 #define	SSL_get_wbio		PSSL_get_wbio
