@@ -552,6 +552,50 @@ PSSL_is_init_finished(const PSSL *ssl)
 	return (msg->ret);
 }
 
+int
+PSSL_client_version(const PSSL *ssl)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_CLIENT_VERSION);
+	if (msg == nullptr)
+		abort();
+	return (msg->ret);
+}
+
+static const char *
+version_string(int version)
+{
+	switch (version) {
+	case SSL3_VERSION:
+		return ("SSLv3");
+	case TLS1_VERSION:
+		return ("TLSv1");
+	case TLS1_1_VERSION:
+		return ("TLSv1.1");
+	case TLS1_2_VERSION:
+		return ("TLSv1.2");
+	case TLS1_3_VERSION:
+		return ("TLSv1.3");
+	default:
+		return ("unknown");
+	}
+}
+
+const char *
+PSSL_get_version(const PSSL *ssl)
+{
+	return (version_string(PSSL_version(ssl)));
+}
+
+int
+PSSL_version(const PSSL *ssl)
+{
+	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_VERSION);
+	if (msg == nullptr)
+		abort();
+	return (msg->ret);
+}
+
 const char *
 PSSL_get_servername(const PSSL *sslc, const int type)
 {

@@ -102,6 +102,9 @@
 #undef SSL_in_init
 #undef SSL_in_before
 #undef SSL_is_init_finished
+#undef SSL_client_version
+#undef SSL_get_version
+#undef SSL_version
 #undef SSL_get_servername
 #undef SSL_get_servername_type
 #undef SSL_read

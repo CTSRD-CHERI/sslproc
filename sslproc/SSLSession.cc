@@ -487,6 +487,14 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		else
 			writeReplyMessage(hdr->type, ret);
 		break;
+	case SSLPROC_CLIENT_VERSION:
+		ret = SSL_client_version(ssl);
+		writeReplyMessage(hdr->type, ret);
+		break;
+	case SSLPROC_VERSION:
+		ret = SSL_version(ssl);
+		writeReplyMessage(hdr->type, ret);
+		break;
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);
