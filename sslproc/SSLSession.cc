@@ -90,6 +90,28 @@ servername_cb(SSL *ssl, int *al, void *arg)
 	return (msg->ret);
 }
 
+int
+client_hello_cb(SSL *ssl, int *al, void *arg)
+{
+	auto it = sessions.find(ssl);
+	if (it == sessions.end()) {
+		syslog(LOG_WARNING, "%s: unable to locate session", __func__);
+		*al = SSL_AD_INTERNAL_ERROR;
+		return (0);
+	}
+
+	SSLSession *ss = it->second;
+	const Message::Result *msg = ss->sendRequest(SSLPROC_CLIENT_HELLO_CB,
+	    al, sizeof(*al));
+	if (msg == nullptr) {
+		*al = SSL_AD_INTERNAL_ERROR;
+		return (0);
+	}
+	if (msg->bodyLength() == sizeof(*al))
+		*al = *reinterpret_cast<const int *>(msg->body());
+	return (msg->ret);
+}
+
 bool
 SSLSession::init(SSL_CTX *ctx)
 {

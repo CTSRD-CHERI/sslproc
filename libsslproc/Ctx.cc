@@ -112,6 +112,8 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 
 	ctx->servername_cb = nullptr;
 	ctx->servername_cb_arg = nullptr;
+	ctx->client_hello_cb = nullptr;
+	ctx->client_hello_cb_arg = nullptr;
 	ctx->refs = 1;
 	return (ctx);
 }
@@ -419,4 +421,16 @@ PSSL_CTX_check_private_key(PSSL_CTX *ctx)
 	if (reply == nullptr)
 		return (0);
 	return (reply->ret);
+}
+
+void
+PSSL_CTX_set_client_hello_cb(PSSL_CTX *ctx, PSSL_client_hello_cb_fn cb,
+    void *arg)
+{
+
+	ctx->client_hello_cb = cb;
+	ctx->client_hello_cb_arg = arg;
+	(void)ctx->cs->waitForReply(cb == nullptr ?
+	    SSLPROC_CTX_DISABLE_CLIENT_HELLO_CB :
+	    SSLPROC_CTX_ENABLE_CLIENT_HELLO_CB);
 }

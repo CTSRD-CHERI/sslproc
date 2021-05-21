@@ -97,6 +97,8 @@ struct _PSSL_CTX {
 	CRYPTO_EX_DATA ex_data;
 	int (*servername_cb)(struct _PSSL *, int *, void *);
 	void *servername_cb_arg;
+	int (*client_hello_cb)(struct _PSSL *, int *, void *);
+	void *client_hello_cb_arg;
 	std::atomic_int refs;
 };
 

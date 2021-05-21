@@ -242,6 +242,28 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, ret);
 		break;
 	}
+	case SSLPROC_CTX_ENABLE_CLIENT_HELLO_CB:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_client_hello_cb(ctx, client_hello_cb, nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case SSLPROC_CTX_DISABLE_CLIENT_HELLO_CB:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_client_hello_cb(ctx, nullptr, nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||

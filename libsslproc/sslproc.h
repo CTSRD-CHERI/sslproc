@@ -62,6 +62,9 @@ int PSSL_CIPHER_get_bits(const PSSL_CIPHER *c, int *alg_bits);
 struct _PSSL_CTX;
 typedef struct _PSSL_CTX PSSL_CTX;
 
+struct _PSSL;
+typedef struct _PSSL PSSL;
+
 PSSL_CTX *PSSL_CTX_new(const PSSL_METHOD *method);
 int PSSL_CTX_up_ref(PSSL_CTX *ctx);
 void PSSL_CTX_free(PSSL_CTX *ctx);
@@ -80,11 +83,11 @@ int PSSL_CTX_use_PrivateKey_ASN1(int type, PSSL_CTX *ctx,
     const unsigned char *d, int len);
 int PSSL_CTX_use_PrivateKey_file(PSSL_CTX *ctx, const char *file, int type);
 int PSSL_CTX_check_private_key(PSSL_CTX *ctx);
+typedef int (*PSSL_client_hello_cb_fn)(PSSL *s, int *al, void *arg);
+void PSSL_CTX_set_client_hello_cb(PSSL_CTX *ctx, PSSL_client_hello_cb_fn cb,
+    void *arg);
 
 /* SSL */
-
-struct _PSSL;
-typedef struct _PSSL PSSL;
 
 PSSL *PSSL_new(PSSL_CTX *ctx);
 int PSSL_up_ref(PSSL *ssl);

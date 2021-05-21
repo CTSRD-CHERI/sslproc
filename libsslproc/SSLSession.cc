@@ -173,6 +173,24 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, ret, &al, sizeof(al));
 		break;
 	}
+	case SSLPROC_CLIENT_HELLO_CB:
+	{
+		int al;
+
+		if (hdr->bodyLength() != sizeof(al)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		al = *reinterpret_cast<const int *>(hdr->body());
+		if (ssl->ctx->client_hello_cb == NULL)
+			ret = 0;
+		else
+			ret = ssl->ctx->client_hello_cb(ssl, &al,
+			    ssl->ctx->client_hello_cb_arg);
+		writeReplyMessage(hdr->type, ret, &al, sizeof(al));
+		break;
+	}
 	default:
 		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

@@ -63,6 +63,8 @@
 #define	SSL_CTX_use_PrivateKey_ASN1	PSSL_CTX_use_PrivateKey_ASN1
 #define	SSL_CTX_use_PrivateKey_file	PSSL_CTX_use_PrivateKey_file
 #define	SSL_CTX_check_private_key	PSSL_CTX_check_private_key
+#define	SSL_client_hello_cb_fn	PSSL_client_hello_cb_fn
+#define	SSL_CTX_set_client_hello_cb	PSSL_CTX_set_client_hello_cb
 
 /* SSL */
 
