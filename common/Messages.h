@@ -54,8 +54,8 @@ namespace Message {
 
 /* Global messages from client -> sslproc over the 'control' socket. */
 
-#define	SSLPROC_NOP			1
-#define	SSLPROC_CREATE_CONTEXT		2
+#define	SSLPROC_NOP			0x01
+#define	SSLPROC_CREATE_CONTEXT		0x02
 
 	struct CreateContext : public Header {
 		int	method;		/* SSLPROC_METHOD_* */
@@ -66,16 +66,16 @@ namespace Message {
 #define	SSLPROC_METHOD_TLS_SERVER	2	/* TLS_client_method() */
 
 /* These three return 'long options' on success. */
-#define	SSLPROC_CTX_SET_OPTIONS		3
-#define	SSLPROC_CTX_CLEAR_OPTIONS	4
+#define	SSLPROC_CTX_SET_OPTIONS		0x03
+#define	SSLPROC_CTX_CLEAR_OPTIONS	0x04
 
 	struct Options : public Header {
 		long	options;
 	};
 
-#define	SSLPROC_CTX_GET_OPTIONS		5
+#define	SSLPROC_CTX_GET_OPTIONS		0x05
 
-#define	SSLPROC_CTX_CTRL		6
+#define	SSLPROC_CTX_CTRL		0x06
 
 	struct CtrlBody {
 		int	cmd;
@@ -96,9 +96,9 @@ namespace Message {
 	};
 
 /* Message body is a ASN1-serialized X509 object. */
-#define	SSLPROC_CTX_USE_CERTIFICATE_ASN1	7
+#define	SSLPROC_CTX_USE_CERTIFICATE_ASN1	0x07
 
-#define	SSLPROC_CTX_USE_PRIVATEKEY_ASN1	8
+#define	SSLPROC_CTX_USE_PRIVATEKEY_ASN1	0x08
 
 	struct PKey : public Header {
 		int	pktype;
@@ -114,11 +114,11 @@ namespace Message {
 		}
 	};
 
-#define	SSLPROC_CTX_CHECK_PRIVATE_KEY	9
-#define	SSLPROC_CTX_ENABLE_SERVERNAME_CB	10
-#define	SSLPROC_CTX_DISABLE_SERVERNAME_CB	11
-#define	SSLPROC_CTX_ENABLE_CLIENT_HELLO_CB	12
-#define	SSLPROC_CTX_DISABLE_CLIENT_HELLO_CB	13
+#define	SSLPROC_CTX_CHECK_PRIVATE_KEY	0x09
+#define	SSLPROC_CTX_ENABLE_SERVERNAME_CB	0x0a
+#define	SSLPROC_CTX_DISABLE_SERVERNAME_CB	0x0b
+#define	SSLPROC_CTX_ENABLE_CLIENT_HELLO_CB	0x0c
+#define	SSLPROC_CTX_DISABLE_CLIENT_HELLO_CB	0x0d
 #define	SSLPROC_CTX_ENABLE_SRP_USERNAME_CB	0x0e
 #define	SSLPROC_CTX_DISABLE_SRP_USERNAME_CB	0x0f
 
