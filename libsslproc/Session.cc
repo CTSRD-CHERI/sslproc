@@ -193,6 +193,25 @@ PSSL_get_ex_data(const PSSL *ssl, int idx)
 	return (CRYPTO_get_ex_data(&ssl->ex_data, idx));
 }
 
+PSSL_CTX *
+PSSL_get_SSL_CTX(const PSSL *ssl)
+{
+	return (ssl->ctx);
+}
+
+PSSL_CTX *
+PSSL_set_SSL_CTX(PSSL *ssl, PSSL_CTX *ctx)
+{
+	if (ssl->ctx == ctx)
+		return (ctx);
+
+	/*
+	 * This is not easy to handle in the current model since each
+	 * context lives in a separate helper.
+	 */
+	return (NULL);
+}
+
 void
 PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *))

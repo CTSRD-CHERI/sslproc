@@ -67,6 +67,8 @@
 #undef SSL_ctrl
 #undef SSL_set_ex_data
 #undef SSL_get_ex_data
+#undef SSL_get_SSL_CTX
+#undef SSL_set_SSL_CTX
 #undef SSL_set_msg_callback
 #undef SSL_get_rbio
 #undef SSL_get_wbio
