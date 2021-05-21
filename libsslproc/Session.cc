@@ -250,6 +250,16 @@ PSSL_set_verify_result(PSSL *ssl, long result)
 	    sizeof(result));
 }
 
+int
+PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos, unsigned int len)
+{
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_SET_ALPN_PROTOS, protos, len);
+	if (msg == nullptr)
+		return (-1);
+	return (msg->ret);
+}
+
 void
 PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *))

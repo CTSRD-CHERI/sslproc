@@ -390,6 +390,22 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case SSLPROC_SET_ALPN_PROTOS:
+	{
+		const unsigned char *protos;
+
+		if (hdr->bodyLength() == 0)
+			protos = nullptr;
+		else
+			protos = reinterpret_cast<const unsigned char *>
+			    (hdr->body());
+		ret = SSL_set_alpn_protos(ssl, protos, hdr->bodyLength());
+		if (ret != 0)
+			writeSSLErrorReply(hdr->type, ret, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);
