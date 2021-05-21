@@ -230,6 +230,26 @@ PSSL_get_peer_certificate(const PSSL *sslc)
 	return (d2i_X509(NULL, &data, msg->bodyLength()));
 }
 
+long
+PSSL_get_verify_result(const PSSL *sslc)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_GET_VERIFY_RESULT);
+	if (msg == nullptr)
+		return (X509_V_ERR_UNSPECIFIED);
+	if (msg->error != SSL_ERROR_NONE)
+		return (X509_V_ERR_UNSPECIFIED);
+	return (msg->ret);
+}
+
+void
+PSSL_set_verify_result(PSSL *ssl, long result)
+{
+	(void)ssl->ss->waitForReply(SSLPROC_SET_VERIFY_RESULT, &result,
+	    sizeof(result));
+}
+
 void
 PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *))

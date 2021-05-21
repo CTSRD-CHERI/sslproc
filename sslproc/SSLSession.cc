@@ -370,6 +370,26 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		OPENSSL_free(buf);
 		break;
 	}
+	case SSLPROC_GET_VERIFY_RESULT:
+		ret = SSL_get_verify_result(ssl);
+		writeReplyMessage(hdr->type, ret);
+		break;
+	case SSLPROC_SET_VERIFY_RESULT:
+	{
+		long result;
+
+		if (hdr->bodyLength() != sizeof(long)) {
+			syslog(LOG_WARNING,
+		    "invalid message length %d for SSLPROC_SET_VERIFY_RESULT",
+			    hdr->length);
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		result = *reinterpret_cast<const long *>(hdr->body());
+		SSL_set_verify_result(ssl, result);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

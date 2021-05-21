@@ -70,6 +70,8 @@
 #undef SSL_get_SSL_CTX
 #undef SSL_set_SSL_CTX
 #undef SSL_get_peer_certificate
+#undef SSL_get_verify_result
+#undef SSL_set_verify_result
 #undef SSL_set_msg_callback
 #undef SSL_get_rbio
 #undef SSL_get_wbio

@@ -159,6 +159,8 @@ namespace Message {
 #define	SSLPROC_SET_SHUTDOWN	0x51
 #define	SSLPROC_GET_SHUTDOWN	0x52
 #define	SSLPROC_GET_PEER_CERTIFICATE	0x53
+#define	SSLPROC_GET_VERIFY_RESULT	0x54
+#define	SSLPROC_SET_VERIFY_RESULT	0x55
 
 /* Per-session messages from sslproc -> client over the 'session' fd. */
 
