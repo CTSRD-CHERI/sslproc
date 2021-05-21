@@ -106,6 +106,8 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->rbio = nullptr;
 	ssl->wbio = nullptr;
 	ssl->servername = nullptr;
+	ssl->srp_username = nullptr;
+	ssl->srp_userinfo = nullptr;
 	ssl->refs = 1;
 	return (ssl);
 }
@@ -132,6 +134,8 @@ PSSL_free(PSSL *ssl)
 		return;
 
 	PSSL_CTX *ctx = ssl->ctx;
+	free(ssl->srp_userinfo);
+	free(ssl->srp_username);
 	free(ssl->servername);
 	delete ssl->ss;
 	BIO_free_all(ssl->wbio);
@@ -258,6 +262,52 @@ PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos, unsigned int len)
 	if (msg == nullptr)
 		return (-1);
 	return (msg->ret);
+}
+
+/*
+ * SSL_get_srp_username() returns a pointer to an internal string that
+ * is not reference-counted.  To avoid leaking memory, cache the
+ * pointer in PSSL and free it when the PSSL is destroyed.  This does
+ * assume the value doesn't change once it is set.
+ */
+char *
+PSSL_get_srp_username(PSSL *ssl)
+{
+	if (ssl->srp_username != nullptr)
+		return (ssl->srp_username);
+
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_GET_SRP_USERNAME);
+	if (msg == nullptr)
+		return (nullptr);
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+	const char *name = reinterpret_cast<const char *>(msg->body());
+	ssl->srp_username = strndup(name, msg->bodyLength());
+	return (ssl->srp_username);
+}
+
+/*
+ * SSL_get_srp_userinfo() returns a pointer to an internal string that
+ * is not reference-counted.  To avoid leaking memory, cache the
+ * pointer in PSSL and free it when the PSSL is destroyed.  This does
+ * assume the value doesn't change once it is set.
+ */
+char *
+PSSL_get_srp_userinfo(PSSL *ssl)
+{
+	if (ssl->srp_userinfo != nullptr)
+		return (ssl->srp_userinfo);
+
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_GET_SRP_USERINFO);
+	if (msg == nullptr)
+		return (nullptr);
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+	const char *info = reinterpret_cast<const char *>(msg->body());
+	ssl->srp_userinfo = strndup(info, msg->bodyLength());
+	return (ssl->srp_userinfo);
 }
 
 void

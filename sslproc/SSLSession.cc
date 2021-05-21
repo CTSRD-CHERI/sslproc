@@ -406,6 +406,24 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case SSLPROC_GET_SRP_USERNAME:
+	{
+		const char *s = SSL_get_srp_username(ssl);
+		if (s != nullptr)
+			writeReplyMessage(hdr->type, 0, s, strlen(s));
+		else
+			writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case SSLPROC_GET_SRP_USERINFO:
+	{
+		const char *s = SSL_get_srp_userinfo(ssl);
+		if (s != nullptr)
+			writeReplyMessage(hdr->type, 0, s, strlen(s));
+		else
+			writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

@@ -73,6 +73,8 @@
 #define	SSL_get_verify_result	PSSL_get_verify_result
 #define	SSL_set_verify_result	PSSL_set_verify_result
 #define	SSL_set_alpn_protos	PSSL_set_alpn_protos
+#define	SSL_get_srp_username	PSSL_get_srp_username
+#define	SSL_get_srp_userinfo	PSSL_get_srp_userinfo
 #define	SSL_set_msg_callback	PSSL_set_msg_callback
 #define	SSL_get_rbio		PSSL_get_rbio
 #define	SSL_get_wbio		PSSL_get_wbio

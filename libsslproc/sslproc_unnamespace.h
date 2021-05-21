@@ -73,6 +73,8 @@
 #undef SSL_get_verify_result
 #undef SSL_set_verify_result
 #undef SSL_set_alpn_protos
+#undef SSL_get_srp_username
+#undef SSL_get_srp_userinfo
 #undef SSL_set_msg_callback
 #undef SSL_get_rbio
 #undef SSL_get_wbio

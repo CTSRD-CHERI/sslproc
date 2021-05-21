@@ -162,6 +162,8 @@ namespace Message {
 #define	SSLPROC_GET_VERIFY_RESULT	0x54
 #define	SSLPROC_SET_VERIFY_RESULT	0x55
 #define	SSLPROC_SET_ALPN_PROTOS	0x56
+#define	SSLPROC_GET_SRP_USERNAME	0x57
+#define	SSLPROC_GET_SRP_USERINFO	0x58
 
 /* Per-session messages from sslproc -> client over the 'session' fd. */
 

@@ -103,6 +103,8 @@ struct _PSSL {
 	BIO *wbio;
 	SSLSession *ss;
 	char *servername;
+	char *srp_username;
+	char *srp_userinfo;
 	void (*msg_cb)(int, int, int, const void *, size_t, struct _PSSL *, void *);
 	void *msg_cb_arg;
 	std::atomic_int refs;

@@ -91,6 +91,8 @@ long PSSL_get_verify_result(const PSSL *ssl);
 void PSSL_set_verify_result(PSSL *ssl, long result);
 int PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos,
     unsigned int len);
+char *PSSL_get_srp_username(PSSL *ssl);
+char *PSSL_get_srp_userinfo(PSSL *ssl);
 void PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *));
 BIO *PSSL_get_rbio(PSSL *ssl);
