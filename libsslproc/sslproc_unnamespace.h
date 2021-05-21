@@ -65,6 +65,8 @@
 #undef SSL_CTX_check_private_key
 #undef SSL_client_hello_cb_fn
 #undef SSL_CTX_set_client_hello_cb
+#undef SSL_CTX_set_srp_username_callback
+#undef SSL_CTX_set_srp_cb_arg
 
 /* SSL */
 

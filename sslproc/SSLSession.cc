@@ -112,6 +112,28 @@ client_hello_cb(SSL *ssl, int *al, void *arg)
 	return (msg->ret);
 }
 
+int
+srp_username_cb(SSL *ssl, int *ad, void *arg)
+{
+	auto it = sessions.find(ssl);
+	if (it == sessions.end()) {
+		syslog(LOG_WARNING, "%s: unable to locate session", __func__);
+		*ad = SSL_AD_INTERNAL_ERROR;
+		return (SSL3_AL_FATAL);
+	}
+
+	SSLSession *ss = it->second;
+	const Message::Result *msg = ss->sendRequest(SSLPROC_SRP_USERNAME_CB,
+	    ad, sizeof(*ad));
+	if (msg == nullptr) {
+		*ad = SSL_AD_INTERNAL_ERROR;
+		return (SSL3_AL_FATAL);
+	}
+	if (msg->bodyLength() == sizeof(*ad))
+		*ad = *reinterpret_cast<const int *>(msg->body());
+	return (msg->ret);
+}
+
 bool
 SSLSession::init(SSL_CTX *ctx)
 {

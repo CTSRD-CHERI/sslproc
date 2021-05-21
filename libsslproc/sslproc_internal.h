@@ -99,6 +99,8 @@ struct _PSSL_CTX {
 	void *servername_cb_arg;
 	int (*client_hello_cb)(struct _PSSL *, int *, void *);
 	void *client_hello_cb_arg;
+	int (*srp_username_cb)(struct _PSSL *, int *, void *);
+	void *srp_cb_arg;
 	std::atomic_int refs;
 };
 

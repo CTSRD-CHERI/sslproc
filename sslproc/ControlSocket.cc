@@ -264,6 +264,28 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case SSLPROC_CTX_ENABLE_SRP_USERNAME_CB:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_srp_username_callback(ctx, srp_username_cb);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case SSLPROC_CTX_DISABLE_SRP_USERNAME_CB:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_srp_username_callback(ctx, nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||

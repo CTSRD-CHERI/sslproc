@@ -119,6 +119,8 @@ namespace Message {
 #define	SSLPROC_CTX_DISABLE_SERVERNAME_CB	11
 #define	SSLPROC_CTX_ENABLE_CLIENT_HELLO_CB	12
 #define	SSLPROC_CTX_DISABLE_CLIENT_HELLO_CB	13
+#define	SSLPROC_CTX_ENABLE_SRP_USERNAME_CB	0x0e
+#define	SSLPROC_CTX_DISABLE_SRP_USERNAME_CB	0x0f
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x10
@@ -206,6 +208,7 @@ namespace Message {
  */
 #define	SSLPROC_SERVERNAME_CB	0x85
 #define	SSLPROC_CLIENT_HELLO_CB	0x86
+#define	SSLPROC_SRP_USERNAME_CB	0x87
 
 /*
  * The receiver always returns a Result message to the sender at the

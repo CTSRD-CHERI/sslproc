@@ -191,6 +191,24 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, ret, &al, sizeof(al));
 		break;
 	}
+	case SSLPROC_SRP_USERNAME_CB:
+	{
+		int ad;
+
+		if (hdr->bodyLength() != sizeof(ad)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ad = *reinterpret_cast<const int *>(hdr->body());
+		if (ssl->ctx->srp_username_cb == NULL)
+			ret = SSL_ERROR_NONE;
+		else
+			ret = ssl->ctx->srp_username_cb(ssl, &ad,
+			    ssl->ctx->srp_cb_arg);
+		writeReplyMessage(hdr->type, ret, &ad, sizeof(ad));
+		break;
+	}
 	default:
 		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

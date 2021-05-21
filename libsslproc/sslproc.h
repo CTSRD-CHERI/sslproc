@@ -86,6 +86,9 @@ int PSSL_CTX_check_private_key(PSSL_CTX *ctx);
 typedef int (*PSSL_client_hello_cb_fn)(PSSL *s, int *al, void *arg);
 void PSSL_CTX_set_client_hello_cb(PSSL_CTX *ctx, PSSL_client_hello_cb_fn cb,
     void *arg);
+int PSSL_CTX_set_srp_username_callback(PSSL_CTX *ctx,
+    int (*cb)(PSSL *, int *, void *));
+int PSSL_CTX_set_srp_cb_arg(PSSL_CTX *ctx, void *arg);
 
 /* SSL */
 

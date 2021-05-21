@@ -65,6 +65,8 @@
 #define	SSL_CTX_check_private_key	PSSL_CTX_check_private_key
 #define	SSL_client_hello_cb_fn	PSSL_client_hello_cb_fn
 #define	SSL_CTX_set_client_hello_cb	PSSL_CTX_set_client_hello_cb
+#define	SSL_CTX_set_srp_username_callback PSSL_CTX_set_srp_username_callback
+#define	SSL_CTX_set_srp_cb_arg	PSSL_CTX_set_srp_cb_arg
 
 /* SSL */
 

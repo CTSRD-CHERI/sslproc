@@ -37,3 +37,4 @@
 bool	initOpenSSL();
 int	servername_cb(SSL *, int *, void *);
 int	client_hello_cb(SSL *, int *, void *);
+int	srp_username_cb(SSL *, int *, void *);
