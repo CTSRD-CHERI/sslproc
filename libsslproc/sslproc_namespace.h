@@ -69,6 +69,7 @@
 #define	SSL_get_ex_data		PSSL_get_ex_data
 #define	SSL_get_SSL_CTX		PSSL_get_SSL_CTX
 #define	SSL_set_SSL_CTX		PSSL_set_SSL_CTX
+#define	SSL_get_peer_certificate	PSSL_get_peer_certificate
 #define	SSL_set_msg_callback	PSSL_set_msg_callback
 #define	SSL_get_rbio		PSSL_get_rbio
 #define	SSL_get_wbio		PSSL_get_wbio

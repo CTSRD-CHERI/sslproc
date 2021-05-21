@@ -351,6 +351,25 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		ret = SSL_get_shutdown(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
+	case SSLPROC_GET_PEER_CERTIFICATE:
+	{
+		X509 *x = SSL_get_peer_certificate(ssl);
+		if (x == NULL) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		unsigned char *buf = NULL;
+		int len = i2d_X509(x, &buf);
+		X509_free(x);
+		if (len < 0) {
+			writeReplyMessage(hdr->type, -1);
+			break;
+		}
+		writeReplyMessage(hdr->type, 0, buf, len);
+		OPENSSL_free(buf);
+		break;
+	}
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

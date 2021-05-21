@@ -212,6 +212,24 @@ PSSL_set_SSL_CTX(PSSL *ssl, PSSL_CTX *ctx)
 	return (NULL);
 }
 
+X509 *
+PSSL_get_peer_certificate(const PSSL *sslc)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+	const Message::Result *msg =
+	    ssl->ss->waitForReply(SSLPROC_GET_PEER_CERTIFICATE);
+	if (msg == nullptr)
+		return (nullptr);
+	if (msg->error != SSL_ERROR_NONE)
+		return (nullptr);
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+
+	const unsigned char *data =
+	    reinterpret_cast<const unsigned char *>(msg->body());
+	return (d2i_X509(NULL, &data, msg->bodyLength()));
+}
+
 void
 PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *))

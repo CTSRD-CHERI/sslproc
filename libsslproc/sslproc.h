@@ -86,6 +86,7 @@ int PSSL_set_ex_data(PSSL *ssl, int idx, void *data);
 void *PSSL_get_ex_data(const PSSL *ssl, int idx);
 PSSL_CTX *PSSL_get_SSL_CTX(const PSSL *ssl);
 PSSL_CTX *PSSL_set_SSL_CTX(PSSL *ssl, PSSL_CTX *ctx);
+X509 *PSSL_get_peer_certificate(const PSSL *ssl);
 void PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *));
 BIO *PSSL_get_rbio(PSSL *ssl);
