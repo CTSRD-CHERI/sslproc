@@ -110,6 +110,7 @@ void PSSL_CTX_sess_set_remove_cb(PSSL_CTX *ctx,
     void (*cb)(PSSL_CTX *, PSSL_SESSION *));
 void PSSL_CTX_sess_set_get_cb(PSSL_CTX *ctx,
     PSSL_SESSION * (*cb)(PSSL *, const unsigned char *, int, int *));
+void PSSL_CTX_set_tmp_dh_callback(PSSL_CTX *ctx, DH *(*cb)(PSSL *, int, int));
 
 /* SSL */
 

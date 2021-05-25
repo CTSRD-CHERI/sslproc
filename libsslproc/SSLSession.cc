@@ -341,6 +341,39 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		    s->internal_length);
 		break;
 	}
+	case SSLPROC_TMP_DH_CB:
+	{
+		if (hdr->length != sizeof(Message::TmpDhCb)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		const Message::TmpDhCb *msg =
+		    reinterpret_cast<const Message::TmpDhCb *>(hdr);
+
+		if (ssl->ctx->tmp_dh_cb == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		DH *dh = ssl->ctx->tmp_dh_cb(ssl, msg->is_export,
+		    msg->keylength);
+		if (dh == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		unsigned char *asn1 = nullptr;
+		int len = i2d_DHparams(dh, &asn1);
+		DH_free(dh);
+		if (len <= 0) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+		writeReplyMessage(hdr->type, 0, asn1, len);
+		OPENSSL_free(asn1);
+		break;
+	}
 	default:
 		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

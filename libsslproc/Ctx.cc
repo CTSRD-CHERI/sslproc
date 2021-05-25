@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <openssl/dh.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
@@ -120,6 +121,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	ctx->sess_remove_cb = nullptr;
 	ctx->sess_get_cb = nullptr;
 	ctx->sess_cbs_enabled = false;
+	ctx->tmp_dh_cb = nullptr;
 	ctx->refs = 1;
 	return (ctx);
 }
@@ -214,6 +216,25 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 		if (reply == nullptr)
 			abort();
 		return (reply->ret);
+	case SSL_CTRL_SET_TMP_DH:
+	{
+		unsigned char *asn1 = nullptr;
+		int len = i2d_DHparams(reinterpret_cast<DH *>(parg), &asn1);
+		if (len <= 0)
+			return (0);
+
+		struct iovec iov[2];
+
+		iov[0].iov_base = &body;
+		iov[0].iov_len = sizeof(body);
+		iov[1].iov_base = asn1;
+		iov[1].iov_len = len;
+		reply = ctx->cs->waitForReply(SSLPROC_CTX_CTRL, iov, 2);
+		OPENSSL_free(asn1);
+		if (reply == nullptr)
+			return (0);
+		return (reply->ret);
+	}
 	case SSL_CTRL_SET_TLSEXT_SERVERNAME_ARG:
 		ctx->servername_cb_arg = parg;
 		return (1);
@@ -510,4 +531,12 @@ PSSL_CTX_sess_set_get_cb(PSSL_CTX *ctx,
 {
 	ctx->sess_get_cb = cb;
 	PSSL_CTX_sess_callbacks_updated(ctx);
+}
+
+void
+PSSL_CTX_set_tmp_dh_callback(PSSL_CTX *ctx, DH *(*cb)(PSSL *, int, int))
+{
+	ctx->tmp_dh_cb = cb;
+	(void)ctx->cs->waitForReply(cb == nullptr ?
+	    SSLPROC_CTX_DISABLE_TMP_DH_CB : SSLPROC_CTX_ENABLE_TMP_DH_CB);
 }

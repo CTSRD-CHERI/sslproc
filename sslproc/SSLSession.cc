@@ -245,6 +245,35 @@ sess_get_cb(SSL *ssl, const unsigned char *data, int len, int *copy)
 	return (d2i_SSL_SESSION(nullptr, &pp, msg->bodyLength()));
 }
 
+DH *
+tmp_dh_cb(SSL *ssl, int is_export, int keylength)
+{
+	struct {
+		int is_export;
+		int keylength;
+	} body;
+
+	body.is_export = is_export;
+	body.keylength = keylength;
+
+	SSLSession *ss = currentSession;
+	if (ss == nullptr || !ss->isSSL(ssl)) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
+		return (nullptr);
+	}
+
+	const Message::Result *msg = ss->sendRequest(SSLPROC_TMP_DH_CB, &body,
+	    sizeof(body));
+	if (msg == nullptr || msg->error != SSL_ERROR_NONE ||
+	    msg->bodyLength() == 0)
+		return (nullptr);
+
+	const unsigned char *pp = reinterpret_cast<const unsigned char *>
+	    (msg->body());
+	return (d2i_DHparams(nullptr, &pp, msg->bodyLength()));
+}
+
 bool
 SSLSession::init(SSL_CTX *ctx)
 {

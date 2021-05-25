@@ -82,6 +82,7 @@
 #define	SSL_CTX_sess_set_new_cb	PSSL_CTX_sess_set_new_cb
 #define	SSL_CTX_sess_set_remove_cb	PSSL_CTX_sess_set_remove_cb
 #define	SSL_CTX_sess_set_get_cb	PSSL_CTX_sess_set_get_cb
+#define	SSL_CTX_set_tmp_dh_callback	PSSL_CTX_set_tmp_dh_callback
 
 /* SSL */
 

@@ -139,7 +139,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 	}
 	case SSLPROC_CTX_CTRL:
 	{
-		if (hdr->length != sizeof(Message::Ctrl)) {
+		if (hdr->length < sizeof(Message::Ctrl)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
@@ -160,6 +160,24 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			ret = SSL_CTX_ctrl(ctx, msg->cmd, msg->larg, nullptr);
 			writeReplyMessage(hdr->type, ret);
 			break;
+		case SSL_CTRL_SET_TMP_DH:
+		{
+			const unsigned char *pp =
+			    reinterpret_cast<const unsigned char *>
+			    (msg->body());
+			DH *dh = d2i_DHparams(nullptr, &pp, msg->bodyLength());
+			if (dh == nullptr) {
+				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+				break;
+			}
+			ret = SSL_CTX_set_tmp_dh(ctx, dh);
+			DH_free(dh);
+			if (ret == 0)
+				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+			else
+				writeReplyMessage(hdr->type, ret);
+			break;
+		}
 		default:
 			writeErrnoReply(hdr->type, -1, EOPNOTSUPP);
 			break;
@@ -306,6 +324,24 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_sess_set_new_cb(ctx, nullptr);
 		SSL_CTX_sess_set_remove_cb(ctx, nullptr);
 		SSL_CTX_sess_set_get_cb(ctx, nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_CTX_ENABLE_TMP_DH_CB:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_tmp_dh_callback(ctx, tmp_dh_cb);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_CTX_DISABLE_TMP_DH_CB:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_tmp_dh_callback(ctx, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
 	case SSLPROC_CREATE_SESSION:

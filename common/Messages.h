@@ -122,6 +122,8 @@ namespace Message {
 #define	SSLPROC_CTX_DISABLE_SRP_USERNAME_CB	0x0f
 #define	SSLPROC_CTX_ENABLE_SESS_CBS		0x10
 #define	SSLPROC_CTX_DISABLE_SESS_CBS		0x11
+#define	SSLPROC_CTX_ENABLE_TMP_DH_CB	0x12
+#define	SSLPROC_CTX_DISABLE_TMP_DH_CB	0x13
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x20
@@ -231,6 +233,12 @@ namespace Message {
 
 #define	SSLPROC_SESS_REMOVE_CB	0x89
 #define	SSLPROC_SESS_GET_CB	0x8a
+#define	SSLPROC_TMP_DH_CB	0x8b
+
+	struct TmpDhCb : public Header {
+		int	is_export;
+		int	keylength;
+	};
 
 /*
  * The receiver always returns a Result message to the sender at the
