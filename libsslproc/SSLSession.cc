@@ -374,6 +374,21 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		OPENSSL_free(asn1);
 		break;
 	}
+	case SSLPROC_INFO_CB:
+	{
+		if (hdr->length != sizeof(Message::InfoCb)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		const Message::InfoCb *msg =
+		    reinterpret_cast<const Message::InfoCb *>(hdr);
+
+		if (ssl->ctx->info_cb != nullptr)
+			ssl->ctx->info_cb(ssl, msg->where, msg->ret);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	default:
 		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

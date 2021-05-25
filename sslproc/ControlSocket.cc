@@ -344,6 +344,24 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_tmp_dh_callback(ctx, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
+	case SSLPROC_CTX_ENABLE_INFO_CB:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_info_callback(ctx, info_cb);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_CTX_DISABLE_INFO_CB:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_info_callback(ctx, nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||

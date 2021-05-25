@@ -124,6 +124,8 @@ namespace Message {
 #define	SSLPROC_CTX_DISABLE_SESS_CBS		0x11
 #define	SSLPROC_CTX_ENABLE_TMP_DH_CB	0x12
 #define	SSLPROC_CTX_DISABLE_TMP_DH_CB	0x13
+#define	SSLPROC_CTX_ENABLE_INFO_CB	0x14
+#define	SSLPROC_CTX_DISABLE_INFO_CB	0x15
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x20
@@ -238,6 +240,13 @@ namespace Message {
 	struct TmpDhCb : public Header {
 		int	is_export;
 		int	keylength;
+	};
+
+#define	SSLPROC_INFO_CB		0x8c
+
+	struct InfoCb : public Header {
+		int	where;
+		int	ret;
 	};
 
 /*

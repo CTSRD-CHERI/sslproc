@@ -156,6 +156,7 @@ struct _PSSL_CTX {
 	struct _PSSL_SESSION *(*sess_get_cb)(struct _PSSL *,
 	    const unsigned char *, int, int *);
 	DH *(*tmp_dh_cb)(struct _PSSL *, int, int);
+	void (*info_cb)(const struct _PSSL *, int, int);
 	bool sess_cbs_enabled;
 	std::unordered_map<session_map_key, struct _PSSL_SESSION *> sessions;
 	std::atomic_int refs;

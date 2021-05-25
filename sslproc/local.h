@@ -42,3 +42,4 @@ int	sess_new_cb(SSL *, SSL_SESSION *);
 void	sess_remove_cb(SSL_CTX *, SSL_SESSION *);
 SSL_SESSION *sess_get_cb(SSL *, const unsigned char *, int, int *);
 DH	*tmp_dh_cb(SSL *, int, int);
+void	info_cb(const SSL *, int, int);

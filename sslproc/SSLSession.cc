@@ -274,6 +274,27 @@ tmp_dh_cb(SSL *ssl, int is_export, int keylength)
 	return (d2i_DHparams(nullptr, &pp, msg->bodyLength()));
 }
 
+void
+info_cb(const SSL *ssl, int where, int ret)
+{
+	struct {
+		int where;
+		int ret;
+	} body;
+
+	body.where = where;
+	body.ret = ret;
+
+	SSLSession *ss = currentSession;
+	if (ss == nullptr || !ss->isSSL(ssl)) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
+		return;
+	}
+
+	(void)ss->sendRequest(SSLPROC_INFO_CB, &body, sizeof(body));
+}
+
 bool
 SSLSession::init(SSL_CTX *ctx)
 {

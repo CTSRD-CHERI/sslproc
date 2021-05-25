@@ -540,3 +540,11 @@ PSSL_CTX_set_tmp_dh_callback(PSSL_CTX *ctx, DH *(*cb)(PSSL *, int, int))
 	(void)ctx->cs->waitForReply(cb == nullptr ?
 	    SSLPROC_CTX_DISABLE_TMP_DH_CB : SSLPROC_CTX_ENABLE_TMP_DH_CB);
 }
+
+void
+PSSL_CTX_set_info_callback(PSSL_CTX *ctx, void (*cb)(const PSSL *, int, int))
+{
+	ctx->info_cb = cb;
+	(void)ctx->cs->waitForReply(cb == nullptr ?
+	    SSLPROC_CTX_DISABLE_INFO_CB : SSLPROC_CTX_ENABLE_INFO_CB);
+}
