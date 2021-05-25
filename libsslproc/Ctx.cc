@@ -111,6 +111,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 		return (nullptr);
 	}
 
+	ctx->get0_cert = nullptr;
 	ctx->servername_cb = nullptr;
 	ctx->servername_cb_arg = nullptr;
 	ctx->client_hello_cb = nullptr;
@@ -149,6 +150,7 @@ PSSL_CTX_free(PSSL_CTX *ctx)
 
 	delete ctx->cs;
 	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx, &ctx->ex_data);
+	X509_free(ctx->get0_cert);
 	delete ctx;
 }
 
@@ -600,4 +602,31 @@ PSSL_CTX_set_timeout(PSSL_CTX *ctx, long time)
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
+}
+
+/*
+ * This function doesn't return a reference to the caller.  Instead,
+ * let this instance hang around until either the next call to this
+ * function or until the context is freed.
+ */
+X509 *
+PSSL_CTX_get0_certificate(const PSSL_CTX *ctxc)
+{
+	PSSL_CTX *ctx = const_cast<PSSL_CTX *>(ctxc);
+	const Message::Result *msg = ctx->cs->waitForReply(
+	    SSLPROC_CTX_GET0_CERTIFICATE);
+	if (msg == nullptr)
+		return (nullptr);
+	if (msg->error != SSL_ERROR_NONE)
+		return (nullptr);
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+	const unsigned char *data =
+	    reinterpret_cast<const unsigned char *>(msg->body());
+	X509 *cert = d2i_X509(NULL, &data, msg->bodyLength());
+	if (cert == nullptr)
+		return (nullptr);
+	X509_free(ctx->get0_cert);
+	ctx->get0_cert = cert;
+	return (cert);
 }

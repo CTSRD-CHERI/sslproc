@@ -420,7 +420,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		long time;
 
 		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, 0, ENXIO);
+			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
 		}
 
@@ -434,6 +434,29 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		time = *reinterpret_cast<const long *>(hdr->body());
 		long ret = SSL_CTX_set_timeout(ctx, time);
 		writeReplyMessage(hdr->type, ret);
+		break;
+	}
+	case SSLPROC_CTX_GET0_CERTIFICATE:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		X509 *cert = SSL_CTX_get0_certificate(ctx);
+		if (cert == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		unsigned char *buf = NULL;
+		int len = i2d_X509(cert, &buf);
+		if (len < 0) {
+			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
+			break;
+		}
+		writeReplyMessage(hdr->type, 0, buf, len);
+		OPENSSL_free(buf);
 		break;
 	}
 	case SSLPROC_CREATE_SESSION:

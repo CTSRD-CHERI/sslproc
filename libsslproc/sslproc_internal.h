@@ -147,6 +147,7 @@ namespace std {
 struct _PSSL_CTX {
 	ControlSocket *cs;
 	CRYPTO_EX_DATA ex_data;
+	X509 *get0_cert;
 	int (*servername_cb)(struct _PSSL *, int *, void *);
 	void *servername_cb_arg;
 	int (*client_hello_cb)(struct _PSSL *, int *, void *);

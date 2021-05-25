@@ -121,6 +121,7 @@ void PSSL_CTX_set_alpn_select_cb(PSSL_CTX *ctx, PSSL_CTX_alpn_select_cb_func cb,
 int PSSL_CTX_set_cipher_list(PSSL_CTX *ctx, const char *s);
 int PSSL_CTX_set_ciphersuites(PSSL_CTX *ctx, const char *s);
 long PSSL_CTX_set_timeout(PSSL_CTX *ctx, long time);
+X509 *PSSL_CTX_get0_certificate(const PSSL_CTX *ctx);
 
 /* SSL */
 
