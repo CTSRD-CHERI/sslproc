@@ -203,6 +203,8 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 	case SSL_CTRL_GET_MAX_PROTO_VERSION:
 	case SSL_CTRL_MODE:
 	case SSL_CTRL_CLEAR_MODE:
+	case SSL_CTRL_SET_SESS_CACHE_MODE:
+	case SSL_CTRL_GET_SESS_CACHE_MODE:
 		reply = ctx->cs->waitForReply(SSLPROC_CTX_CTRL, &body,
 		    sizeof(body));
 		if (reply == nullptr)
