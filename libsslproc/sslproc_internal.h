@@ -66,12 +66,14 @@ void	PERR_init(void);
 #define	PROC_F_SSL_CTX_USE_PRIVATEKEY_FILE	13
 #define	PROC_F_SSL_HANDLE_MESSAGE	14
 #define	PROC_F_SSL_READ			15
+#define	PROC_F_D2I_SSL_SESSION		16
 
 #define	ERR_R_IO_ERROR		(128|ERR_R_FATAL)
 #define	ERR_R_BAD_MESSAGE	(129|ERR_R_FATAL)
 #define	ERR_R_UNEXPECTED_EOF	(130|ERR_R_FATAL)
 #define	ERR_R_MISMATCHED_REPLY	(131|ERR_R_FATAL)
 #define	ERR_R_MESSAGE_ERROR	(132)
+#define	ERR_R_BAD_VERSION	(133|ERR_R_FATAL)
 
 /* SSL_METHOD */
 
@@ -85,6 +87,18 @@ struct _PSSL_CIPHER {
 	char *name;
 	int alg_bits;
 	int bits;
+};
+
+/* SSL_SESSION */
+
+struct _PSSL_SESSION {
+	long time;
+	int compress_id;
+	unsigned char *id;
+	unsigned int id_len;
+	unsigned char *internal_repr;
+	long internal_length;
+	std::atomic_int refs;
 };
 
 /* SSL_CTX */

@@ -43,6 +43,18 @@
 #undef SSL_CIPHER_get_name
 #undef SSL_CIPHER_get_bits
 
+/* SSL_SESSION */
+
+#undef SSL_SESSION
+#undef SSL_SESSION_new
+#undef SSL_SESSION_up_ref
+#undef SSL_SESSION_free
+#undef SSL_SESSION_get_id
+#undef SSL_SESSION_get_compress_id
+#undef SSL_SESSION_get_time
+#undef d2i_SSL_SESSION
+#undef i2d_SSL_SESSION
+
 /* SSL_CTX */
 
 #undef SSL_CTX

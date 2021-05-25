@@ -33,11 +33,175 @@
 #include <unistd.h>
 
 #include <openssl/ssl.h>
+#include <openssl/asn1t.h>
 
 #include "sslproc.h"
 #include "sslproc_internal.h"
 #include "ControlSocket.h"
 #include "SSLSession.h"
+
+/* XXX: The normal version of this does not work with C++. */
+#undef M_ASN1_free_of
+#define	M_ASN1_free_of(x, type) \
+	ASN1_item_free(reinterpret_cast<ASN1_VALUE *>(x), ASN1_ITEM_rptr(type))
+
+PSSL_SESSION *
+PSSL_SESSION_new(void)
+{
+	PSSL_SESSION *s;
+
+	s = new PSSL_SESSION();
+	s->time = time(nullptr);
+	s->compress_id = 0;
+	s->id = nullptr;
+	s->id_len = 0;
+	s->internal_repr = nullptr;
+	s->internal_length = 0;
+	s->refs = 1;
+	return (s);
+}
+
+int
+PSSL_SESSION_up_ref(PSSL_SESSION *s)
+{
+	int refs;
+
+	refs = s->refs;
+	for (;;) {
+		if (refs == INT_MAX)
+			return (0);
+		if (s->refs.compare_exchange_weak(refs, refs + 1,
+		    std::memory_order_relaxed))
+			return (1);
+	}
+}
+
+void
+PSSL_SESSION_free(PSSL_SESSION *s)
+{
+	if (s->refs.fetch_sub(1, std::memory_order_relaxed) > 1)
+		return;
+
+	free(s->id);
+	free(s->internal_repr);
+	delete s;
+}
+
+const unsigned char *
+PSSL_SESSION_get_id(const PSSL_SESSION *s, unsigned int *len)
+{
+	if (len != nullptr)
+		*len = s->id_len;
+	return (s->id);
+}
+
+unsigned int
+PSSL_SESSION_get_compress_id(const PSSL_SESSION *s)
+{
+	return (s->compress_id);
+}
+
+long
+PSSL_SESSION_get_time(const PSSL_SESSION *s)
+{
+	return (s->time);
+}
+
+#define	PSSL_SESSION_ASN1_VERSION	1
+
+typedef struct {
+	uint32_t version;
+	int32_t compress_id;
+	int64_t time;
+	ASN1_OCTET_STRING *id;
+	ASN1_OCTET_STRING *internal;
+} PSSL_SESSION_ASN1;
+
+ASN1_SEQUENCE(PSSL_SESSION_ASN1) = {
+	ASN1_EMBED(PSSL_SESSION_ASN1, version, UINT32),
+	ASN1_EMBED(PSSL_SESSION_ASN1, compress_id, INT32),
+	ASN1_EMBED(PSSL_SESSION_ASN1, time, ZINT64),
+	ASN1_SIMPLE(PSSL_SESSION_ASN1, id, ASN1_OCTET_STRING),
+	ASN1_SIMPLE(PSSL_SESSION_ASN1, internal, ASN1_OCTET_STRING)
+} static_ASN1_SEQUENCE_END(PSSL_SESSION_ASN1)
+
+IMPLEMENT_STATIC_ASN1_ENCODE_FUNCTIONS(PSSL_SESSION_ASN1);
+
+PSSL_SESSION *
+d2i_PSSL_SESSION(PSSL_SESSION **a, const unsigned char **pp,
+    long length)
+{
+	PSSL_SESSION *s = nullptr;
+	const unsigned char *p = *pp;
+	PSSL_SESSION_ASN1 *as = d2i_PSSL_SESSION_ASN1(nullptr, &p, length);
+	if (as == nullptr)
+		goto error;
+
+	if (a == nullptr || *a == nullptr) {
+		s = PSSL_SESSION_new();
+		if (s == nullptr)
+			goto error;
+	} else
+		s = *a;
+
+	if (as->version != PSSL_SESSION_ASN1_VERSION) {
+		PROCerr(PROC_F_D2I_SSL_SESSION, ERR_R_BAD_VERSION);
+		goto error;
+	}
+
+	if (as->time != 0)
+		s->time = as->time;
+	else
+		s->time = time(nullptr);
+
+	s->compress_id = as->compress_id;
+	s->id_len = as->id->length;
+	s->id = reinterpret_cast<unsigned char *>(malloc(s->id_len));
+	memcpy(s->id, as->id->data, s->id_len);
+	s->internal_length = as->internal->length;
+	s->internal_repr = reinterpret_cast<unsigned char *>
+	    (malloc(s->internal_length));
+	memcpy(s->internal_repr, as->internal->data, s->internal_length);
+
+	M_ASN1_free_of(as, PSSL_SESSION_ASN1);
+
+	if (a != nullptr)
+		*a = s;
+	*pp = p;
+	return (s);
+error:
+	M_ASN1_free_of(as, PSSL_SESSION_ASN1);
+	if (a == nullptr || *a == nullptr)
+		PSSL_SESSION_free(s);
+	return (nullptr);
+}
+
+int
+i2d_PSSL_SESSION(PSSL_SESSION *in, unsigned char **pp)
+{
+	PSSL_SESSION_ASN1 as;
+	ASN1_OCTET_STRING id;
+	ASN1_OCTET_STRING internal;
+
+	if (in == nullptr)
+		return (0);
+
+	memset(&as, 0, sizeof(as));
+
+	as.version = PSSL_SESSION_ASN1_VERSION;
+	as.compress_id = in->compress_id;
+	as.time = in->time;
+	as.id = &id;
+	id.data = in->id;
+	id.length = in->id_len;
+	id.flags = 0;
+	as.internal = &internal;
+	internal.data = in->internal_repr;
+	internal.length = in->internal_length;
+	internal.flags = 0;
+
+	return (i2d_PSSL_SESSION_ASN1(&as, pp));
+}
 
 PSSL *
 PSSL_new(PSSL_CTX *ctx)

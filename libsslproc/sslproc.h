@@ -57,6 +57,22 @@ typedef struct _PSSL_CIPHER PSSL_CIPHER;
 const char *PSSL_CIPHER_get_name(const PSSL_CIPHER *c);
 int PSSL_CIPHER_get_bits(const PSSL_CIPHER *c, int *alg_bits);
 
+/* SSL_SESSION */
+
+struct _PSSL_SESSION;
+typedef struct _PSSL_SESSION PSSL_SESSION;
+
+PSSL_SESSION *PSSL_SESSION_new(void);
+int PSSL_SESSION_up_ref(PSSL_SESSION *s);
+void PSSL_SESSION_free(PSSL_SESSION *s);
+const unsigned char *PSSL_SESSION_get_id(const PSSL_SESSION *s,
+    unsigned int *len);
+unsigned int PSSL_SESSION_get_compress_id(const PSSL_SESSION *s);
+long PSSL_SESSION_get_time(const PSSL_SESSION *s);
+PSSL_SESSION *d2i_PSSL_SESSION(PSSL_SESSION **a, const unsigned char **pp,
+    long length);
+int i2d_PSSL_SESSION(PSSL_SESSION *in, unsigned char **pp);
+
 /* SSL_CTX */
 
 struct _PSSL_CTX;

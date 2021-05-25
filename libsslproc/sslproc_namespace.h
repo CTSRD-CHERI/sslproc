@@ -43,6 +43,18 @@
 #define	SSL_CIPHER_get_name	PSSL_CIPHER_get_name
 #define	SSL_CIPHER_get_bits	PSSL_CIPHER_get_bits
 
+/* SSL_SESSION */
+
+#define	SSL_SESSION		PSSL_SESSION
+#define	SSL_SESSION_new		PSSL_SESSION_new
+#define	SSL_SESSION_up_ref	PSSL_SESSION_up_ref
+#define	SSL_SESSION_free	PSSL_SESSION_free
+#define	SSL_SESSION_get_id	PSSL_SESSION_get_id
+#define	SSL_SESSION_get_compress_id	PSSL_SESSION_get_compress_id
+#define	SSL_SESSION_get_time	PSSL_SESSION_get_time
+#define	d2i_SSL_SESSION		d2i_PSSL_SESSION
+#define	i2d_SSL_SESSION		i2d_PSSL_SESSION
+
 /* SSL_CTX */
 
 #define	SSL_CTX			PSSL_CTX

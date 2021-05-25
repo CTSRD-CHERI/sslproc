@@ -63,11 +63,13 @@ static ERR_STRING_DATA PROC_strings[] = {
 	{ERR_PACK(0, PROC_F_SSL_HANDLE_MESSAGE, 0),
 	 "SSLSession::handleMessage"},
 	{ERR_PACK(0, PROC_F_SSL_READ, 0), "PSSL_read"},
+	{ERR_PACK(0, PROC_F_D2I_SSL_SESSION, 0), "d2i_PSSL_SESSION"},
 	{ERR_PACK(0, 0, ERR_R_IO_ERROR), "I/O error"},
 	{ERR_PACK(0, 0, ERR_R_BAD_MESSAGE), "invalid message"},
 	{ERR_PACK(0, 0, ERR_R_UNEXPECTED_EOF), "unexpected EOF"},
 	{ERR_PACK(0, 0, ERR_R_MISMATCHED_REPLY), "mismatched reply"},
 	{ERR_PACK(0, 0, ERR_R_MESSAGE_ERROR), "message error"},
+	{ERR_PACK(0, 0, ERR_R_BAD_VERSION), "invalid version"},
 	{0, nullptr},
 };
 
