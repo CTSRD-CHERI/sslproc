@@ -559,3 +559,35 @@ PSSL_CTX_set_alpn_select_cb(PSSL_CTX *ctx, PSSL_CTX_alpn_select_cb_func cb,
 	    SSLPROC_CTX_DISABLE_ALPN_SELECT_CB :
 	    SSLPROC_CTX_ENABLE_ALPN_SELECT_CB);
 }
+
+int
+PSSL_CTX_set_cipher_list(PSSL_CTX *ctx, const char *s)
+{
+	if (s == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_SET_CIPHER_LIST,
+		    ERR_R_PASSED_NULL_PARAMETER);
+		return (0);
+	}
+
+	const Message::Result *msg = ctx->cs->waitForReply(
+	    SSLPROC_CTX_SET_CIPHER_LIST, s, strlen(s));
+	if (msg == nullptr)
+		return (0);
+	return (msg->ret);
+}
+
+int
+PSSL_CTX_set_ciphersuites(PSSL_CTX *ctx, const char *s)
+{
+	if (s == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_SET_CIPHERSUITES,
+		    ERR_R_PASSED_NULL_PARAMETER);
+		return (0);
+	}
+
+	const Message::Result *msg = ctx->cs->waitForReply(
+	    SSLPROC_CTX_SET_CIPHERSUITES, s, strlen(s));
+	if (msg == nullptr)
+		return (0);
+	return (msg->ret);
+}

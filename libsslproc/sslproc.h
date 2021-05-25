@@ -118,6 +118,8 @@ typedef int (*PSSL_CTX_alpn_select_cb_func)(PSSL *ssl,
     unsigned int inlen, void *arg);
 void PSSL_CTX_set_alpn_select_cb(PSSL_CTX *ctx, PSSL_CTX_alpn_select_cb_func cb,
     void *arg);
+int PSSL_CTX_set_cipher_list(PSSL_CTX *ctx, const char *s);
+int PSSL_CTX_set_ciphersuites(PSSL_CTX *ctx, const char *s);
 
 /* SSL */
 

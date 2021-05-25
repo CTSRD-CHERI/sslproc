@@ -86,6 +86,8 @@
 #undef SSL_CTX_set_info_callback
 #undef SSL_CTX_alpn_select_cb_func
 #undef SSL_CTX_set_alpn_select_cb
+#undef SSL_CTX_set_cipher_list
+#undef SSL_CTX_set_ciphersuites
 
 /* SSL */
 

@@ -86,6 +86,8 @@
 #define	SSL_CTX_set_info_callback	PSSL_CTX_set_info_callback
 #define	SSL_CTX_alpn_select_cb_func	PSSL_CTX_alpn_select_cb_func
 #define	SSL_CTX_set_alpn_select_cb	PSSL_CTX_set_alpn_select_cb
+#define	SSL_CTX_set_cipher_list	PSSL_CTX_set_cipher_list
+#define	SSL_CTX_set_ciphersuites	PSSL_CTX_set_ciphersuites
 
 /* SSL */
 

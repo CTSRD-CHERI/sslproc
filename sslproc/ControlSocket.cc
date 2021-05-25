@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <capsicum_helpers.h>
 #include <errno.h>
+#include <string.h>
 #include <syslog.h>
 
 #include <openssl/ssl.h>
@@ -380,6 +381,40 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_alpn_select_cb(ctx, nullptr, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
+	case SSLPROC_CTX_SET_CIPHER_LIST:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, 0, ENXIO);
+			break;
+		}
+
+		char *s = strndup(reinterpret_cast<const char *>(hdr->body()),
+		    hdr->bodyLength());
+		int ret = SSL_CTX_set_cipher_list(ctx, s);
+		free(s);
+		if (ret == 0)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, ret);
+		break;
+	}
+	case SSLPROC_CTX_SET_CIPHERSUITES:
+	{
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, 0, ENXIO);
+			break;
+		}
+
+		char *s = strndup(reinterpret_cast<const char *>(hdr->body()),
+		    hdr->bodyLength());
+		int ret = SSL_CTX_set_ciphersuites(ctx, s);
+		free(s);
+		if (ret == 0)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, ret);
+		break;
+	}
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
