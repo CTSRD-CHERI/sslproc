@@ -48,7 +48,7 @@ namespace Message {
 
 		const void *body() const
 		{
-			return (reinterpret_cast<const void *>(this + 1));
+			return (this + 1);
 		}
 	};
 
@@ -83,7 +83,6 @@ namespace Message {
 	};
 
 	struct Ctrl : public Header, CtrlBody {
-
 		size_t bodyLength() const
 		{
 			return (length - sizeof(Ctrl));
@@ -91,7 +90,7 @@ namespace Message {
 
 		const void *body() const
 		{
-			return (reinterpret_cast<const void *>(this + 1));
+			return (this + 1);
 		}
 	};
 
@@ -110,7 +109,7 @@ namespace Message {
 
 		const void *key() const
 		{
-			return (reinterpret_cast<const void *>(this + 1));
+			return (this + 1);
 		}
 	};
 
@@ -198,7 +197,7 @@ namespace Message {
 
 		const void *body() const
 		{
-			return (reinterpret_cast<const void *>(this + 1));
+			return (this + 1);
 		}
 	};
 
@@ -221,7 +220,7 @@ namespace Message {
 
 		const void *id() const
 		{
-			return (reinterpret_cast<const void *>(this + 1));
+			return (this + 1);
 		}
 
 		const void *internal() const
@@ -255,7 +254,7 @@ namespace Message {
 
 		const void *body() const
 		{
-			return (reinterpret_cast<const void *>(this + 1));
+			return (this + 1);
 		}
 	};
 
