@@ -362,6 +362,24 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_info_callback(ctx, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
+	case SSLPROC_CTX_ENABLE_ALPN_SELECT_CB:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_alpn_select_cb(ctx, alpn_select_cb, nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_CTX_DISABLE_ALPN_SELECT_CB:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_alpn_select_cb(ctx, nullptr, nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||

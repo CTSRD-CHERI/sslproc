@@ -84,6 +84,8 @@
 #define	SSL_CTX_sess_set_get_cb	PSSL_CTX_sess_set_get_cb
 #define	SSL_CTX_set_tmp_dh_callback	PSSL_CTX_set_tmp_dh_callback
 #define	SSL_CTX_set_info_callback	PSSL_CTX_set_info_callback
+#define	SSL_CTX_alpn_select_cb_func	PSSL_CTX_alpn_select_cb_func
+#define	SSL_CTX_set_alpn_select_cb	PSSL_CTX_set_alpn_select_cb
 
 /* SSL */
 

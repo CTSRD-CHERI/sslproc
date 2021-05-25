@@ -113,6 +113,11 @@ void PSSL_CTX_sess_set_get_cb(PSSL_CTX *ctx,
 void PSSL_CTX_set_tmp_dh_callback(PSSL_CTX *ctx, DH *(*cb)(PSSL *, int, int));
 void PSSL_CTX_set_info_callback(PSSL_CTX *ctx,
     void (*cb)(const PSSL *, int, int));
+typedef int (*PSSL_CTX_alpn_select_cb_func)(PSSL *ssl,
+    const unsigned char **out, unsigned char *outlen, const unsigned char *in,
+    unsigned int inlen, void *arg);
+void PSSL_CTX_set_alpn_select_cb(PSSL_CTX *ctx, PSSL_CTX_alpn_select_cb_func cb,
+    void *arg);
 
 /* SSL */
 

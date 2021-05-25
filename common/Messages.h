@@ -126,6 +126,8 @@ namespace Message {
 #define	SSLPROC_CTX_DISABLE_TMP_DH_CB	0x13
 #define	SSLPROC_CTX_ENABLE_INFO_CB	0x14
 #define	SSLPROC_CTX_DISABLE_INFO_CB	0x15
+#define	SSLPROC_CTX_ENABLE_ALPN_SELECT_CB	0x16
+#define	SSLPROC_CTX_DISABLE_ALPN_SELECT_CB	0x17
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x20
@@ -248,6 +250,8 @@ namespace Message {
 		int	where;
 		int	ret;
 	};
+
+#define	SSLPROC_ALPN_SELECT_CB	0x8d
 
 /*
  * The receiver always returns a Result message to the sender at the

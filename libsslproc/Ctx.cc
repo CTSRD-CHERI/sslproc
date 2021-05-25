@@ -548,3 +548,14 @@ PSSL_CTX_set_info_callback(PSSL_CTX *ctx, void (*cb)(const PSSL *, int, int))
 	(void)ctx->cs->waitForReply(cb == nullptr ?
 	    SSLPROC_CTX_DISABLE_INFO_CB : SSLPROC_CTX_ENABLE_INFO_CB);
 }
+
+void
+PSSL_CTX_set_alpn_select_cb(PSSL_CTX *ctx, PSSL_CTX_alpn_select_cb_func cb,
+    void *arg)
+{
+	ctx->alpn_select_cb = cb;
+	ctx->alpn_select_cb_arg = arg;
+	(void)ctx->cs->waitForReply(cb == nullptr ?
+	    SSLPROC_CTX_DISABLE_ALPN_SELECT_CB :
+	    SSLPROC_CTX_ENABLE_ALPN_SELECT_CB);
+}

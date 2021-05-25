@@ -84,6 +84,8 @@
 #undef SSL_CTX_sess_set_get_cb
 #undef SSL_CTX_set_tmp_dh_callback
 #undef SSL_CTX_set_info_callback
+#undef SSL_CTX_alpn_select_cb_func
+#undef SSL_CTX_set_alpn_select_cb
 
 /* SSL */
 

@@ -389,6 +389,21 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case SSLPROC_ALPN_SELECT_CB:
+	{
+		if (ssl->ctx->alpn_select_cb == nullptr) {
+			writeReplyMessage(hdr->type, SSL_TLSEXT_ERR_NOACK);
+			break;
+		}
+
+		const unsigned char *out = nullptr;
+		unsigned char outlen = 0;
+		ret = ssl->ctx->alpn_select_cb(ssl, &out, &outlen,
+		    reinterpret_cast<const unsigned char *>(hdr->body()),
+		    hdr->bodyLength(), ssl->ctx->alpn_select_cb_arg);
+		writeReplyMessage(hdr->type, ret, out, outlen);
+		break;
+	}
 	default:
 		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

@@ -295,6 +295,31 @@ info_cb(const SSL *ssl, int where, int ret)
 	(void)ss->sendRequest(SSLPROC_INFO_CB, &body, sizeof(body));
 }
 
+int
+alpn_select_cb(SSL *ssl, const unsigned char **out, unsigned char *outlen,
+    const unsigned char *in, unsigned int inlen, void *arg)
+{
+	SSLSession *ss = currentSession;
+	if (ss == nullptr || !ss->isSSL(ssl)) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
+		return (SSL_TLSEXT_ERR_ALERT_FATAL);
+	}
+
+	const Message::Result *msg = ss->sendRequest(SSLPROC_ALPN_SELECT_CB,
+	    in, inlen);
+	if (msg == nullptr || msg->error != SSL_ERROR_NONE)
+		return (SSL_TLSEXT_ERR_ALERT_FATAL);
+
+	/*
+	 * Since the message points into the replyBuffer of 'ss', it
+	 * is ok to return this pointer to the caller.
+	 */
+	*out = reinterpret_cast<const unsigned char *>(msg->body());
+	*outlen = msg->bodyLength();
+	return (msg->ret);
+}
+
 bool
 SSLSession::init(SSL_CTX *ctx)
 {
