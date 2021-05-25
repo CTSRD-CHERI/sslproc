@@ -591,3 +591,13 @@ PSSL_CTX_set_ciphersuites(PSSL_CTX *ctx, const char *s)
 		return (0);
 	return (msg->ret);
 }
+
+long
+PSSL_CTX_set_timeout(PSSL_CTX *ctx, long time)
+{
+	const Message::Result *msg = ctx->cs->waitForReply(
+	    SSLPROC_CTX_SET_TIMEOUT, &time, sizeof(time));
+	if (msg == nullptr)
+		abort();
+	return (msg->ret);
+}

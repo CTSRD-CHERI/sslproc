@@ -88,6 +88,7 @@
 #define	SSL_CTX_set_alpn_select_cb	PSSL_CTX_set_alpn_select_cb
 #define	SSL_CTX_set_cipher_list	PSSL_CTX_set_cipher_list
 #define	SSL_CTX_set_ciphersuites	PSSL_CTX_set_ciphersuites
+#define	SSL_CTX_set_timeout	PSSL_CTX_set_timeout
 
 /* SSL */
 

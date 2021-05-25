@@ -130,6 +130,7 @@ namespace Message {
 #define	SSLPROC_CTX_DISABLE_ALPN_SELECT_CB	0x17
 #define	SSLPROC_CTX_SET_CIPHER_LIST	0x18
 #define	SSLPROC_CTX_SET_CIPHERSUITES	0x19
+#define	SSLPROC_CTX_SET_TIMEOUT	0x1a
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x20

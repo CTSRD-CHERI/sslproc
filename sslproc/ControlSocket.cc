@@ -415,6 +415,27 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeReplyMessage(hdr->type, ret);
 		break;
 	}
+	case SSLPROC_CTX_SET_TIMEOUT:
+	{
+		long time;
+
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, 0, ENXIO);
+			break;
+		}
+
+		if (hdr->bodyLength() != sizeof(time)) {
+			syslog(LOG_WARNING,
+			    "invalid message size for SSLPROC_CTX_SET_TIMEOUT");
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		time = *reinterpret_cast<const long *>(hdr->body());
+		long ret = SSL_CTX_set_timeout(ctx, time);
+		writeReplyMessage(hdr->type, ret);
+		break;
+	}
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
