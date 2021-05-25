@@ -49,6 +49,7 @@ public:
 	    int iovCnt);
 	const Message::Result *sendRequest(int type,
 	    const void *payload, size_t payloadLen);
+	bool isSSL(const SSL *_ssl) const { return (ssl == _ssl); }
 
 private:
 	const Message::Result *_waitForReply(int type);

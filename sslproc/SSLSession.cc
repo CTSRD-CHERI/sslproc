@@ -37,16 +37,28 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include <unordered_map>
-
 #include <openssl/ssl.h>
 
 #include "local.h"
 #include "Messages.h"
 #include "SSLSession.h"
 
-static std::unordered_map<SSL *, SSLSession *> sessions;
+static SSLSession *currentSession;
 static BIO_METHOD *readBioMethod, *writeBioMethod;
+
+class SetCurrentSession {
+public:
+	SetCurrentSession(SSLSession *ss)
+	{
+		assert(currentSession == nullptr);
+		currentSession = ss;
+	}
+
+	~SetCurrentSession()
+	{
+		currentSession = nullptr;
+	}
+};
 
 static void
 msg_cb(int write_p, int version, int content_type, const void *buf,
@@ -59,6 +71,12 @@ msg_cb(int write_p, int version, int content_type, const void *buf,
 		int content_type;
 	} args;
 	struct iovec iov[2];
+
+	if (ss != currentSession) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
+		return;
+	}
 
 	args.write_p = write_p;
 	args.version = version;
@@ -74,13 +92,13 @@ msg_cb(int write_p, int version, int content_type, const void *buf,
 int
 servername_cb(SSL *ssl, int *al, void *arg)
 {
-	auto it = sessions.find(ssl);
-	if (it == sessions.end()) {
-		syslog(LOG_WARNING, "%s: unable to locate session", __func__);
+	SSLSession *ss = currentSession;
+	if (ss == nullptr || !ss->isSSL(ssl)) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
 		return (SSL_TLSEXT_ERR_ALERT_FATAL);
 	}
 
-	SSLSession *ss = it->second;
 	const Message::Result *msg = ss->sendRequest(SSLPROC_SERVERNAME_CB,
 	    al, sizeof(*al));
 	if (msg == nullptr)
@@ -93,14 +111,14 @@ servername_cb(SSL *ssl, int *al, void *arg)
 int
 client_hello_cb(SSL *ssl, int *al, void *arg)
 {
-	auto it = sessions.find(ssl);
-	if (it == sessions.end()) {
-		syslog(LOG_WARNING, "%s: unable to locate session", __func__);
+	SSLSession *ss = currentSession;
+	if (ss == nullptr || !ss->isSSL(ssl)) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
 		*al = SSL_AD_INTERNAL_ERROR;
 		return (0);
 	}
 
-	SSLSession *ss = it->second;
 	const Message::Result *msg = ss->sendRequest(SSLPROC_CLIENT_HELLO_CB,
 	    al, sizeof(*al));
 	if (msg == nullptr) {
@@ -115,14 +133,14 @@ client_hello_cb(SSL *ssl, int *al, void *arg)
 int
 srp_username_cb(SSL *ssl, int *ad, void *arg)
 {
-	auto it = sessions.find(ssl);
-	if (it == sessions.end()) {
-		syslog(LOG_WARNING, "%s: unable to locate session", __func__);
+	SSLSession *ss = currentSession;
+	if (ss == nullptr || !ss->isSSL(ssl)) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
 		*ad = SSL_AD_INTERNAL_ERROR;
 		return (SSL3_AL_FATAL);
 	}
 
-	SSLSession *ss = it->second;
 	const Message::Result *msg = ss->sendRequest(SSLPROC_SRP_USERNAME_CB,
 	    ad, sizeof(*ad));
 	if (msg == nullptr) {
@@ -158,7 +176,6 @@ SSLSession::init(SSL_CTX *ctx)
 		BIO_free(wbio);
 		return (false);
 	}
-	sessions.insert({ssl, this});
 	SSL_set_bio(ssl, rbio, wbio);
 
 	/*
@@ -175,9 +192,6 @@ SSLSession::init(SSL_CTX *ctx)
 
 SSLSession::~SSLSession()
 {
-	if (ssl != nullptr)
-		sessions.erase(ssl);
-
 	SSL_free(ssl);
 
 	close(fd);
@@ -534,6 +548,8 @@ SSLSession::onEvent(const struct kevent *kevent)
 		delete this;
 		return;
 	}
+
+	SetCurrentSession scs(this);
 
 	resid = kevent->data;
 	while (resid > 0) {
