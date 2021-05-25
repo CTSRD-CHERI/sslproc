@@ -34,6 +34,7 @@
 
 #include <sys/cdefs.h>
 #include <atomic>
+#include <unordered_map>
 
 #include <openssl/crypto.h>
 #include <openssl/err.h>
@@ -48,6 +49,8 @@ int	POPENSSL_init_ssl(void);
 
 extern int PROC_lib;
 void	PERR_init(void);
+
+__END_DECLS
 
 #define	PROCerr(f,r)	ERR_PUT_error(PROC_lib, (f), (r), __FILE__, __LINE__)
 
@@ -106,6 +109,39 @@ struct _PSSL_SESSION {
 class ControlSocket;
 struct _PSSL;
 
+struct session_map_key {
+	session_map_key(const unsigned char *_id, unsigned int _len) :
+	    id(_id), id_len(_len)
+	{}
+
+	const unsigned char *id;
+	unsigned int id_len;
+};
+
+inline bool operator==(const session_map_key &l, const session_map_key &r)
+{
+	if (l.id_len != r.id_len)
+		return (false);
+	return (memcmp(l.id, r.id, l.id_len) == 0);
+}
+
+namespace std {
+	template<> struct hash<session_map_key> {
+		inline size_t operator()(const session_map_key &k) const noexcept
+		{
+			size_t value;
+
+			if (k.id_len >= sizeof(value))
+				value = *reinterpret_cast<const size_t *>(k.id);
+			else if (k.id_len == 0)
+				value = 0;
+			else
+				value = *k.id;
+			return (value);
+		}
+	};
+}
+
 struct _PSSL_CTX {
 	ControlSocket *cs;
 	CRYPTO_EX_DATA ex_data;
@@ -115,6 +151,12 @@ struct _PSSL_CTX {
 	void *client_hello_cb_arg;
 	int (*srp_username_cb)(struct _PSSL *, int *, void *);
 	void *srp_cb_arg;
+	int (*sess_new_cb)(struct _PSSL *, struct _PSSL_SESSION *);
+	void (*sess_remove_cb)(struct _PSSL_CTX *, struct _PSSL_SESSION *);
+	struct _PSSL_SESSION *(*sess_get_cb)(struct _PSSL *,
+	    const unsigned char *, int, int *);
+	bool sess_cbs_enabled;
+	std::unordered_map<session_map_key, struct _PSSL_SESSION *> sessions;
 	std::atomic_int refs;
 };
 
@@ -138,5 +180,3 @@ struct _PSSL {
 	std::atomic_int refs;
 	int last_error;
 };
-
-__END_DECLS

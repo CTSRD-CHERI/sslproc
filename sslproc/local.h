@@ -38,3 +38,6 @@ bool	initOpenSSL();
 int	servername_cb(SSL *, int *, void *);
 int	client_hello_cb(SSL *, int *, void *);
 int	srp_username_cb(SSL *, int *, void *);
+int	sess_new_cb(SSL *, SSL_SESSION *);
+void	sess_remove_cb(SSL_CTX *, SSL_SESSION *);
+SSL_SESSION *sess_get_cb(SSL *, const unsigned char *, int, int *);

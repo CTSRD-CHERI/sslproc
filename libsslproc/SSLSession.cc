@@ -209,6 +209,138 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, ret, &ad, sizeof(ad));
 		break;
 	}
+	case SSLPROC_SESS_NEW_CB:
+	{
+		if (hdr->length < sizeof(Message::SessNewCb)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		const Message::SessNewCb *msg =
+		    reinterpret_cast<const Message::SessNewCb *>(hdr);
+
+		if (msg->id_len <= 0 || msg->internal_length <= 0) {
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+		if (msg->length != sizeof(Message::SessNewCb) + msg->id_len +
+		    msg->internal_length) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		PSSL_SESSION *s = PSSL_SESSION_new();
+		if (s == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOMEM);
+			break;
+		}
+
+		s->time = msg->time;
+		s->compress_id = msg->compress_id;
+		s->id_len = msg->id_len;
+		s->internal_length = msg->internal_length;
+		s->id = reinterpret_cast<unsigned char *>(malloc(s->id_len));
+		s->internal_repr = reinterpret_cast<unsigned char *>
+		    (malloc(s->internal_length));
+		if (s->id == nullptr || s->internal_repr == nullptr) {
+			PSSL_SESSION_free(s);
+			writeErrnoReply(hdr->type, -1, ENOMEM);
+			break;
+		}
+		memcpy(s->id, msg->id(), s->id_len);
+		memcpy(s->internal_repr, msg->internal(), s->internal_length);
+
+		/*
+		 * Locally created PSSL_SESSION objects are stored in
+		 * a hash table so that the original pointer passed to
+		 * the new session callback below is also passed in a
+		 * future remove callback.
+		 */
+		auto res = ssl->ctx->sessions.emplace(
+		    session_map_key(s->id, s->id_len), s);
+		if (!res.second) {
+			PSSL_SESSION_free(s);
+			writeErrnoReply(hdr->type, -1, EEXIST);
+			break;
+		}
+
+		if (ssl->ctx->sess_new_cb != nullptr) {
+			PSSL_SESSION_up_ref(s);
+			if (ssl->ctx->sess_new_cb(ssl, s) == 0)
+				PSSL_SESSION_free(s);
+		}
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case SSLPROC_SESS_REMOVE_CB:
+	{
+		if (hdr->bodyLength() == 0) {
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+
+		auto it = ssl->ctx->sessions.find(session_map_key(
+		    reinterpret_cast<const unsigned char *>(hdr->body()),
+		    hdr->bodyLength()));
+		if (it == ssl->ctx->sessions.end()) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		PSSL_SESSION *s = it->second;
+		ssl->ctx->sessions.erase(it);
+		if (ssl->ctx->sess_remove_cb != nullptr)
+			ssl->ctx->sess_remove_cb(ssl->ctx, s);
+		PSSL_SESSION_free(s);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case SSLPROC_SESS_GET_CB:
+	{
+		if (hdr->bodyLength() == 0) {
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+
+		if (ssl->ctx->sess_get_cb == nullptr) {
+			writeErrnoReply(hdr->type, -1, EOPNOTSUPP);
+			break;
+		}
+
+		int copy = 1;
+		PSSL_SESSION *s = ssl->ctx->sess_get_cb(ssl,
+		    reinterpret_cast<const unsigned char *>(hdr->body()),
+		    hdr->bodyLength(), &copy);
+		if (s == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+		if (copy)
+			PSSL_SESSION_up_ref(s);
+		if (s->internal_length == 0 || s->id_len == 0 ||
+		    s->internal_repr == nullptr || s->id == nullptr) {
+			PSSL_SESSION_free(s);
+			writeErrnoReply(hdr->type, -1, EINVAL);
+			break;
+		}
+
+		/*
+		 * XXX: Is it correct to assume that newly created
+		 * sessions via the get callback should be assume to
+		 * already be cached and subject to a future remove
+		 * callback?
+		 */
+		auto res = ssl->ctx->sessions.emplace(
+		    session_map_key(s->id, s->id_len), s);
+		if (!res.second) {
+			PSSL_SESSION_free(s);
+			writeErrnoReply(hdr->type, -1, EEXIST);
+			break;
+		}
+		writeReplyMessage(hdr->type, 0, s->internal_repr,
+		    s->internal_length);
+		break;
+	}
 	default:
 		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

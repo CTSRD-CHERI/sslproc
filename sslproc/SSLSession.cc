@@ -152,6 +152,99 @@ srp_username_cb(SSL *ssl, int *ad, void *arg)
 	return (msg->ret);
 }
 
+/*
+ * XXX: These callbacks are not yet implemented.  The "new" and "get"
+ * callbacks are sychronously invoked during SSL_* operations and
+ * could be safely mapped to low-level callbacks on the session
+ * socket.  However, the "remove" callback is not as clear-cut.
+ * Perhaps we could take advantage of the helper being single-threaded
+ * and use a global to track the currently active SSL session and
+ * invoke the callback there.  For now, this just punts and
+ * effectively disables external caching.
+ */
+int
+sess_new_cb(SSL *ssl, SSL_SESSION *s)
+{
+	struct {
+		long	time;
+		int	compress_id;
+		unsigned int id_len;
+		long	internal_length;
+	} body;
+	struct iovec iov[3];
+
+	SSLSession *ss = currentSession;
+	if (ss == nullptr || !ss->isSSL(ssl)) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
+		return (0);
+	}
+
+	iov[0].iov_base = &body;
+	iov[0].iov_len = sizeof(body);
+	body.time = SSL_SESSION_get_time(s);
+	body.compress_id = SSL_SESSION_get_compress_id(s);
+
+	iov[1].iov_base = const_cast<unsigned char *>(SSL_SESSION_get_id(s,
+	    &body.id_len));
+	if (iov[1].iov_base == nullptr)
+		return (0);
+	iov[1].iov_len = body.id_len;
+
+	unsigned char *asn1 = nullptr;
+	iov[2].iov_len = i2d_SSL_SESSION(s, &asn1);
+	if (iov[2].iov_len == 0)
+		return (0);
+	iov[2].iov_base = asn1;
+	body.internal_length = iov[2].iov_len;
+
+	(void)ss->sendRequest(SSLPROC_SESS_NEW_CB, iov, 3);
+
+	OPENSSL_free(asn1);
+
+	return (0);
+}
+
+void
+sess_remove_cb(SSL_CTX *ctx, SSL_SESSION *s)
+{
+	SSLSession *ss = currentSession;
+	if (ss == nullptr) {
+		syslog(LOG_WARNING, "%s: invoked without a current session",
+		    __func__);
+		return;
+	}
+
+	unsigned int id_len;
+	const unsigned char *id = SSL_SESSION_get_id(s, &id_len);
+	if (id == nullptr || id_len == 0)
+		return;
+
+	(void)ss->sendRequest(SSLPROC_SESS_REMOVE_CB, id, id_len);
+}
+
+SSL_SESSION *
+sess_get_cb(SSL *ssl, const unsigned char *data, int len, int *copy)
+{
+	SSLSession *ss = currentSession;
+	if (ss == nullptr || !ss->isSSL(ssl)) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
+		return (0);
+	}
+
+	const Message::Result *msg = ss->sendRequest(SSLPROC_SESS_GET_CB,
+	    data, len);
+	if (msg == nullptr || msg->error != SSL_ERROR_NONE ||
+	    msg->bodyLength() == 0)
+		return (nullptr);
+
+	const unsigned char *pp = reinterpret_cast<const unsigned char *>
+	    (msg->body());
+	*copy = 0;
+	return (d2i_SSL_SESSION(nullptr, &pp, msg->bodyLength()));
+}
+
 bool
 SSLSession::init(SSL_CTX *ctx)
 {

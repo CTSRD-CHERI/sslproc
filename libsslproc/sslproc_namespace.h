@@ -79,6 +79,9 @@
 #define	SSL_CTX_set_client_hello_cb	PSSL_CTX_set_client_hello_cb
 #define	SSL_CTX_set_srp_username_callback PSSL_CTX_set_srp_username_callback
 #define	SSL_CTX_set_srp_cb_arg	PSSL_CTX_set_srp_cb_arg
+#define	SSL_CTX_sess_set_new_cb	PSSL_CTX_sess_set_new_cb
+#define	SSL_CTX_sess_set_remove_cb	PSSL_CTX_sess_set_remove_cb
+#define	SSL_CTX_sess_set_get_cb	PSSL_CTX_sess_set_get_cb
 
 /* SSL */
 

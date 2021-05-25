@@ -288,6 +288,26 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case SSLPROC_CTX_ENABLE_SESS_CBS:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+		SSL_CTX_sess_set_new_cb(ctx, sess_new_cb);
+		SSL_CTX_sess_set_remove_cb(ctx, sess_remove_cb);
+		SSL_CTX_sess_set_get_cb(ctx, sess_get_cb);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_CTX_DISABLE_SESS_CBS:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+		SSL_CTX_sess_set_new_cb(ctx, nullptr);
+		SSL_CTX_sess_set_remove_cb(ctx, nullptr);
+		SSL_CTX_sess_set_get_cb(ctx, nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||

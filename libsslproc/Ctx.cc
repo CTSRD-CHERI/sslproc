@@ -116,6 +116,10 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	ctx->client_hello_cb_arg = nullptr;
 	ctx->srp_username_cb = nullptr;
 	ctx->srp_cb_arg = nullptr;
+	ctx->sess_new_cb = nullptr;
+	ctx->sess_remove_cb = nullptr;
+	ctx->sess_get_cb = nullptr;
+	ctx->sess_cbs_enabled = false;
 	ctx->refs = 1;
 	return (ctx);
 }
@@ -460,4 +464,50 @@ PSSL_CTX_set_srp_cb_arg(PSSL_CTX *ctx, void *arg)
 {
 	ctx->srp_cb_arg = arg;
 	return (1);
+}
+
+static void
+PSSL_CTX_sess_callbacks_updated(PSSL_CTX *ctx)
+{
+	if (ctx->sess_new_cb == nullptr && ctx->sess_remove_cb == nullptr &&
+	    ctx->sess_get_cb == nullptr) {
+		if (ctx->sess_cbs_enabled) {
+			const Message::Result *msg = ctx->cs->waitForReply(
+			    SSLPROC_CTX_DISABLE_SESS_CBS);
+			if (msg == nullptr || msg->error != SSL_ERROR_NONE)
+				abort();
+			ctx->sess_cbs_enabled = false;
+		}
+	} else {
+		if (!ctx->sess_cbs_enabled) {
+			const Message::Result *msg = ctx->cs->waitForReply(
+			    SSLPROC_CTX_ENABLE_SESS_CBS);
+			if (msg == nullptr || msg->error != SSL_ERROR_NONE)
+				abort();
+			ctx->sess_cbs_enabled = true;
+		}
+	}
+}
+
+void
+PSSL_CTX_sess_set_new_cb(PSSL_CTX *ctx, int (*cb)(PSSL *, PSSL_SESSION *))
+{
+	ctx->sess_new_cb = cb;
+	PSSL_CTX_sess_callbacks_updated(ctx);
+}
+
+void
+PSSL_CTX_sess_set_remove_cb(PSSL_CTX *ctx,
+    void (*cb)(PSSL_CTX *, PSSL_SESSION *))
+{
+	ctx->sess_remove_cb = cb;
+	PSSL_CTX_sess_callbacks_updated(ctx);
+}
+
+void
+PSSL_CTX_sess_set_get_cb(PSSL_CTX *ctx,
+    PSSL_SESSION * (*cb)(PSSL *, const unsigned char *, int, int *))
+{
+	ctx->sess_get_cb = cb;
+	PSSL_CTX_sess_callbacks_updated(ctx);
 }

@@ -121,9 +121,11 @@ namespace Message {
 #define	SSLPROC_CTX_DISABLE_CLIENT_HELLO_CB	0x0d
 #define	SSLPROC_CTX_ENABLE_SRP_USERNAME_CB	0x0e
 #define	SSLPROC_CTX_DISABLE_SRP_USERNAME_CB	0x0f
+#define	SSLPROC_CTX_ENABLE_SESS_CBS		0x10
+#define	SSLPROC_CTX_DISABLE_SESS_CBS		0x11
 
 /* Includes session fd in an SCM_RIGHTS control message. */
-#define	SSLPROC_CREATE_SESSION	0x10
+#define	SSLPROC_CREATE_SESSION	0x20
 
 /* Per-session messages from client -> sslproc over the 'session' fd. */
 
@@ -209,6 +211,27 @@ namespace Message {
 #define	SSLPROC_SERVERNAME_CB	0x85
 #define	SSLPROC_CLIENT_HELLO_CB	0x86
 #define	SSLPROC_SRP_USERNAME_CB	0x87
+#define	SSLPROC_SESS_NEW_CB	0x88
+
+	struct SessNewCb : public Header {
+		long	time;
+		int	compress_id;
+		unsigned int id_len;
+		long	internal_length;
+
+		const void *id() const
+		{
+			return (reinterpret_cast<const void *>(this + 1));
+		}
+
+		const void *internal() const
+		{
+			return (reinterpret_cast<const char *>(id()) + id_len);
+		}
+	};
+
+#define	SSLPROC_SESS_REMOVE_CB	0x89
+#define	SSLPROC_SESS_GET_CB	0x8a
 
 /*
  * The receiver always returns a Result message to the sender at the

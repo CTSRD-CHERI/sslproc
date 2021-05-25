@@ -105,6 +105,11 @@ void PSSL_CTX_set_client_hello_cb(PSSL_CTX *ctx, PSSL_client_hello_cb_fn cb,
 int PSSL_CTX_set_srp_username_callback(PSSL_CTX *ctx,
     int (*cb)(PSSL *, int *, void *));
 int PSSL_CTX_set_srp_cb_arg(PSSL_CTX *ctx, void *arg);
+void PSSL_CTX_sess_set_new_cb(PSSL_CTX *ctx, int (*cb)(PSSL *, PSSL_SESSION *));
+void PSSL_CTX_sess_set_remove_cb(PSSL_CTX *ctx,
+    void (*cb)(PSSL_CTX *, PSSL_SESSION *));
+void PSSL_CTX_sess_set_get_cb(PSSL_CTX *ctx,
+    PSSL_SESSION * (*cb)(PSSL *, const unsigned char *, int, int *));
 
 /* SSL */
 

@@ -79,6 +79,9 @@
 #undef SSL_CTX_set_client_hello_cb
 #undef SSL_CTX_set_srp_username_callback
 #undef SSL_CTX_set_srp_cb_arg
+#undef SSL_CTX_sess_set_new_cb
+#undef SSL_CTX_sess_set_remove_cb
+#undef SSL_CTX_sess_set_get_cb
 
 /* SSL */
 
