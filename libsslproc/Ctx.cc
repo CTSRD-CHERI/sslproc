@@ -630,3 +630,13 @@ PSSL_CTX_get0_certificate(const PSSL_CTX *ctxc)
 	ctx->get0_cert = cert;
 	return (cert);
 }
+
+void
+PSSL_CTX_set_client_cert_cb(PSSL_CTX *ctx,
+    int (*cb)(PSSL *, X509 **, EVP_PKEY **))
+{
+	ctx->client_cert_cb = cb;
+	(void)ctx->cs->waitForReply(cb == nullptr ?
+	    SSLPROC_CTX_DISABLE_CLIENT_CERT_CB :
+	    SSLPROC_CTX_ENABLE_CLIENT_CERT_CB);
+}

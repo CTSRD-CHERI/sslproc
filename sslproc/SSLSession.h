@@ -48,7 +48,7 @@ public:
 	const Message::Result *sendRequest(int type, struct iovec *iov,
 	    int iovCnt);
 	const Message::Result *sendRequest(int type,
-	    const void *payload, size_t payloadLen);
+	    const void *payload = nullptr, size_t payloadLen = 0);
 	bool isSSL(const SSL *_ssl) const { return (ssl == _ssl); }
 
 private:

@@ -45,3 +45,4 @@ DH	*tmp_dh_cb(SSL *, int, int);
 void	info_cb(const SSL *, int, int);
 int	alpn_select_cb(SSL *, const unsigned char **, unsigned char *,
     const unsigned char *, unsigned int, void *);
+int	client_cert_cb(SSL *, X509 **, EVP_PKEY **);

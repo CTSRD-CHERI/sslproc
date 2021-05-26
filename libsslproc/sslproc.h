@@ -122,6 +122,8 @@ int PSSL_CTX_set_cipher_list(PSSL_CTX *ctx, const char *s);
 int PSSL_CTX_set_ciphersuites(PSSL_CTX *ctx, const char *s);
 long PSSL_CTX_set_timeout(PSSL_CTX *ctx, long time);
 X509 *PSSL_CTX_get0_certificate(const PSSL_CTX *ctx);
+void PSSL_CTX_set_client_cert_cb(PSSL_CTX *ctx,
+    int (*cb)(PSSL *, X509 **, EVP_PKEY **));
 
 /* SSL */
 

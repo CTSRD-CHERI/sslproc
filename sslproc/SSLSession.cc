@@ -320,6 +320,43 @@ alpn_select_cb(SSL *ssl, const unsigned char **out, unsigned char *outlen,
 	return (msg->ret);
 }
 
+int
+client_cert_cb(SSL *ssl, X509 **certp, EVP_PKEY **pkeyp)
+{
+	SSLSession *ss = currentSession;
+	if (ss == nullptr || !ss->isSSL(ssl)) {
+		syslog(LOG_WARNING, "%s: invoked on non-current session",
+		    __func__);
+		return (-1);
+	}
+
+	const Message::Result *hdr = ss->sendRequest(SSLPROC_CLIENT_CERT_CB);
+	if (hdr == nullptr)
+		return (-1);
+	if (hdr->ret != 1)
+		return (hdr->ret);
+	if (hdr->length < sizeof(Message::ClientCertCbResult))
+		return (-1);
+
+	const Message::ClientCertCbResult *msg =
+	    reinterpret_cast<const Message::ClientCertCbResult *>(hdr);
+	const unsigned char *pp = reinterpret_cast<const unsigned char *>
+	    (msg->cert());
+	X509 *cert = d2i_X509(nullptr, &pp, msg->cert_len);
+	if (cert == nullptr)
+		return (-1);
+	pp = reinterpret_cast<const unsigned char *>(msg->pkey());
+	EVP_PKEY *pkey = d2i_PrivateKey(msg->pktype, nullptr, &pp, msg->pk_len);
+	if (pkey == nullptr) {
+		X509_free(cert);
+		return (-1);
+	}
+
+	*certp = cert;
+	*pkeyp = pkey;
+	return (1);
+}
+
 bool
 SSLSession::init(SSL_CTX *ctx)
 {

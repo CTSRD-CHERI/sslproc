@@ -404,6 +404,57 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, ret, out, outlen);
 		break;
 	}
+	case SSLPROC_CLIENT_CERT_CB:
+	{
+		if (ssl->ctx->client_cert_cb == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		X509 *cert = nullptr;
+		EVP_PKEY *pkey = nullptr;
+		int ret = ssl->ctx->client_cert_cb(ssl, &cert, &pkey);
+		if (ret != 1) {
+			X509_free(cert);
+			EVP_PKEY_free(pkey);
+			writeReplyMessage(hdr->type, ret);
+			break;
+		}
+
+		Message::ClientCertCbResultBody body;
+		unsigned char *cert_buf = nullptr;
+		body.cert_len = i2d_X509(cert, &cert_buf);
+		if (body.cert_len < 0) {
+			X509_free(cert);
+			EVP_PKEY_free(pkey);
+			writeReplyMessage(hdr->type, -1);
+			break;
+		}
+		X509_free(cert);
+
+		unsigned char *pkey_buf = nullptr;
+		body.pk_len = i2d_PrivateKey(pkey, &pkey_buf);
+		if (body.pk_len < 0) {
+			OPENSSL_free(cert_buf);
+			EVP_PKEY_free(pkey);
+			writeReplyMessage(hdr->type, -1);
+			break;
+		}
+		body.pktype = EVP_PKEY_base_id(pkey);
+		EVP_PKEY_free(pkey);
+
+		struct iovec iov[3];
+		iov[0].iov_base = &body;
+		iov[0].iov_len = sizeof(body);
+		iov[1].iov_base = cert_buf;
+		iov[1].iov_len = body.cert_len;
+		iov[2].iov_base = pkey_buf;
+		iov[2].iov_len = body.pk_len;
+		writeReplyMessage(hdr->type, 1, iov, 3);
+		OPENSSL_free(cert_buf);
+		OPENSSL_free(pkey_buf);
+		break;
+	}
 	default:
 		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

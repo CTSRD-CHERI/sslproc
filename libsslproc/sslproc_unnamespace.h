@@ -90,6 +90,7 @@
 #undef SSL_CTX_set_ciphersuites
 #undef SSL_CTX_set_timeout
 #undef SSL_CTX_get0_certificate
+#undef SSL_CTX_set_client_cert_cb
 
 /* SSL */
 

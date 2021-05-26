@@ -90,6 +90,7 @@
 #define	SSL_CTX_set_ciphersuites	PSSL_CTX_set_ciphersuites
 #define	SSL_CTX_set_timeout	PSSL_CTX_set_timeout
 #define	SSL_CTX_get0_certificate	PSSL_CTX_get0_certificate
+#define	SSL_CTX_set_client_cert_cb	PSSL_CTX_set_client_cert_cb
 
 /* SSL */
 

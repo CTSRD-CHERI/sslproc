@@ -132,6 +132,8 @@ namespace Message {
 #define	SSLPROC_CTX_SET_CIPHERSUITES	0x19
 #define	SSLPROC_CTX_SET_TIMEOUT	0x1a
 #define	SSLPROC_CTX_GET0_CERTIFICATE	0x1b
+#define	SSLPROC_CTX_ENABLE_CLIENT_CERT_CB	0x1c
+#define	SSLPROC_CTX_DISABLE_CLIENT_CERT_CB	0x1d
 
 /* Includes session fd in an SCM_RIGHTS control message. */
 #define	SSLPROC_CREATE_SESSION	0x20
@@ -256,6 +258,7 @@ namespace Message {
 	};
 
 #define	SSLPROC_ALPN_SELECT_CB	0x8d
+#define	SSLPROC_CLIENT_CERT_CB	0x8e
 
 /*
  * The receiver always returns a Result message to the sender at the
@@ -298,6 +301,26 @@ namespace Message {
 		const char *name() const
 		{
 			return (reinterpret_cast<const char *>(this + 1));
+		}
+	};
+
+	/* Response from SSLPROC_CLIENT_CERT_CB */
+	struct ClientCertCbResultBody {
+		int	cert_len;
+		int	pk_len;
+		int	pktype;
+	};
+
+	struct ClientCertCbResult : public Result, ClientCertCbResultBody {
+		const void *cert() const
+		{
+			return (this + 1);
+		}
+
+		const void *pkey() const
+		{
+			return (reinterpret_cast<const char *>(cert()) +
+			    cert_len);
 		}
 	};
 }

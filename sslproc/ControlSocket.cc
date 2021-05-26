@@ -459,6 +459,24 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		OPENSSL_free(buf);
 		break;
 	}
+	case SSLPROC_CTX_ENABLE_CLIENT_CERT_CB:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_client_cert_cb(ctx, client_cert_cb);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case SSLPROC_CTX_DISABLE_CLIENT_CERT_CB:
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		SSL_CTX_set_client_cert_cb(ctx, nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
 	case SSLPROC_CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
