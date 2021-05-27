@@ -64,10 +64,10 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 	int *fds;
 
 	switch (hdr->type) {
-	case SSLPROC_NOP:
+	case Message::NOP:
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CREATE_CONTEXT:
+	case Message::CREATE_CONTEXT:
 	{
 		if (hdr->length != sizeof(Message::CreateContext)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -82,13 +82,13 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		    reinterpret_cast<const Message::CreateContext *>(hdr);
 		const SSL_METHOD *method = nullptr;
 		switch (msg->method) {
-		case SSLPROC_METHOD_TLS:
+		case Message::METHOD_TLS:
 			method = TLS_method();
 			break;
-		case SSLPROC_METHOD_TLS_SERVER:
+		case Message::METHOD_TLS_SERVER:
 			method = TLS_server_method();
 			break;
-		case SSLPROC_METHOD_TLS_CLIENT:
+		case Message::METHOD_TLS_CLIENT:
 			method = TLS_client_method();
 			break;
 		}
@@ -104,8 +104,8 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_CTX_SET_OPTIONS:
-	case SSLPROC_CTX_CLEAR_OPTIONS:
+	case Message::CTX_SET_OPTIONS:
+	case Message::CTX_CLEAR_OPTIONS:
 	{
 		if (hdr->length != sizeof(Message::Options)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -120,14 +120,14 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		    reinterpret_cast<const Message::Options *>(hdr);
 		long options;
 
-		if (hdr->type == SSLPROC_CTX_SET_OPTIONS)
+		if (hdr->type == Message::CTX_SET_OPTIONS)
 			options = SSL_CTX_set_options(ctx, msg->options);
 		else
 			options = SSL_CTX_clear_options(ctx, msg->options);
 		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
 		break;
 	}
-	case SSLPROC_CTX_GET_OPTIONS:
+	case Message::CTX_GET_OPTIONS:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
@@ -138,7 +138,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
 		break;
 	}
-	case SSLPROC_CTX_CTRL:
+	case Message::CTX_CTRL:
 	{
 		if (hdr->length < sizeof(Message::Ctrl)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -185,7 +185,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		}
 		break;
 	}
-	case SSLPROC_CTX_USE_CERTIFICATE_ASN1:
+	case Message::CTX_USE_CERTIFICATE_ASN1:
 	{
 		if (hdr->bodyLength() == 0) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -204,7 +204,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeReplyMessage(hdr->type, 1);
 		break;
 	}
-	case SSLPROC_CTX_USE_PRIVATEKEY_ASN1:
+	case Message::CTX_USE_PRIVATEKEY_ASN1:
 	{
 		if (hdr->length <= sizeof(Message::PKey)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -226,7 +226,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeReplyMessage(hdr->type, 1);
 		break;
 	}
-	case SSLPROC_CTX_CHECK_PRIVATE_KEY:
+	case Message::CTX_CHECK_PRIVATE_KEY:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
@@ -240,7 +240,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeReplyMessage(hdr->type, 1);
 		break;
 	}
-	case SSLPROC_CTX_ENABLE_SERVERNAME_CB:
+	case Message::CTX_ENABLE_SERVERNAME_CB:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
@@ -252,7 +252,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, ret);
 		break;
 	}
-	case SSLPROC_CTX_DISABLE_SERVERNAME_CB:
+	case Message::CTX_DISABLE_SERVERNAME_CB:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
@@ -263,7 +263,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, ret);
 		break;
 	}
-	case SSLPROC_CTX_ENABLE_CLIENT_HELLO_CB:
+	case Message::CTX_ENABLE_CLIENT_HELLO_CB:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
@@ -274,7 +274,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_CTX_DISABLE_CLIENT_HELLO_CB:
+	case Message::CTX_DISABLE_CLIENT_HELLO_CB:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
@@ -285,7 +285,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_CTX_ENABLE_SRP_USERNAME_CB:
+	case Message::CTX_ENABLE_SRP_USERNAME_CB:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
@@ -296,7 +296,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_CTX_DISABLE_SRP_USERNAME_CB:
+	case Message::CTX_DISABLE_SRP_USERNAME_CB:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
@@ -307,7 +307,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_CTX_ENABLE_SESS_CBS:
+	case Message::CTX_ENABLE_SESS_CBS:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -317,7 +317,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_sess_set_get_cb(ctx, sess_get_cb);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CTX_DISABLE_SESS_CBS:
+	case Message::CTX_DISABLE_SESS_CBS:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -327,7 +327,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_sess_set_get_cb(ctx, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CTX_ENABLE_TMP_DH_CB:
+	case Message::CTX_ENABLE_TMP_DH_CB:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -336,7 +336,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_tmp_dh_callback(ctx, tmp_dh_cb);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CTX_DISABLE_TMP_DH_CB:
+	case Message::CTX_DISABLE_TMP_DH_CB:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -345,7 +345,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_tmp_dh_callback(ctx, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CTX_ENABLE_INFO_CB:
+	case Message::CTX_ENABLE_INFO_CB:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -354,7 +354,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_info_callback(ctx, info_cb);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CTX_DISABLE_INFO_CB:
+	case Message::CTX_DISABLE_INFO_CB:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -363,7 +363,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_info_callback(ctx, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CTX_ENABLE_ALPN_SELECT_CB:
+	case Message::CTX_ENABLE_ALPN_SELECT_CB:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -372,7 +372,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_alpn_select_cb(ctx, alpn_select_cb, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CTX_DISABLE_ALPN_SELECT_CB:
+	case Message::CTX_DISABLE_ALPN_SELECT_CB:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -381,7 +381,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_alpn_select_cb(ctx, nullptr, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CTX_SET_CIPHER_LIST:
+	case Message::CTX_SET_CIPHER_LIST:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, 0, ENXIO);
@@ -398,7 +398,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeReplyMessage(hdr->type, ret);
 		break;
 	}
-	case SSLPROC_CTX_SET_CIPHERSUITES:
+	case Message::CTX_SET_CIPHERSUITES:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, 0, ENXIO);
@@ -415,7 +415,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeReplyMessage(hdr->type, ret);
 		break;
 	}
-	case SSLPROC_CTX_SET_TIMEOUT:
+	case Message::CTX_SET_TIMEOUT:
 	{
 		long time;
 
@@ -426,7 +426,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 
 		if (hdr->bodyLength() != sizeof(time)) {
 			syslog(LOG_WARNING,
-			    "invalid message size for SSLPROC_CTX_SET_TIMEOUT");
+		    "invalid message size for Message::CTX_SET_TIMEOUT");
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
@@ -436,7 +436,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, ret);
 		break;
 	}
-	case SSLPROC_CTX_GET0_CERTIFICATE:
+	case Message::CTX_GET0_CERTIFICATE:
 	{
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
@@ -459,7 +459,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		OPENSSL_free(buf);
 		break;
 	}
-	case SSLPROC_CTX_ENABLE_CLIENT_CERT_CB:
+	case Message::CTX_ENABLE_CLIENT_CERT_CB:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -468,7 +468,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_client_cert_cb(ctx, client_cert_cb);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CTX_DISABLE_CLIENT_CERT_CB:
+	case Message::CTX_DISABLE_CLIENT_CERT_CB:
 		if (ctx == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
@@ -477,13 +477,13 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 		SSL_CTX_set_client_cert_cb(ctx, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_CREATE_SESSION:
+	case Message::CREATE_SESSION:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
 		    cmsg->cmsg_type != SCM_RIGHTS ||
 		    cmsg->cmsg_len != CMSG_LEN(sizeof(int))) {
 			syslog(LOG_WARNING,
-		    "invalid control message for SSLPROC_CREATE_SESSION");
+		    "invalid control message for Message::CREATE_SESSION");
 			writeErrnoReply(hdr->type, -1, EBADMSG);
 			break;
 		}

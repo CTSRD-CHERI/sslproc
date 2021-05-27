@@ -32,11 +32,13 @@
 
 #pragma once
 
+#include <Messages.h>
 #include <MessageSocket.h>
 
 /* A ProcMessageSocket adds a helper method for writing libssl errors. */
 class ProcMessageSocket : public MessageSocket {
 protected:
 	ProcMessageSocket(int fd) : MessageSocket(fd) {}
-	void writeSSLErrorReply(int type, long ret, int errorType);
+	void writeSSLErrorReply(enum Message::Type type, long ret,
+	    int errorType);
 };

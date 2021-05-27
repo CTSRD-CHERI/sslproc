@@ -86,7 +86,7 @@ msg_cb(int write_p, int version, int content_type, const void *buf,
 	iov[0].iov_len = sizeof(args);
 	iov[1].iov_base = const_cast<void *>(buf);
 	iov[1].iov_len = len;
-	(void)ss->sendRequest(SSLPROC_MSG_CB, iov, 2);
+	(void)ss->sendRequest(Message::MSG_CB, iov, 2);
 }
 
 int
@@ -99,7 +99,7 @@ servername_cb(SSL *ssl, int *al, void *arg)
 		return (SSL_TLSEXT_ERR_ALERT_FATAL);
 	}
 
-	const Message::Result *msg = ss->sendRequest(SSLPROC_SERVERNAME_CB,
+	const Message::Result *msg = ss->sendRequest(Message::SERVERNAME_CB,
 	    al, sizeof(*al));
 	if (msg == nullptr)
 		return (SSL_TLSEXT_ERR_ALERT_FATAL);
@@ -119,7 +119,7 @@ client_hello_cb(SSL *ssl, int *al, void *arg)
 		return (0);
 	}
 
-	const Message::Result *msg = ss->sendRequest(SSLPROC_CLIENT_HELLO_CB,
+	const Message::Result *msg = ss->sendRequest(Message::CLIENT_HELLO_CB,
 	    al, sizeof(*al));
 	if (msg == nullptr) {
 		*al = SSL_AD_INTERNAL_ERROR;
@@ -141,7 +141,7 @@ srp_username_cb(SSL *ssl, int *ad, void *arg)
 		return (SSL3_AL_FATAL);
 	}
 
-	const Message::Result *msg = ss->sendRequest(SSLPROC_SRP_USERNAME_CB,
+	const Message::Result *msg = ss->sendRequest(Message::SRP_USERNAME_CB,
 	    ad, sizeof(*ad));
 	if (msg == nullptr) {
 		*ad = SSL_AD_INTERNAL_ERROR;
@@ -198,7 +198,7 @@ sess_new_cb(SSL *ssl, SSL_SESSION *s)
 	iov[2].iov_base = asn1;
 	body.internal_length = iov[2].iov_len;
 
-	(void)ss->sendRequest(SSLPROC_SESS_NEW_CB, iov, 3);
+	(void)ss->sendRequest(Message::SESS_NEW_CB, iov, 3);
 
 	OPENSSL_free(asn1);
 
@@ -220,7 +220,7 @@ sess_remove_cb(SSL_CTX *ctx, SSL_SESSION *s)
 	if (id == nullptr || id_len == 0)
 		return;
 
-	(void)ss->sendRequest(SSLPROC_SESS_REMOVE_CB, id, id_len);
+	(void)ss->sendRequest(Message::SESS_REMOVE_CB, id, id_len);
 }
 
 SSL_SESSION *
@@ -233,7 +233,7 @@ sess_get_cb(SSL *ssl, const unsigned char *data, int len, int *copy)
 		return (0);
 	}
 
-	const Message::Result *msg = ss->sendRequest(SSLPROC_SESS_GET_CB,
+	const Message::Result *msg = ss->sendRequest(Message::SESS_GET_CB,
 	    data, len);
 	if (msg == nullptr || msg->error != SSL_ERROR_NONE ||
 	    msg->bodyLength() == 0)
@@ -263,7 +263,7 @@ tmp_dh_cb(SSL *ssl, int is_export, int keylength)
 		return (nullptr);
 	}
 
-	const Message::Result *msg = ss->sendRequest(SSLPROC_TMP_DH_CB, &body,
+	const Message::Result *msg = ss->sendRequest(Message::TMP_DH_CB, &body,
 	    sizeof(body));
 	if (msg == nullptr || msg->error != SSL_ERROR_NONE ||
 	    msg->bodyLength() == 0)
@@ -292,7 +292,7 @@ info_cb(const SSL *ssl, int where, int ret)
 		return;
 	}
 
-	(void)ss->sendRequest(SSLPROC_INFO_CB, &body, sizeof(body));
+	(void)ss->sendRequest(Message::INFO_CB, &body, sizeof(body));
 }
 
 int
@@ -306,7 +306,7 @@ alpn_select_cb(SSL *ssl, const unsigned char **out, unsigned char *outlen,
 		return (SSL_TLSEXT_ERR_ALERT_FATAL);
 	}
 
-	const Message::Result *msg = ss->sendRequest(SSLPROC_ALPN_SELECT_CB,
+	const Message::Result *msg = ss->sendRequest(Message::ALPN_SELECT_CB,
 	    in, inlen);
 	if (msg == nullptr || msg->error != SSL_ERROR_NONE)
 		return (SSL_TLSEXT_ERR_ALERT_FATAL);
@@ -330,7 +330,7 @@ client_cert_cb(SSL *ssl, X509 **certp, EVP_PKEY **pkeyp)
 		return (-1);
 	}
 
-	const Message::Result *hdr = ss->sendRequest(SSLPROC_CLIENT_CERT_CB);
+	const Message::Result *hdr = ss->sendRequest(Message::CLIENT_CERT_CB);
 	if (hdr == nullptr)
 		return (-1);
 	if (hdr->ret != 1)
@@ -409,10 +409,10 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	int ret;
 
 	switch (hdr->type) {
-	case SSLPROC_CONNECT:
+	case Message::CONNECT:
 		if (hdr->length != sizeof(*hdr)) {
 			syslog(LOG_WARNING,
-			    "invalid message length %d for SSLPROC_CONNECT",
+			    "invalid message length %d for Message::CONNECT",
 			    hdr->length);
 			return (false);
 		}
@@ -423,10 +423,10 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
-	case SSLPROC_DO_HANDSHAKE:
+	case Message::DO_HANDSHAKE:
 		if (hdr->length != sizeof(*hdr)) {
 			syslog(LOG_WARNING,
-		    "invalid message length %d for SSLPROC_DO_HANDSHAKE",
+		    "invalid message length %d for Message::DO_HANDSHAKE",
 			    hdr->length);
 			return (false);
 		}
@@ -437,10 +437,10 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
-	case SSLPROC_ACCEPT:
+	case Message::ACCEPT:
 		if (hdr->length != sizeof(*hdr)) {
 			syslog(LOG_WARNING,
-			    "invalid message length %d for SSLPROC_ACCEPT",
+			    "invalid message length %d for Message::ACCEPT",
 			    hdr->length);
 			return (false);
 		}
@@ -451,10 +451,10 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
-	case SSLPROC_SHUTDOWN:
+	case Message::SHUTDOWN:
 		if (hdr->length != sizeof(*hdr)) {
 			syslog(LOG_WARNING,
-			    "invalid message length %d for SSLPROC_SHUTDOWN",
+			    "invalid message length %d for Message::SHUTDOWN",
 			    hdr->length);
 			return (false);
 		}
@@ -465,10 +465,10 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
-	case SSLPROC_READ:
+	case Message::READ:
 		if (hdr->length != sizeof(*readMsg)) {
 			syslog(LOG_WARNING,
-			    "invalid message length %d for SSLPROC_READ",
+			    "invalid message length %d for Message::READ",
 			    hdr->length);
 			return (false);
 		}
@@ -493,7 +493,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
-	case SSLPROC_WRITE:
+	case Message::WRITE:
 		ret = SSL_write(ssl, hdr->body(), hdr->bodyLength());
 		if (ret > 0)
 			writeReplyMessage(hdr->type, ret);
@@ -501,46 +501,46 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeSSLErrorReply(hdr->type, ret,
 			    SSL_get_error(ssl, ret));
 		break;
-	case SSLPROC_ENABLE_MSG_CB:
+	case Message::ENABLE_MSG_CB:
 		SSL_set_msg_callback_arg(ssl, this);
 		SSL_set_msg_callback(ssl, msg_cb);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_DISABLE_MSG_CB:
+	case Message::DISABLE_MSG_CB:
 		SSL_set_msg_callback(ssl, NULL);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_SET_CONNECT_STATE:
+	case Message::SET_CONNECT_STATE:
 		SSL_set_connect_state(ssl);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_SET_ACCEPT_STATE:
+	case Message::SET_ACCEPT_STATE:
 		SSL_set_accept_state(ssl);
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case SSLPROC_IS_SERVER:
+	case Message::IS_SERVER:
 		ret = SSL_is_server(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
-	case SSLPROC_IN_INIT:
+	case Message::IN_INIT:
 		ret = SSL_in_init(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
-	case SSLPROC_IN_BEFORE:
+	case Message::IN_BEFORE:
 		ret = SSL_in_before(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
-	case SSLPROC_IS_INIT_FINISHED:
+	case Message::IS_INIT_FINISHED:
 		ret = SSL_is_init_finished(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
-	case SSLPROC_GET_SERVERNAME:
+	case Message::GET_SERVERNAME:
 	{
 		int type;
 
 		if (hdr->bodyLength() != sizeof(type)) {
 			syslog(LOG_WARNING,
-		    "invalid message length %d for SSLPROC_GET_SERVERNAME",
+		    "invalid message length %d for Message::GET_SERVERNAME",
 			    hdr->length);
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
@@ -554,15 +554,15 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			    strlen(servername));
 		break;
 	}
-	case SSLPROC_GET_SERVERNAME_TYPE:
+	case Message::GET_SERVERNAME_TYPE:
 		ret = SSL_get_servername_type(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
-	case SSLPROC_CTRL:
+	case Message::CTRL:
 	{
 		if (hdr->length < sizeof(Message::Ctrl)) {
 			syslog(LOG_WARNING,
-			    "invalid message length %d for SSLPROC_CTRL",
+			    "invalid message length %d for Message::CTRL",
 			    hdr->length);
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
@@ -594,13 +594,13 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		}
 		break;
 	}
-	case SSLPROC_SET_SHUTDOWN:
+	case Message::SET_SHUTDOWN:
 	{
 		int mode;
 
 		if (hdr->bodyLength() != sizeof(mode)) {
 			syslog(LOG_WARNING,
-		    "invalid message length %d for SSLPROC_SET_SHUTDOWN",
+		    "invalid message length %d for Message::SET_SHUTDOWN",
 			    hdr->length);
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
@@ -610,11 +610,11 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_GET_SHUTDOWN:
+	case Message::GET_SHUTDOWN:
 		ret = SSL_get_shutdown(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
-	case SSLPROC_GET_PEER_CERTIFICATE:
+	case Message::GET_PEER_CERTIFICATE:
 	{
 		X509 *x = SSL_get_peer_certificate(ssl);
 		if (x == NULL) {
@@ -633,17 +633,17 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		OPENSSL_free(buf);
 		break;
 	}
-	case SSLPROC_GET_VERIFY_RESULT:
+	case Message::GET_VERIFY_RESULT:
 		ret = SSL_get_verify_result(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
-	case SSLPROC_SET_VERIFY_RESULT:
+	case Message::SET_VERIFY_RESULT:
 	{
 		long result;
 
 		if (hdr->bodyLength() != sizeof(long)) {
 			syslog(LOG_WARNING,
-		    "invalid message length %d for SSLPROC_SET_VERIFY_RESULT",
+		    "invalid message length %d for Message::SET_VERIFY_RESULT",
 			    hdr->length);
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
@@ -653,7 +653,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_SET_ALPN_PROTOS:
+	case Message::SET_ALPN_PROTOS:
 	{
 		const unsigned char *protos;
 
@@ -669,7 +669,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_GET_SRP_USERNAME:
+	case Message::GET_SRP_USERNAME:
 	{
 		const char *s = SSL_get_srp_username(ssl);
 		if (s != nullptr)
@@ -678,7 +678,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_GET_SRP_USERINFO:
+	case Message::GET_SRP_USERINFO:
 	{
 		const char *s = SSL_get_srp_userinfo(ssl);
 		if (s != nullptr)
@@ -687,12 +687,12 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_GET_CURRENT_CIPHER:
-	case SSLPROC_GET_PENDING_CIPHER:
+	case Message::GET_CURRENT_CIPHER:
+	case Message::GET_PENDING_CIPHER:
 	{
 		const SSL_CIPHER *cipher;
 
-		if (hdr->type == SSLPROC_GET_CURRENT_CIPHER)
+		if (hdr->type == Message::GET_CURRENT_CIPHER)
 			cipher = SSL_get_current_cipher(ssl);
 		else
 			cipher = SSL_get_pending_cipher(ssl);
@@ -713,7 +713,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0, iov, 2);
 		break;
 	}
-	case SSLPROC_SET_SESSION_ID_CONTEXT:
+	case Message::SET_SESSION_ID_CONTEXT:
 		const unsigned char *ctx_id;
 
 		if (hdr->bodyLength() == 0)
@@ -728,11 +728,11 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		else
 			writeReplyMessage(hdr->type, ret);
 		break;
-	case SSLPROC_CLIENT_VERSION:
+	case Message::CLIENT_VERSION:
 		ret = SSL_client_version(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
-	case SSLPROC_VERSION:
+	case Message::VERSION:
 		ret = SSL_version(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
@@ -805,7 +805,7 @@ SSLSession::observeWriteError()
 }
 
 const Message::Result *
-SSLSession::sendRequest(int type, struct iovec *iov, int iovCnt)
+SSLSession::sendRequest(enum Message::Type type, struct iovec *iov, int iovCnt)
 {
 	if (!writeMessage(type, iov, iovCnt)) {
 		syslog(LOG_DEBUG, "%s: failed to send request %d: %m", __func__,
@@ -817,7 +817,8 @@ SSLSession::sendRequest(int type, struct iovec *iov, int iovCnt)
 }
 
 const Message::Result *
-SSLSession::sendRequest(int type, const void *payload, size_t payloadLen)
+SSLSession::sendRequest(enum Message::Type type, const void *payload,
+    size_t payloadLen)
 {
 	if (!writeMessage(type, payload, payloadLen)) {
 		syslog(LOG_DEBUG, "%s: failed to send request %d: %m", __func__,
@@ -829,7 +830,7 @@ SSLSession::sendRequest(int type, const void *payload, size_t payloadLen)
 }
 
 const Message::Result *
-SSLSession::_waitForReply(int type)
+SSLSession::_waitForReply(enum Message::Type type)
 {
 	const Message::Result *msg;
 	int rc;
@@ -844,7 +845,7 @@ SSLSession::_waitForReply(int type)
 		return (nullptr);
 	}
 	msg = reinterpret_cast<const Message::Result *>(replyBuffer.hdr());
-	if (msg->type != SSLPROC_RESULT) {
+	if (msg->type != Message::RESULT) {
 		syslog(LOG_DEBUG, "%s: unexpected reply message %d", __func__,
 		    msg->type);
 		return (nullptr);
@@ -874,7 +875,7 @@ readBioRead(BIO *bio, char *out, int outl)
 	BIO_clear_retry_flags(bio);
 
 	resid = outl;
-	msg = ss->sendRequest(SSLPROC_BIO_READ, &resid, sizeof(resid));
+	msg = ss->sendRequest(Message::BIO_READ, &resid, sizeof(resid));
 	if (msg == nullptr) {
 		/* XXX: Do we need to terminate the session? */
 		return (-1);
@@ -940,7 +941,7 @@ readBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 	case BIO_CTRL_FLUSH:
 		body.cmd = cmd;
 		body.larg = num;
-		msg = ss->sendRequest(SSLPROC_BIO_CTRL_READ, &body,
+		msg = ss->sendRequest(Message::BIO_CTRL_READ, &body,
 		    sizeof(body));
 		if (msg == nullptr) {
 			syslog(LOG_DEBUG, "%s: failed to get a reply",
@@ -984,7 +985,7 @@ writeBioWrite(BIO *bio, const char *in, int inl)
 
 	BIO_clear_retry_flags(bio);
 
-	msg = ss->sendRequest(SSLPROC_BIO_WRITE, const_cast<char *>(in), inl);
+	msg = ss->sendRequest(Message::BIO_WRITE, const_cast<char *>(in), inl);
 	if (msg == nullptr) {
 		/* XXX: Do we need to terminate the session? */
 		return (-1);
@@ -1029,7 +1030,7 @@ writeBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 	case BIO_CTRL_FLUSH:
 		body.cmd = cmd;
 		body.larg = num;
-		msg = ss->sendRequest(SSLPROC_BIO_CTRL_WRITE, &body,
+		msg = ss->sendRequest(Message::BIO_CTRL_WRITE, &body,
 		    sizeof(body));
 		if (msg == nullptr) {
 			syslog(LOG_DEBUG, "%s: failed to get a reply",

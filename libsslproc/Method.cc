@@ -35,7 +35,7 @@
 #include <Messages.h>
 
 static PSSL_METHOD TLS = {
-	.method = SSLPROC_METHOD_TLS
+	.method = Message::METHOD_TLS
 };
 
 const PSSL_METHOD *
@@ -45,7 +45,7 @@ PTLS_method(void)
 }
 
 static PSSL_METHOD TLS_server = {
-	.method = SSLPROC_METHOD_TLS_SERVER
+	.method = Message::METHOD_TLS_SERVER
 };
 
 const PSSL_METHOD *
@@ -55,7 +55,7 @@ PTLS_server_method(void)
 }
 
 static PSSL_METHOD TLS_client = {
-	.method = SSLPROC_METHOD_TLS_CLIENT
+	.method = Message::METHOD_TLS_CLIENT
 };
 
 const PSSL_METHOD *

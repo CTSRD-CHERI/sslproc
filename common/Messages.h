@@ -33,12 +33,133 @@
 #pragma once
 
 /*
- * Messages sent and received over the various sockets.
+ * Messages sent and received over the IPC channels.
  */
 namespace Message {
+	enum Type {
+		NOP = 0x0001,
+		RESULT,
+		CREATE_CONTEXT,
+
+		/* Operations on an SSL_CTX. */
+
+		/* These three return 'long options' on success. */
+		CTX_SET_OPTIONS = 0x100,
+		CTX_CLEAR_OPTIONS,
+		CTX_GET_OPTIONS,
+
+		CTX_CTRL,
+
+		/* Message body is a ASN1-serialized X509 object. */
+		CTX_USE_CERTIFICATE_ASN1,
+
+		CTX_USE_PRIVATEKEY_ASN1,
+
+		CTX_CHECK_PRIVATE_KEY,
+		CTX_ENABLE_SERVERNAME_CB,
+		CTX_DISABLE_SERVERNAME_CB,
+		CTX_ENABLE_CLIENT_HELLO_CB,
+		CTX_DISABLE_CLIENT_HELLO_CB,
+		CTX_ENABLE_SRP_USERNAME_CB,
+		CTX_DISABLE_SRP_USERNAME_CB,
+		CTX_ENABLE_SESS_CBS,
+		CTX_DISABLE_SESS_CBS,
+		CTX_ENABLE_TMP_DH_CB,
+		CTX_DISABLE_TMP_DH_CB,
+		CTX_ENABLE_INFO_CB,
+		CTX_DISABLE_INFO_CB,
+		CTX_ENABLE_ALPN_SELECT_CB,
+		CTX_DISABLE_ALPN_SELECT_CB,
+		CTX_SET_CIPHER_LIST,
+		CTX_SET_CIPHERSUITES,
+		CTX_SET_TIMEOUT,
+		CTX_GET0_CERTIFICATE,
+		CTX_ENABLE_CLIENT_CERT_CB,
+		CTX_DISABLE_CLIENT_CERT_CB,
+
+		/* Includes session fd in an SCM_RIGHTS control message. */
+		CREATE_SESSION,
+
+		/* Operations on an SSL. */
+
+		/*
+		 * The result of these messages return the return
+		 * value of the associated SSL_* function in 'ret'.
+		 */
+		CONNECT = 0x200,
+		DO_HANDSHAKE,
+		ACCEPT,
+		SHUTDOWN,
+		READ,
+
+		/*
+		 * The payload of this message is the data to write.
+		 * The length is implicit from the length of the
+		 * payload.
+		 */
+		WRITE,
+
+		ENABLE_MSG_CB,
+		DISABLE_MSG_CB,
+
+		SET_ACCEPT_STATE,
+		SET_CONNECT_STATE,
+		IS_SERVER,
+		IN_INIT,
+		IN_BEFORE,
+		IS_INIT_FINISHED,
+		GET_SERVERNAME,
+		GET_SERVERNAME_TYPE,
+		CTRL,
+		SET_SHUTDOWN,
+		GET_SHUTDOWN,
+		GET_PEER_CERTIFICATE,
+		GET_VERIFY_RESULT,
+		SET_VERIFY_RESULT,
+		SET_ALPN_PROTOS,
+		GET_SRP_USERNAME,
+		GET_SRP_USERINFO,
+		GET_CURRENT_CIPHER,
+		GET_PENDING_CIPHER,
+		SET_SESSION_ID_CONTEXT,
+		CLIENT_VERSION,
+		VERSION,
+
+		/*
+		 * Requests to operate on the BIOs belonging to an
+		 * SSL.  The target identifies the SSL.
+		 */
+		BIO_READ = 0x300,
+		BIO_WRITE,
+		BIO_CTRL_READ,
+		BIO_CTRL_WRITE,
+
+		/*
+		 * Callbacks on SSL objects.  The target identifies
+		 * the SSL.
+		 */
+		MSG_CB = 0x400,
+
+		/*
+		 * The message body contains the '*al' or '*ad' value.
+		 * The message reply can contain an updated value of
+		 * '*al'/'*ad' in its body.
+		 */
+		SERVERNAME_CB,
+		CLIENT_HELLO_CB,
+		SRP_USERNAME_CB,
+
+		SESS_NEW_CB,
+		SESS_REMOVE_CB,
+		SESS_GET_CB,
+		TMP_DH_CB,
+		INFO_CB,
+		ALPN_SELECT_CB,
+		CLIENT_CERT_CB,
+	};
 
 	struct Header {
-		int	type;
+		enum Type type;
 		int	length;
 
 		size_t bodyLength() const
@@ -52,31 +173,29 @@ namespace Message {
 		}
 	};
 
-/* Global messages from client -> sslproc over the 'control' socket. */
-
-#define	SSLPROC_NOP			0x01
-#define	SSLPROC_CREATE_CONTEXT		0x02
-
-	struct CreateContext : public Header {
-		int	method;		/* SSLPROC_METHOD_* */
+	enum ContextMethod {
+		METHOD_TLS = 0,		/* TLS_method() */
+		METHOD_TLS_CLIENT,	/* TLS_server_method() */
+		METHOD_TLS_SERVER	/* TLS_client_method() */
 	};
 
-#define	SSLPROC_METHOD_TLS		0	/* TLS_method() */
-#define	SSLPROC_METHOD_TLS_CLIENT	1	/* TLS_server_method() */
-#define	SSLPROC_METHOD_TLS_SERVER	2	/* TLS_client_method() */
+	/* Body for CREATE_CONTEXT */
+	struct CreateContext : public Header {
+		enum ContextMethod method;
+	};
 
-/* These three return 'long options' on success. */
-#define	SSLPROC_CTX_SET_OPTIONS		0x03
-#define	SSLPROC_CTX_CLEAR_OPTIONS	0x04
-
+	/*
+	 * Body for CTX_SET_OPTIONS and
+	 * CTX_CLEAR_OPTIONS.
+	 */
 	struct Options : public Header {
 		long	options;
 	};
 
-#define	SSLPROC_CTX_GET_OPTIONS		0x05
-
-#define	SSLPROC_CTX_CTRL		0x06
-
+	/*
+	 * Body for CTX_CTRL and CTRL.  Additional
+	 * data for the 'parg' may also be included.
+	 */
 	struct CtrlBody {
 		int	cmd;
 		long	larg;
@@ -94,11 +213,7 @@ namespace Message {
 		}
 	};
 
-/* Message body is a ASN1-serialized X509 object. */
-#define	SSLPROC_CTX_USE_CERTIFICATE_ASN1	0x07
-
-#define	SSLPROC_CTX_USE_PRIVATEKEY_ASN1	0x08
-
+	/* Body for CTX_USE_PRIVATEKEY_ASN1 */
 	struct PKey : public Header {
 		int	pktype;
 
@@ -113,90 +228,17 @@ namespace Message {
 		}
 	};
 
-#define	SSLPROC_CTX_CHECK_PRIVATE_KEY	0x09
-#define	SSLPROC_CTX_ENABLE_SERVERNAME_CB	0x0a
-#define	SSLPROC_CTX_DISABLE_SERVERNAME_CB	0x0b
-#define	SSLPROC_CTX_ENABLE_CLIENT_HELLO_CB	0x0c
-#define	SSLPROC_CTX_DISABLE_CLIENT_HELLO_CB	0x0d
-#define	SSLPROC_CTX_ENABLE_SRP_USERNAME_CB	0x0e
-#define	SSLPROC_CTX_DISABLE_SRP_USERNAME_CB	0x0f
-#define	SSLPROC_CTX_ENABLE_SESS_CBS		0x10
-#define	SSLPROC_CTX_DISABLE_SESS_CBS		0x11
-#define	SSLPROC_CTX_ENABLE_TMP_DH_CB	0x12
-#define	SSLPROC_CTX_DISABLE_TMP_DH_CB	0x13
-#define	SSLPROC_CTX_ENABLE_INFO_CB	0x14
-#define	SSLPROC_CTX_DISABLE_INFO_CB	0x15
-#define	SSLPROC_CTX_ENABLE_ALPN_SELECT_CB	0x16
-#define	SSLPROC_CTX_DISABLE_ALPN_SELECT_CB	0x17
-#define	SSLPROC_CTX_SET_CIPHER_LIST	0x18
-#define	SSLPROC_CTX_SET_CIPHERSUITES	0x19
-#define	SSLPROC_CTX_SET_TIMEOUT	0x1a
-#define	SSLPROC_CTX_GET0_CERTIFICATE	0x1b
-#define	SSLPROC_CTX_ENABLE_CLIENT_CERT_CB	0x1c
-#define	SSLPROC_CTX_DISABLE_CLIENT_CERT_CB	0x1d
-
-/* Includes session fd in an SCM_RIGHTS control message. */
-#define	SSLPROC_CREATE_SESSION	0x20
-
-/* Per-session messages from client -> sslproc over the 'session' fd. */
-
-/*
- * The result of these messages return the return value of the
- * associated SSL_* function in 'ret'.
- */
-#define	SSLPROC_CONNECT		0x40
-#define	SSLPROC_DO_HANDSHAKE	0x41
-#define	SSLPROC_ACCEPT		0x42
-#define	SSLPROC_SHUTDOWN	0x43
-
-#define	SSLPROC_READ		0x44
-
+	/*
+	 * Body for READ and BIO_READ.
+	 */
 	struct Read : public Header {
 		int	resid;		/* Max amount of data requested. */
 	};
 
-/*
- * The payload of this message is the data to write.  The length is
- * implicit from the length of the payload.
- */
-#define	SSLPROC_WRITE		0x45
-
-#define	SSLPROC_ENABLE_MSG_CB	0x46
-#define	SSLPROC_DISABLE_MSG_CB	0x47
-
-#define	SSLPROC_SET_ACCEPT_STATE	0x48
-#define	SSLPROC_SET_CONNECT_STATE	0x49
-#define	SSLPROC_IS_SERVER	0x4a
-#define	SSLPROC_IN_INIT		0x4b
-#define	SSLPROC_IN_BEFORE	0x4c
-#define	SSLPROC_IS_INIT_FINISHED	0x4d
-#define	SSLPROC_GET_SERVERNAME	0x4e
-#define	SSLPROC_GET_SERVERNAME_TYPE	0x4f
-#define	SSLPROC_CTRL		0x50
-#define	SSLPROC_SET_SHUTDOWN	0x51
-#define	SSLPROC_GET_SHUTDOWN	0x52
-#define	SSLPROC_GET_PEER_CERTIFICATE	0x53
-#define	SSLPROC_GET_VERIFY_RESULT	0x54
-#define	SSLPROC_SET_VERIFY_RESULT	0x55
-#define	SSLPROC_SET_ALPN_PROTOS	0x56
-#define	SSLPROC_GET_SRP_USERNAME	0x57
-#define	SSLPROC_GET_SRP_USERINFO	0x58
-#define	SSLPROC_GET_CURRENT_CIPHER	0x59
-#define	SSLPROC_GET_PENDING_CIPHER	0x5a
-#define	SSLPROC_SET_SESSION_ID_CONTEXT	0x5b
-#define	SSLPROC_CLIENT_VERSION	0x5c
-#define	SSLPROC_VERSION		0x5d
-
-/* Per-session messages from sslproc -> client over the 'session' fd. */
-
-#define	SSLPROC_BIO_READ	0x80
-#define	SSLPROC_BIO_WRITE	0x81
-#define	SSLPROC_BIO_CTRL_READ	0x82
-#define	SSLPROC_BIO_CTRL_WRITE	0x83
-
-/* The message buffer is stored in the body. */
-#define	SSLPROC_MSG_CB		0x84
-
+	/*
+	 * Body for MSG_CB.  The message buffer is stored in
+	 * the body.
+	 */
 	struct MsgCb : public Header {
 		int	write_p;
 		int	version;
@@ -213,17 +255,7 @@ namespace Message {
 		}
 	};
 
-/*
- * While these callbacks are registered in the context, they are
- * invoked on a session.  The message body contains the '*al' alert
- * value.  The message reply can contain an updated value of '*al' in
- * its body.
- */
-#define	SSLPROC_SERVERNAME_CB	0x85
-#define	SSLPROC_CLIENT_HELLO_CB	0x86
-#define	SSLPROC_SRP_USERNAME_CB	0x87
-#define	SSLPROC_SESS_NEW_CB	0x88
-
+	/* Body for SESS_NEW_CB. */
 	struct SessNewCb : public Header {
 		long	time;
 		int	compress_id;
@@ -241,37 +273,30 @@ namespace Message {
 		}
 	};
 
-#define	SSLPROC_SESS_REMOVE_CB	0x89
-#define	SSLPROC_SESS_GET_CB	0x8a
-#define	SSLPROC_TMP_DH_CB	0x8b
-
+	/* Body for TMP_DH_CB. */
 	struct TmpDhCb : public Header {
 		int	is_export;
 		int	keylength;
 	};
 
-#define	SSLPROC_INFO_CB		0x8c
 
+	/* Body for INFO_CB. */
 	struct InfoCb : public Header {
 		int	where;
 		int	ret;
 	};
 
-#define	SSLPROC_ALPN_SELECT_CB	0x8d
-#define	SSLPROC_CLIENT_CERT_CB	0x8e
-
-/*
- * The receiver always returns a Result message to the sender at the
- * completion of each operation.  'error' is set to SSL_ERROR_NONE on
- * success, or another value for an error.  If 'error' is
- * SSL_ERROR_SYSCALL, the body contains an errno value as an int.  If
- * 'error' is SSL_ERROR_SSL, the body contains an error string of the
- * OpenSSL error queue generated by ERR_print_errors().
- */
-#define	SSLPROC_RESULT		0x100
-
+	/*
+	 * The receiver always returns a Result message to the sender
+	 * at the completion of each operation.  'error' is set to
+	 * SSL_ERROR_NONE on success, or another value for an error.
+	 * If 'error' is SSL_ERROR_SYSCALL, the body contains an errno
+	 * value as an int.  If 'error' is SSL_ERROR_SSL, the body
+	 * contains an error string of the OpenSSL error queue
+	 * generated by ERR_print_errors().
+	 */
 	struct Result : public Header {
-		int	request;	/* SSLPROC_* */
+		enum Type request;
 		int	error;		/* SSL_ERROR_* */
 		long	ret;
 
@@ -286,7 +311,7 @@ namespace Message {
 		}
 	};
 
-	/* Returned by SSLPROC_GET_*_CIPHER. */
+	/* Returned by GET_*_CIPHER. */
 	struct CipherResultBody {
 		int	bits;
 		int	alg_bits;
@@ -304,7 +329,7 @@ namespace Message {
 		}
 	};
 
-	/* Response from SSLPROC_CLIENT_CERT_CB */
+	/* Response from CLIENT_CERT_CB */
 	struct ClientCertCbResultBody {
 		int	cert_len;
 		int	pk_len;

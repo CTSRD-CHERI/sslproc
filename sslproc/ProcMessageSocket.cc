@@ -40,7 +40,8 @@
 #include "ProcMessageSocket.h"
 
 void
-ProcMessageSocket::writeSSLErrorReply(int type, long ret, int errorType)
+ProcMessageSocket::writeSSLErrorReply(enum Message::Type type, long ret,
+    int errorType)
 {
 	switch (errorType) {
 	case SSL_ERROR_SYSCALL:

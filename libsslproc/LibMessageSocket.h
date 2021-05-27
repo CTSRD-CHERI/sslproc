@@ -40,13 +40,13 @@ class LibMessageSocket : public MessageSocket {
 public:
 	LibMessageSocket(int fd) : MessageSocket(fd) {}
 	bool init();
-	const Message::Result *waitForReply(int type,
+	const Message::Result *waitForReply(enum Message::Type type,
 	    const struct iovec *iov, int iovCnt);
-	const Message::Result *waitForReply(int type,
+	const Message::Result *waitForReply(enum Message::Type type,
 	    const void *payload = nullptr, size_t payloadLen = 0,
 	    const void *control = nullptr, size_t controlLen = 0);
 private:
-	const Message::Result *_waitForReply(int type);
+	const Message::Result *_waitForReply(enum Message::Type type);
 	virtual bool handleMessage(const Message::Header *hdr) = 0;
 	virtual void observeReadError(enum ReadError error,
 	    const Message::Header *hdr);

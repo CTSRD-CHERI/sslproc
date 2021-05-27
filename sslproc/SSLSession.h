@@ -45,14 +45,14 @@ public:
 	~SSLSession();
 	bool init(SSL_CTX *ctx);
 	virtual void onEvent(const struct kevent *);
-	const Message::Result *sendRequest(int type, struct iovec *iov,
-	    int iovCnt);
-	const Message::Result *sendRequest(int type,
+	const Message::Result *sendRequest(enum Message::Type type,
+	    struct iovec *iov, int iovCnt);
+	const Message::Result *sendRequest(enum Message::Type type,
 	    const void *payload = nullptr, size_t payloadLen = 0);
 	bool isSSL(const SSL *_ssl) const { return (ssl == _ssl); }
 
 private:
-	const Message::Result *_waitForReply(int type);
+	const Message::Result *_waitForReply(enum Message::Type type);
 	bool handleMessage(const Message::Header *hdr);
 	virtual void observeReadError(enum ReadError,
 	    const Message::Header *hdr);

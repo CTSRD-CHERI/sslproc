@@ -341,7 +341,7 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 			cnt++;
 		}
 
-		msg = ssl->ss->waitForReply(SSLPROC_CTRL, iov, cnt);
+		msg = ssl->ss->waitForReply(Message::CTRL, iov, cnt);
 		if (msg == nullptr)
 			return (0);
 		ret = msg->ret;
@@ -389,7 +389,7 @@ PSSL_get_peer_certificate(const PSSL *sslc)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_GET_PEER_CERTIFICATE);
+	    ssl->ss->waitForReply(Message::GET_PEER_CERTIFICATE);
 	if (msg == nullptr)
 		return (nullptr);
 	if (msg->error != SSL_ERROR_NONE)
@@ -407,7 +407,7 @@ PSSL_get_verify_result(const PSSL *sslc)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_GET_VERIFY_RESULT);
+	    ssl->ss->waitForReply(Message::GET_VERIFY_RESULT);
 	if (msg == nullptr)
 		return (X509_V_ERR_UNSPECIFIED);
 	if (msg->error != SSL_ERROR_NONE)
@@ -418,7 +418,7 @@ PSSL_get_verify_result(const PSSL *sslc)
 void
 PSSL_set_verify_result(PSSL *ssl, long result)
 {
-	(void)ssl->ss->waitForReply(SSLPROC_SET_VERIFY_RESULT, &result,
+	(void)ssl->ss->waitForReply(Message::SET_VERIFY_RESULT, &result,
 	    sizeof(result));
 }
 
@@ -426,7 +426,7 @@ int
 PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos, unsigned int len)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_SET_ALPN_PROTOS, protos, len);
+	    ssl->ss->waitForReply(Message::SET_ALPN_PROTOS, protos, len);
 	if (msg == nullptr)
 		return (-1);
 	return (msg->ret);
@@ -445,7 +445,7 @@ PSSL_get_srp_username(PSSL *ssl)
 		return (ssl->srp_username);
 
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_GET_SRP_USERNAME);
+	    ssl->ss->waitForReply(Message::GET_SRP_USERNAME);
 	if (msg == nullptr)
 		return (nullptr);
 	if (msg->bodyLength() == 0)
@@ -468,7 +468,7 @@ PSSL_get_srp_userinfo(PSSL *ssl)
 		return (ssl->srp_userinfo);
 
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_GET_SRP_USERINFO);
+	    ssl->ss->waitForReply(Message::GET_SRP_USERINFO);
 	if (msg == nullptr)
 		return (nullptr);
 	if (msg->bodyLength() == 0)
@@ -479,7 +479,7 @@ PSSL_get_srp_userinfo(PSSL *ssl)
 }
 
 static const PSSL_CIPHER *
-PSSL_fetch_cipher(PSSL *ssl, int request, PSSL_CIPHER *cipher)
+PSSL_fetch_cipher(PSSL *ssl, enum Message::Type request, PSSL_CIPHER *cipher)
 {
 	const Message::Result *msg = ssl->ss->waitForReply(request);
 	if (msg == nullptr)
@@ -503,7 +503,7 @@ const PSSL_CIPHER *
 PSSL_get_current_cipher(const PSSL *sslc)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
-	return (PSSL_fetch_cipher(ssl, SSLPROC_GET_CURRENT_CIPHER,
+	return (PSSL_fetch_cipher(ssl, Message::GET_CURRENT_CIPHER,
 	    &ssl->current_cipher));
 }
 
@@ -511,7 +511,7 @@ const PSSL_CIPHER *
 PSSL_get_pending_cipher(const PSSL *sslc)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
-	return (PSSL_fetch_cipher(ssl, SSLPROC_GET_PENDING_CIPHER,
+	return (PSSL_fetch_cipher(ssl, Message::GET_PENDING_CIPHER,
 	    &ssl->pending_cipher));
 }
 
@@ -520,7 +520,7 @@ PSSL_set_session_id_context(PSSL *ssl, const unsigned char *ctx,
     unsigned int len)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_SET_SESSION_ID_CONTEXT, ctx, len);
+	    ssl->ss->waitForReply(Message::SET_SESSION_ID_CONTEXT, ctx, len);
 	if (msg == nullptr)
 		return (0);
 	return (msg->ret);
@@ -534,9 +534,9 @@ PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
 		return;
 	if (ssl->msg_cb == NULL) {
 		ssl->msg_cb = cb;
-		ssl->ss->waitForReply(SSLPROC_ENABLE_MSG_CB);
+		ssl->ss->waitForReply(Message::ENABLE_MSG_CB);
 	} else if (cb == NULL) {
-		ssl->ss->waitForReply(SSLPROC_DISABLE_MSG_CB);
+		ssl->ss->waitForReply(Message::DISABLE_MSG_CB);
 		ssl->msg_cb = NULL;
 	} else
 		ssl->msg_cb = cb;
@@ -627,7 +627,7 @@ void
 PSSL_set_connect_state(PSSL *ssl)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_SET_CONNECT_STATE);
+	    ssl->ss->waitForReply(Message::SET_CONNECT_STATE);
 	if (msg == nullptr)
 		abort();
 }
@@ -636,7 +636,7 @@ void
 PSSL_set_accept_state(PSSL *ssl)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_SET_ACCEPT_STATE);
+	    ssl->ss->waitForReply(Message::SET_ACCEPT_STATE);
 	if (msg == nullptr)
 		abort();
 }
@@ -645,7 +645,7 @@ int
 PSSL_is_server(PSSL *ssl)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_IS_SERVER);
+	    ssl->ss->waitForReply(Message::IS_SERVER);
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
@@ -655,7 +655,7 @@ int
 PSSL_do_handshake(PSSL *ssl)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_DO_HANDSHAKE);
+	    ssl->ss->waitForReply(Message::DO_HANDSHAKE);
 	if (msg == nullptr) {
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
@@ -667,7 +667,7 @@ PSSL_do_handshake(PSSL *ssl)
 int
 PSSL_accept(PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_ACCEPT);
+	const Message::Result *msg = ssl->ss->waitForReply(Message::ACCEPT);
 	if (msg == nullptr) {
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
@@ -679,7 +679,7 @@ PSSL_accept(PSSL *ssl)
 int
 PSSL_connect(PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_CONNECT);
+	const Message::Result *msg = ssl->ss->waitForReply(Message::CONNECT);
 	if (msg == nullptr) {
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
@@ -691,7 +691,7 @@ PSSL_connect(PSSL *ssl)
 int
 PSSL_in_init(const PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_IN_INIT);
+	const Message::Result *msg = ssl->ss->waitForReply(Message::IN_INIT);
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
@@ -700,7 +700,7 @@ PSSL_in_init(const PSSL *ssl)
 int
 PSSL_in_before(const PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_IN_BEFORE);
+	const Message::Result *msg = ssl->ss->waitForReply(Message::IN_BEFORE);
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
@@ -710,7 +710,7 @@ int
 PSSL_is_init_finished(const PSSL *ssl)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_IS_INIT_FINISHED);
+	    ssl->ss->waitForReply(Message::IS_INIT_FINISHED);
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
@@ -720,7 +720,7 @@ int
 PSSL_client_version(const PSSL *ssl)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_CLIENT_VERSION);
+	    ssl->ss->waitForReply(Message::CLIENT_VERSION);
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
@@ -754,7 +754,7 @@ PSSL_get_version(const PSSL *ssl)
 int
 PSSL_version(const PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_VERSION);
+	const Message::Result *msg = ssl->ss->waitForReply(Message::VERSION);
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
@@ -765,7 +765,7 @@ PSSL_get_servername(const PSSL *sslc, const int type)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_GET_SERVERNAME_TYPE, &type,
+	    ssl->ss->waitForReply(Message::GET_SERVERNAME_TYPE, &type,
 		sizeof(type));
 	if (msg == nullptr)
 		return (nullptr);
@@ -787,7 +787,7 @@ int
 PSSL_get_servername_type(const PSSL *ssl)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_GET_SERVERNAME_TYPE);
+	    ssl->ss->waitForReply(Message::GET_SERVERNAME_TYPE);
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
@@ -797,7 +797,7 @@ int
 PSSL_read(PSSL *ssl, void *buf, int len)
 {
 	int resid = len;
-	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_READ,
+	const Message::Result *msg = ssl->ss->waitForReply(Message::READ,
 	    &resid, sizeof(resid));
 	if (msg == nullptr) {
 		ssl->last_error = SSL_ERROR_SYSCALL;
@@ -833,7 +833,7 @@ PSSL_read(PSSL *ssl, void *buf, int len)
 int
 PSSL_write(PSSL *ssl, const void *buf, int len)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_WRITE, buf,
+	const Message::Result *msg = ssl->ss->waitForReply(Message::WRITE, buf,
 	    len);
 	if (msg == nullptr) {
 		ssl->last_error = SSL_ERROR_SYSCALL;
@@ -847,7 +847,7 @@ void
 PSSL_set_shutdown(PSSL *ssl, int mode)
 {
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_SET_SHUTDOWN, &mode, sizeof(mode));
+	    ssl->ss->waitForReply(Message::SET_SHUTDOWN, &mode, sizeof(mode));
 	if (msg == nullptr)
 		abort();
 }
@@ -857,7 +857,7 @@ PSSL_get_shutdown(const PSSL *sslc)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
 	const Message::Result *msg =
-	    ssl->ss->waitForReply(SSLPROC_GET_SHUTDOWN);
+	    ssl->ss->waitForReply(Message::GET_SHUTDOWN);
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
@@ -866,7 +866,7 @@ PSSL_get_shutdown(const PSSL *sslc)
 int
 PSSL_shutdown(PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(SSLPROC_SHUTDOWN);
+	const Message::Result *msg = ssl->ss->waitForReply(Message::SHUTDOWN);
 	if (msg == nullptr) {
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);

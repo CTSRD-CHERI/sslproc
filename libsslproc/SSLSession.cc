@@ -50,13 +50,13 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	long ret;
 
 	switch (hdr->type) {
-	case SSLPROC_BIO_READ:
+	case Message::BIO_READ:
 	{
 		if (hdr->length != sizeof(Message::Read)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 			snprintf(tmp, sizeof(tmp), "%d", hdr->length);
-			ERR_add_error_data(2, "SSLPROC_BIO_READ bad length=",
+			ERR_add_error_data(2, "Message::BIO_READ bad length=",
 			    tmp);
 			return (false);
 		}
@@ -89,23 +89,24 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		}
 		break;
 	}
-	case SSLPROC_BIO_WRITE:
+	case Message::BIO_WRITE:
 	{
 		ret = BIO_write(ssl->wbio, hdr->body(), hdr->bodyLength());
 		int flags = BIO_get_flags(ssl->wbio);
 		writeReplyMessage(hdr->type, ret, &flags, sizeof(flags));
 		break;
 	}
-	case SSLPROC_BIO_CTRL_READ:
-	case SSLPROC_BIO_CTRL_WRITE:
+	case Message::BIO_CTRL_READ:
+	case Message::BIO_CTRL_WRITE:
 	{
 		if (hdr->length != sizeof(Message::Ctrl)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 			snprintf(tmp, sizeof(tmp), "%d", hdr->length);
 			ERR_add_error_data(3,
-			    hdr->type == SSLPROC_BIO_CTRL_READ ?
-			    "SSLPROC_BIO_CTRL_READ" : "SSLPROC_BIO_CTRL_WRITE",
+			    hdr->type == Message::BIO_CTRL_READ ?
+			    "Message::BIO_CTRL_READ" :
+			    "Message::BIO_CTRL_WRITE",
 			    " bad length=", tmp);
 			return (false);
 		}
@@ -115,7 +116,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		long ret;
 		BIO *bio;
 
-		if (hdr->type == SSLPROC_BIO_CTRL_READ)
+		if (hdr->type == Message::BIO_CTRL_READ)
 			bio = ssl->rbio;
 		else
 			bio = ssl->wbio;
@@ -132,14 +133,15 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 			snprintf(tmp, sizeof(tmp), "%d", msg->cmd);
 			ERR_add_error_data(3,
-			    hdr->type == SSLPROC_BIO_CTRL_READ ?
-			    "SSLPROC_BIO_CTRL_READ" : "SSLPROC_BIO_CTRL_WRITE",
+			    hdr->type == Message::BIO_CTRL_READ ?
+			    "Message::BIO_CTRL_READ" :
+			    "Message::BIO_CTRL_WRITE",
 			    " unsupported cmd=", tmp);
 			return (false);
 		}
 		break;
 	}
-	case SSLPROC_MSG_CB:
+	case Message::MSG_CB:
 	{
 		if (hdr->length < sizeof(Message::MsgCb)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -155,7 +157,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_SERVERNAME_CB:
+	case Message::SERVERNAME_CB:
 	{
 		int al;
 
@@ -173,7 +175,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, ret, &al, sizeof(al));
 		break;
 	}
-	case SSLPROC_CLIENT_HELLO_CB:
+	case Message::CLIENT_HELLO_CB:
 	{
 		int al;
 
@@ -191,7 +193,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, ret, &al, sizeof(al));
 		break;
 	}
-	case SSLPROC_SRP_USERNAME_CB:
+	case Message::SRP_USERNAME_CB:
 	{
 		int ad;
 
@@ -209,7 +211,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, ret, &ad, sizeof(ad));
 		break;
 	}
-	case SSLPROC_SESS_NEW_CB:
+	case Message::SESS_NEW_CB:
 	{
 		if (hdr->length < sizeof(Message::SessNewCb)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -272,7 +274,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_SESS_REMOVE_CB:
+	case Message::SESS_REMOVE_CB:
 	{
 		if (hdr->bodyLength() == 0) {
 			writeErrnoReply(hdr->type, -1, EBADMSG);
@@ -295,7 +297,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_SESS_GET_CB:
+	case Message::SESS_GET_CB:
 	{
 		if (hdr->bodyLength() == 0) {
 			writeErrnoReply(hdr->type, -1, EBADMSG);
@@ -341,7 +343,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		    s->internal_length);
 		break;
 	}
-	case SSLPROC_TMP_DH_CB:
+	case Message::TMP_DH_CB:
 	{
 		if (hdr->length != sizeof(Message::TmpDhCb)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -374,7 +376,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		OPENSSL_free(asn1);
 		break;
 	}
-	case SSLPROC_INFO_CB:
+	case Message::INFO_CB:
 	{
 		if (hdr->length != sizeof(Message::InfoCb)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -389,7 +391,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
-	case SSLPROC_ALPN_SELECT_CB:
+	case Message::ALPN_SELECT_CB:
 	{
 		if (ssl->ctx->alpn_select_cb == nullptr) {
 			writeReplyMessage(hdr->type, SSL_TLSEXT_ERR_NOACK);
@@ -404,7 +406,7 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, ret, out, outlen);
 		break;
 	}
-	case SSLPROC_CLIENT_CERT_CB:
+	case Message::CLIENT_CERT_CB:
 	{
 		if (ssl->ctx->client_cert_cb == nullptr) {
 			writeReplyMessage(hdr->type, 0);

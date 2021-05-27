@@ -86,7 +86,8 @@ LibMessageSocket::observeWriteError()
 }
 
 const Message::Result *
-LibMessageSocket::waitForReply(int type, const struct iovec *iov, int iovCnt)
+LibMessageSocket::waitForReply(enum Message::Type type,
+    const struct iovec *iov, int iovCnt)
 {
 	if (ERR_peek_error() != 0)
 		return (nullptr);
@@ -96,7 +97,7 @@ LibMessageSocket::waitForReply(int type, const struct iovec *iov, int iovCnt)
 }
 
 const Message::Result *
-LibMessageSocket::waitForReply(int type, const void *payload,
+LibMessageSocket::waitForReply(enum Message::Type type, const void *payload,
     size_t payloadLen, const void *control, size_t controlLen)
 {
 	if (ERR_peek_error() != 0)
@@ -107,7 +108,7 @@ LibMessageSocket::waitForReply(int type, const void *payload,
 }
 
 const Message::Result *
-LibMessageSocket::_waitForReply(int type)
+LibMessageSocket::_waitForReply(enum Message::Type type)
 {
 	for (;;) {
 		int rc = readMessage(replyBuffer);
@@ -120,7 +121,7 @@ LibMessageSocket::_waitForReply(int type)
 			return (nullptr);
 
 		const Message::Header *hdr = replyBuffer.hdr();
-		if (hdr->type == SSLPROC_RESULT) {
+		if (hdr->type == Message::RESULT) {
 			char tmp[16], tmp2[16];
 			const Message::Result *result =
 			    reinterpret_cast<const Message::Result *>(hdr);

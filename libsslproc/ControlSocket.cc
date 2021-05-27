@@ -45,7 +45,7 @@ ControlSocket::~ControlSocket()
 bool
 ControlSocket::createContext(const PSSL_METHOD *method)
 {
-	const Message::Result *reply = waitForReply(SSLPROC_CREATE_CONTEXT,
+	const Message::Result *reply = waitForReply(Message::CREATE_CONTEXT,
 	    &method->method, sizeof(method->method));
 	if (reply == nullptr)
 		return (false);
@@ -70,7 +70,7 @@ ControlSocket::createSession(int sessionFd)
 	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
 	fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
 	fds[0] = sessionFd;
-	const Message::Result *reply = waitForReply(SSLPROC_CREATE_SESSION,
+	const Message::Result *reply = waitForReply(Message::CREATE_SESSION,
 	    nullptr, 0, &cmsgbuf, sizeof(cmsgbuf));
 	if (reply == nullptr)
 		return (false);

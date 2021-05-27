@@ -39,6 +39,8 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 
+#include <Messages.h>
+
 __BEGIN_DECLS
 
 /* OPENSSL_init */
@@ -83,7 +85,7 @@ __END_DECLS
 /* SSL_METHOD */
 
 struct _PSSL_METHOD {
-	int method;	/* SSL_METHOD_* */
+	enum Message::ContextMethod method;
 };
 
 /* SSL_CIPHER */

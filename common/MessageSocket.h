@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include "Messages.h"
 #include "MessageBuffer.h"
 
 /*
@@ -51,24 +52,26 @@ protected:
 
 	MessageSocket(int _fd) : fd(_fd) {};
 	int readMessage(MessageBuffer &);
-	bool writeMessage(int type, const void *payload = nullptr,
+	bool writeMessage(enum Message::Type type,
+	    const void *payload = nullptr,
 	    size_t payloadLen = 0, const void *control = nullptr,
 	    size_t controlLen = 0);
-	bool writeMessage(int type, const struct iovec *iov, int iovCnt);
-	void writeErrorReply(int type, long ret, int errorType,
+	bool writeMessage(enum Message::Type type, const struct iovec *iov,
+	    int iovCnt);
+	void writeErrorReply(enum Message::Type type, long ret, int errorType,
 	    const void *payload = NULL, size_t payloadLen = 0);
-	void writeReplyMessage(int type, long ret,
+	void writeReplyMessage(enum Message::Type type, long ret,
 	    const void *payload = nullptr, size_t payloadLen = 0);
-	void writeReplyMessage(int type, long ret,
+	void writeReplyMessage(enum Message::Type type, long ret,
 	    const struct iovec *iov, int iovCnt);
-	void writeErrnoReply(int type, long ret, int error);
+	void writeErrnoReply(enum Message::Type type, long ret, int error);
 	virtual void observeReadError(enum ReadError error,
 	    const Message::Header *hdr) = 0;
 	virtual void observeWriteError() = 0;
 private:
 	bool writeMessage(struct iovec *iov, int iovCnt,
 	    const void *control, size_t controlLen);
-	void writeReplyMessage(int type, long ret, int error,
+	void writeReplyMessage(enum Message::Type type, long ret, int error,
 	    const void *payload, size_t payloadLen);
 
 	int fd;

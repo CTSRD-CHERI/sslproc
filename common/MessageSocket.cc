@@ -133,8 +133,8 @@ MessageSocket::writeMessage(struct iovec *iov, int iovCnt, const void *control,
 }
 
 bool
-MessageSocket::writeMessage(int type, const void *payload, size_t payloadLen,
-    const void *control, size_t controlLen)
+MessageSocket::writeMessage(enum Message::Type type, const void *payload,
+    size_t payloadLen, const void *control, size_t controlLen)
 {
 	Message::Header hdr;
 	struct iovec iov[2];
@@ -154,7 +154,8 @@ MessageSocket::writeMessage(int type, const void *payload, size_t payloadLen,
 }
 
 bool
-MessageSocket::writeMessage(int type, const struct iovec *iov, int iovCnt)
+MessageSocket::writeMessage(enum Message::Type type, const struct iovec *iov,
+    int iovCnt)
 {
 	Message::Header hdr;
 	struct iovec iov2[iovCnt + 1];
@@ -171,14 +172,14 @@ MessageSocket::writeMessage(int type, const struct iovec *iov, int iovCnt)
 }
 
 void
-MessageSocket::writeReplyMessage(int type, long ret, int error,
+MessageSocket::writeReplyMessage(enum Message::Type type, long ret, int error,
     const void *payload, size_t payloadLen)
 {
 	Message::Result result;
 	struct iovec iov[2];
 	int cnt;
 
-	result.type = SSLPROC_RESULT;
+	result.type = Message::RESULT;
 	result.length = sizeof(result) + payloadLen;
 	result.request = type;
 	result.error = error;
@@ -195,21 +196,21 @@ MessageSocket::writeReplyMessage(int type, long ret, int error,
 }
 
 void
-MessageSocket::writeReplyMessage(int type, long ret, const void *payload,
-    size_t payloadLen)
+MessageSocket::writeReplyMessage(enum Message::Type type, long ret,
+    const void *payload, size_t payloadLen)
 {
 	writeReplyMessage(type, ret, SSL_ERROR_NONE, payload, payloadLen);
 }
 
 void
-MessageSocket::writeReplyMessage(int type, long ret, const struct iovec *iov,
-    int iovCnt)
+MessageSocket::writeReplyMessage(enum Message::Type type, long ret,
+    const struct iovec *iov, int iovCnt)
 {
 	Message::Result result;
 	struct iovec iov2[iovCnt + 1];
 	int i;
 
-	result.type = SSLPROC_RESULT;
+	result.type = Message::RESULT;
 	result.length = sizeof(result);
 	result.request = type;
 	result.error = SSL_ERROR_NONE;
@@ -223,14 +224,14 @@ MessageSocket::writeReplyMessage(int type, long ret, const struct iovec *iov,
 }
 
 void
-MessageSocket::writeErrorReply(int type, long ret, int errorType,
+MessageSocket::writeErrorReply(enum Message::Type type, long ret, int errorType,
     const void *payload, size_t payloadLen)
 {
 	writeReplyMessage(type, ret, errorType, payload, payloadLen);
 }
 
 void
-MessageSocket::writeErrnoReply(int type, long ret, int error)
+MessageSocket::writeErrnoReply(enum Message::Type type, long ret, int error)
 {
 	writeErrorReply(type, ret, SSL_ERROR_SYSCALL, &error, sizeof(error));
 }

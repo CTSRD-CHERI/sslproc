@@ -158,7 +158,7 @@ long
 PSSL_CTX_set_options(PSSL_CTX *ctx, long options)
 {
 	const Message::Result *reply = ctx->cs->waitForReply(
-	    SSLPROC_CTX_SET_OPTIONS, &options, sizeof(options));
+	    Message::CTX_SET_OPTIONS, &options, sizeof(options));
 
 	/* No way to return errors. */
 	if (reply == nullptr)
@@ -172,7 +172,7 @@ long
 PSSL_CTX_clear_options(PSSL_CTX *ctx, long options)
 {
 	const Message::Result *reply = ctx->cs->waitForReply(
-	    SSLPROC_CTX_CLEAR_OPTIONS, &options, sizeof(options));
+	    Message::CTX_CLEAR_OPTIONS, &options, sizeof(options));
 
 	/* No way to return errors. */
 	if (reply == nullptr)
@@ -186,7 +186,7 @@ long
 PSSL_CTX_get_options(PSSL_CTX *ctx)
 {
 	const Message::Result *reply = ctx->cs->waitForReply(
-	    SSLPROC_CTX_GET_OPTIONS);
+	    Message::CTX_GET_OPTIONS);
 
 	/* No way to return errors. */
 	if (reply == nullptr)
@@ -213,7 +213,7 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 	case SSL_CTRL_CLEAR_MODE:
 	case SSL_CTRL_SET_SESS_CACHE_MODE:
 	case SSL_CTRL_GET_SESS_CACHE_MODE:
-		reply = ctx->cs->waitForReply(SSLPROC_CTX_CTRL, &body,
+		reply = ctx->cs->waitForReply(Message::CTX_CTRL, &body,
 		    sizeof(body));
 		if (reply == nullptr)
 			abort();
@@ -231,7 +231,7 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 		iov[0].iov_len = sizeof(body);
 		iov[1].iov_base = asn1;
 		iov[1].iov_len = len;
-		reply = ctx->cs->waitForReply(SSLPROC_CTX_CTRL, iov, 2);
+		reply = ctx->cs->waitForReply(Message::CTX_CTRL, iov, 2);
 		OPENSSL_free(asn1);
 		if (reply == nullptr)
 			return (0);
@@ -254,8 +254,8 @@ PSSL_CTX_callback_ctrl(PSSL_CTX *ctx, int cmd, void (*cb)(void))
 	case SSL_CTRL_SET_TLSEXT_SERVERNAME_CB:
 		ctx->servername_cb = (int (*)(PSSL *, int *, void *))cb;
 		msg = ctx->cs->waitForReply(cb == NULL ?
-		    SSLPROC_CTX_DISABLE_SERVERNAME_CB :
-		    SSLPROC_CTX_ENABLE_SERVERNAME_CB);
+		    Message::CTX_DISABLE_SERVERNAME_CB :
+		    Message::CTX_ENABLE_SERVERNAME_CB);
 		if (msg == nullptr)
 			abort();
 		return (msg->ret);
@@ -305,7 +305,7 @@ PSSL_CTX_use_certificate_ASN1(PSSL_CTX *ctx, int len, unsigned char *d)
 	}
 
 	const Message::Result *reply = ctx->cs->waitForReply(
-	    SSLPROC_CTX_USE_CERTIFICATE_ASN1, d, len);
+	    Message::CTX_USE_CERTIFICATE_ASN1, d, len);
 	if (reply == nullptr)
 		return (0);
 	return (reply->ret);
@@ -393,7 +393,7 @@ PSSL_CTX_use_PrivateKey_ASN1(int type, PSSL_CTX *ctx, const unsigned char *d,
 	iov[1].iov_base = const_cast<unsigned char *>(d);
 	iov[1].iov_len = len;
 	const Message::Result *reply = ctx->cs->waitForReply(
-	    SSLPROC_CTX_USE_PRIVATEKEY_ASN1, iov, 2);
+	    Message::CTX_USE_PRIVATEKEY_ASN1, iov, 2);
 	if (reply == nullptr)
 		return (0);
 	return (reply->ret);
@@ -448,7 +448,7 @@ int
 PSSL_CTX_check_private_key(PSSL_CTX *ctx)
 {
 	const Message::Result *reply = ctx->cs->waitForReply(
-	    SSLPROC_CTX_CHECK_PRIVATE_KEY);
+	    Message::CTX_CHECK_PRIVATE_KEY);
 	if (reply == nullptr)
 		return (0);
 	return (reply->ret);
@@ -462,8 +462,8 @@ PSSL_CTX_set_client_hello_cb(PSSL_CTX *ctx, PSSL_client_hello_cb_fn cb,
 	ctx->client_hello_cb = cb;
 	ctx->client_hello_cb_arg = arg;
 	(void)ctx->cs->waitForReply(cb == nullptr ?
-	    SSLPROC_CTX_DISABLE_CLIENT_HELLO_CB :
-	    SSLPROC_CTX_ENABLE_CLIENT_HELLO_CB);
+	    Message::CTX_DISABLE_CLIENT_HELLO_CB :
+	    Message::CTX_ENABLE_CLIENT_HELLO_CB);
 }
 
 int
@@ -473,8 +473,8 @@ PSSL_CTX_set_srp_username_callback(PSSL_CTX *ctx,
 	ctx->srp_username_cb = cb;
 
 	const Message::Result *msg = ctx->cs->waitForReply(cb == nullptr ?
-	    SSLPROC_CTX_DISABLE_SRP_USERNAME_CB :
-	    SSLPROC_CTX_ENABLE_SRP_USERNAME_CB);
+	    Message::CTX_DISABLE_SRP_USERNAME_CB :
+	    Message::CTX_ENABLE_SRP_USERNAME_CB);
 	if (msg == nullptr)
 		return (0);
 	if (msg->error != SSL_ERROR_NONE)
@@ -496,7 +496,7 @@ PSSL_CTX_sess_callbacks_updated(PSSL_CTX *ctx)
 	    ctx->sess_get_cb == nullptr) {
 		if (ctx->sess_cbs_enabled) {
 			const Message::Result *msg = ctx->cs->waitForReply(
-			    SSLPROC_CTX_DISABLE_SESS_CBS);
+			    Message::CTX_DISABLE_SESS_CBS);
 			if (msg == nullptr || msg->error != SSL_ERROR_NONE)
 				abort();
 			ctx->sess_cbs_enabled = false;
@@ -504,7 +504,7 @@ PSSL_CTX_sess_callbacks_updated(PSSL_CTX *ctx)
 	} else {
 		if (!ctx->sess_cbs_enabled) {
 			const Message::Result *msg = ctx->cs->waitForReply(
-			    SSLPROC_CTX_ENABLE_SESS_CBS);
+			    Message::CTX_ENABLE_SESS_CBS);
 			if (msg == nullptr || msg->error != SSL_ERROR_NONE)
 				abort();
 			ctx->sess_cbs_enabled = true;
@@ -540,7 +540,7 @@ PSSL_CTX_set_tmp_dh_callback(PSSL_CTX *ctx, DH *(*cb)(PSSL *, int, int))
 {
 	ctx->tmp_dh_cb = cb;
 	(void)ctx->cs->waitForReply(cb == nullptr ?
-	    SSLPROC_CTX_DISABLE_TMP_DH_CB : SSLPROC_CTX_ENABLE_TMP_DH_CB);
+	    Message::CTX_DISABLE_TMP_DH_CB : Message::CTX_ENABLE_TMP_DH_CB);
 }
 
 void
@@ -548,7 +548,7 @@ PSSL_CTX_set_info_callback(PSSL_CTX *ctx, void (*cb)(const PSSL *, int, int))
 {
 	ctx->info_cb = cb;
 	(void)ctx->cs->waitForReply(cb == nullptr ?
-	    SSLPROC_CTX_DISABLE_INFO_CB : SSLPROC_CTX_ENABLE_INFO_CB);
+	    Message::CTX_DISABLE_INFO_CB : Message::CTX_ENABLE_INFO_CB);
 }
 
 void
@@ -558,8 +558,8 @@ PSSL_CTX_set_alpn_select_cb(PSSL_CTX *ctx, PSSL_CTX_alpn_select_cb_func cb,
 	ctx->alpn_select_cb = cb;
 	ctx->alpn_select_cb_arg = arg;
 	(void)ctx->cs->waitForReply(cb == nullptr ?
-	    SSLPROC_CTX_DISABLE_ALPN_SELECT_CB :
-	    SSLPROC_CTX_ENABLE_ALPN_SELECT_CB);
+	    Message::CTX_DISABLE_ALPN_SELECT_CB :
+	    Message::CTX_ENABLE_ALPN_SELECT_CB);
 }
 
 int
@@ -572,7 +572,7 @@ PSSL_CTX_set_cipher_list(PSSL_CTX *ctx, const char *s)
 	}
 
 	const Message::Result *msg = ctx->cs->waitForReply(
-	    SSLPROC_CTX_SET_CIPHER_LIST, s, strlen(s));
+	    Message::CTX_SET_CIPHER_LIST, s, strlen(s));
 	if (msg == nullptr)
 		return (0);
 	return (msg->ret);
@@ -588,7 +588,7 @@ PSSL_CTX_set_ciphersuites(PSSL_CTX *ctx, const char *s)
 	}
 
 	const Message::Result *msg = ctx->cs->waitForReply(
-	    SSLPROC_CTX_SET_CIPHERSUITES, s, strlen(s));
+	    Message::CTX_SET_CIPHERSUITES, s, strlen(s));
 	if (msg == nullptr)
 		return (0);
 	return (msg->ret);
@@ -598,7 +598,7 @@ long
 PSSL_CTX_set_timeout(PSSL_CTX *ctx, long time)
 {
 	const Message::Result *msg = ctx->cs->waitForReply(
-	    SSLPROC_CTX_SET_TIMEOUT, &time, sizeof(time));
+	    Message::CTX_SET_TIMEOUT, &time, sizeof(time));
 	if (msg == nullptr)
 		abort();
 	return (msg->ret);
@@ -614,7 +614,7 @@ PSSL_CTX_get0_certificate(const PSSL_CTX *ctxc)
 {
 	PSSL_CTX *ctx = const_cast<PSSL_CTX *>(ctxc);
 	const Message::Result *msg = ctx->cs->waitForReply(
-	    SSLPROC_CTX_GET0_CERTIFICATE);
+	    Message::CTX_GET0_CERTIFICATE);
 	if (msg == nullptr)
 		return (nullptr);
 	if (msg->error != SSL_ERROR_NONE)
@@ -637,6 +637,6 @@ PSSL_CTX_set_client_cert_cb(PSSL_CTX *ctx,
 {
 	ctx->client_cert_cb = cb;
 	(void)ctx->cs->waitForReply(cb == nullptr ?
-	    SSLPROC_CTX_DISABLE_CLIENT_CERT_CB :
-	    SSLPROC_CTX_ENABLE_CLIENT_CERT_CB);
+	    Message::CTX_DISABLE_CLIENT_CERT_CB :
+	    Message::CTX_ENABLE_CLIENT_CERT_CB);
 }
