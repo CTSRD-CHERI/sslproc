@@ -33,17 +33,15 @@
 #pragma once
 
 #include "LibMessageSocket.h"
-#include "sslproc.h"
 
 class ControlSocket : public LibMessageSocket {
 public:
 	ControlSocket(int _fd) : LibMessageSocket(_fd), fd(_fd) {};
 	~ControlSocket();
-
-	bool createContext(const PSSL_METHOD *method);
-	bool createSession(int sessionFd);
+	bool init();
+	bool createCommandSocket(int fd);
 private:
-	bool handleMessage(const Message::Header *hdr);
+	void handleMessage(const Message::Header *hdr);
 
 	int fd;
 };

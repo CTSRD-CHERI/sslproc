@@ -32,6 +32,8 @@
 
 #pragma once
 
+#include <stack>
+
 #include "Messages.h"
 #include "MessageBuffer.h"
 
@@ -40,9 +42,14 @@
  * datagram socket.  It provides methods to read messages and write
  * messages.
  */
+class MessageRef;
+
 class MessageSocket {
+public:
+	void freeMessage(MessageBuffer *);
 protected:
 	enum ReadError {
+		NO_BUFFER,
 		READ_ERROR,
 		SHORT,
 		TRUNCATED,
@@ -51,13 +58,19 @@ protected:
 	};
 
 	MessageSocket(int _fd) : fd(_fd) {};
-	int readMessage(MessageBuffer &);
+	~MessageSocket();
+
+	bool allocateMessages(int count, size_t size, size_t controlSize = 0);
+	int readMessage(MessageRef &ref);
 	bool writeMessage(enum Message::Type type,
 	    const void *payload = nullptr,
 	    size_t payloadLen = 0, const void *control = nullptr,
 	    size_t controlLen = 0);
-	bool writeMessage(enum Message::Type type, const struct iovec *iov,
-	    int iovCnt);
+	bool writeMessage(enum Message::Type type, int target,
+	    const void *payload = nullptr,
+	    size_t payloadLen = 0);
+	bool writeMessage(enum Message::Type type, int target,
+	    const struct iovec *iov, int iovCnt);
 	void writeErrorReply(enum Message::Type type, long ret, int errorType,
 	    const void *payload = NULL, size_t payloadLen = 0);
 	void writeReplyMessage(enum Message::Type type, long ret,
@@ -75,4 +88,65 @@ private:
 	    const void *payload, size_t payloadLen);
 
 	int fd;
+	std::stack<MessageBuffer *> messages;
+};
+
+class MessageRef {
+public:
+	MessageRef() : ms(nullptr), b(nullptr)
+	{}
+
+	MessageRef(MessageRef &&ref) : ms(ref.ms), b(ref.b)
+	{ ref.b = nullptr; }
+
+	MessageRef(const MessageRef &) = delete;
+
+	~MessageRef()
+	{
+		if (b != nullptr)
+			ms->freeMessage(b);
+	}
+
+	void reset(MessageSocket *_ms, MessageBuffer *_b)
+	{
+		if (b != nullptr)
+			ms->freeMessage(b);
+		ms = _ms;
+		b = _b;
+	}
+
+	size_t length() const
+	{
+		if (b == nullptr)
+			return (0);
+		return (b->length());
+	}
+
+	const Message::Header *hdr() const
+	{
+		if (b == nullptr)
+			return (nullptr);
+		return (b->hdr());
+	}
+
+	const Message::Result *result() const
+	{
+		if (b == nullptr)
+			return (nullptr);
+		return (b->result());
+	}
+
+	const struct cmsghdr *cmsg() const
+	{
+		if (b == nullptr)
+			return (nullptr);
+		return (b->cmsg());
+	}
+
+	explicit operator bool() const
+	{ return (b != nullptr); }
+
+private:
+	MessageSocket *ms;
+	MessageBuffer *b;
 };

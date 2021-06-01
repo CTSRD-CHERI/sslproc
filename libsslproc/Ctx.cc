@@ -30,23 +30,31 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <stdlib.h>
-#include <unistd.h>
-
 #include <openssl/dh.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
 #include "sslproc.h"
 #include "sslproc_internal.h"
-#include "ControlSocket.h"
+#include "CommandSocket.h"
+#include "TargetStore.h"
 
 PSSL_CTX *
 PSSL_CTX_new(const PSSL_METHOD *method)
 {
-	POPENSSL_init_ssl();
+	if (POPENSSL_init_ssl() != 0)
+		return (nullptr);
+
+	if (method == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_PASSED_NULL_PARAMETER);
+		return (nullptr);
+	}
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_NO_COMMAND_SOCKET);
+		return (nullptr);
+	}
 
 	PSSL_CTX *ctx = new PSSL_CTX();
 	if (ctx == nullptr) {
@@ -60,54 +68,35 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 		return (nullptr);
 	}
 
-	int fds[2];
-	if (socketpair(PF_LOCAL, SOCK_SEQPACKET, 0, fds) == -1) {
-		int save_error = errno;
-
+	MessageRef ref = cs->waitForReply(Message::CREATE_CONTEXT,
+	    &method->method, sizeof(method->method));
+	if (!ref) {
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
 		    &ctx->ex_data);
 		delete ctx;
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
-		ERR_add_error_data(2, "socketpair: ", strerror(save_error));
+		ERR_add_error_data(1, "failed to create remote context");
 		return (nullptr);
 	}
 
-	/*
-	 * This doesn't use posix_spawn due to a lack of
-	 * posix_spawn_file_actions_addclosefrom().
-	 */
-	pid_t pid = vfork();
-	if (pid == -1) {
-		int save_error = errno;
-
-		close(fds[0]);
-		close(fds[1]);
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE || msg->bodyLength() != sizeof(int)) {
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
 		    &ctx->ex_data);
 		delete ctx;
-		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
-		ERR_add_error_data(2, "vfork: ", strerror(save_error));
+		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_BAD_MESSAGE);
+		ERR_add_error_data(1, "failed to create remote context");
 		return (nullptr);
 	}
 
-	if (pid == 0) {
-		/* child */
-		if (dup2(fds[1], 3) == -1)
-			exit(127);
-		closefrom(4);
-		execlp("sslproc", "sslproc", NULL);
-		exit(127);
-	}
-
-	close(fds[1]);
-
-	ctx->cs = new ControlSocket(fds[0]);
-	if (!ctx->cs->init() || !ctx->cs->createContext(method)) {
-		delete ctx->cs;
+	ctx->target = *reinterpret_cast<const int *>(msg->body());
+	if (!targets.insert(ctx->target, ctx)) {
+		cs->waitForReply(Message::FREE_CONTEXT, ctx->target);
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx,
 		    &ctx->ex_data);
 		delete ctx;
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "duplicate target");
 		return (nullptr);
 	}
 
@@ -148,7 +137,14 @@ PSSL_CTX_free(PSSL_CTX *ctx)
 	if (ctx->refs.fetch_sub(1, std::memory_order_relaxed) > 1)
 		return;
 
-	delete ctx->cs;
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+	MessageRef ref = cs->waitForReply(Message::FREE_CONTEXT, ctx->target);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		abort();
+	targets.remove(ctx->target);
+
 	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx, &ctx->ex_data);
 	X509_free(ctx->get0_cert);
 	delete ctx;
@@ -157,12 +153,17 @@ PSSL_CTX_free(PSSL_CTX *ctx)
 long
 PSSL_CTX_set_options(PSSL_CTX *ctx, long options)
 {
-	const Message::Result *reply = ctx->cs->waitForReply(
-	    Message::CTX_SET_OPTIONS, &options, sizeof(options));
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::CTX_SET_OPTIONS, ctx->target,
+	    &options, sizeof(options));
 
 	/* No way to return errors. */
-	if (reply == nullptr)
+	if (!ref)
 		abort();
+	const Message::Result *reply = ref.result();
 	if (reply->ret != 0)
 		abort();
 	return (*reinterpret_cast<const long *>(reply->body()));
@@ -171,12 +172,17 @@ PSSL_CTX_set_options(PSSL_CTX *ctx, long options)
 long
 PSSL_CTX_clear_options(PSSL_CTX *ctx, long options)
 {
-	const Message::Result *reply = ctx->cs->waitForReply(
-	    Message::CTX_CLEAR_OPTIONS, &options, sizeof(options));
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::CTX_CLEAR_OPTIONS,
+	    ctx->target, &options, sizeof(options));
 
 	/* No way to return errors. */
-	if (reply == nullptr)
+	if (!ref)
 		abort();
+	const Message::Result *reply = ref.result();
 	if (reply->ret != 0)
 		abort();
 	return (*reinterpret_cast<const long *>(reply->body()));
@@ -185,12 +191,17 @@ PSSL_CTX_clear_options(PSSL_CTX *ctx, long options)
 long
 PSSL_CTX_get_options(PSSL_CTX *ctx)
 {
-	const Message::Result *reply = ctx->cs->waitForReply(
-	    Message::CTX_GET_OPTIONS);
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::CTX_GET_OPTIONS,
+	    ctx->target);
 
 	/* No way to return errors. */
-	if (reply == nullptr)
+	if (!ref)
 		abort();
+	const Message::Result *reply = ref.result();
 	if (reply->ret != 0)
 		abort();
 	return (*reinterpret_cast<const long *>(reply->body()));
@@ -199,8 +210,8 @@ PSSL_CTX_get_options(PSSL_CTX *ctx)
 long
 PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 {
+	CommandSocket *cs = currentCommandSocket();
 	Message::CtrlBody body;
-	const Message::Result *reply;
 
 	body.cmd = cmd;
 	body.larg = larg;
@@ -213,11 +224,15 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 	case SSL_CTRL_CLEAR_MODE:
 	case SSL_CTRL_SET_SESS_CACHE_MODE:
 	case SSL_CTRL_GET_SESS_CACHE_MODE:
-		reply = ctx->cs->waitForReply(Message::CTX_CTRL, &body,
-		    sizeof(body));
-		if (reply == nullptr)
+	{
+		if (cs == nullptr)
 			abort();
-		return (reply->ret);
+		MessageRef ref = cs->waitForReply(Message::CTX_CTRL,
+		    ctx->target, &body, sizeof(body));
+		if (!ref)
+			abort();
+		return (ref.result()->ret);
+	}
 	case SSL_CTRL_SET_TMP_DH:
 	{
 		unsigned char *asn1 = nullptr;
@@ -225,17 +240,23 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 		if (len <= 0)
 			return (0);
 
+		if (cs == nullptr) {
+			PROCerr(PROC_F_SSL_CTX_CTRL, ERR_R_NO_COMMAND_SOCKET);
+			return (0);
+		}
+
 		struct iovec iov[2];
 
 		iov[0].iov_base = &body;
 		iov[0].iov_len = sizeof(body);
 		iov[1].iov_base = asn1;
 		iov[1].iov_len = len;
-		reply = ctx->cs->waitForReply(Message::CTX_CTRL, iov, 2);
+		MessageRef ref = cs->waitForReply(Message::CTX_CTRL,
+		    ctx->target, iov, 2);
 		OPENSSL_free(asn1);
-		if (reply == nullptr)
+		if (!ref)
 			return (0);
-		return (reply->ret);
+		return (ref.result()->ret);
 	}
 	case SSL_CTRL_SET_TLSEXT_SERVERNAME_ARG:
 		ctx->servername_cb_arg = parg;
@@ -248,17 +269,21 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 long
 PSSL_CTX_callback_ctrl(PSSL_CTX *ctx, int cmd, void (*cb)(void))
 {
-	const Message::Result *msg;
+	CommandSocket *cs = currentCommandSocket();
 
 	switch (cmd) {
 	case SSL_CTRL_SET_TLSEXT_SERVERNAME_CB:
-		ctx->servername_cb = (int (*)(PSSL *, int *, void *))cb;
-		msg = ctx->cs->waitForReply(cb == NULL ?
-		    Message::CTX_DISABLE_SERVERNAME_CB :
-		    Message::CTX_ENABLE_SERVERNAME_CB);
-		if (msg == nullptr)
+	{
+		if (cs == nullptr)
 			abort();
-		return (msg->ret);
+		ctx->servername_cb = (int (*)(PSSL *, int *, void *))cb;
+		MessageRef ref = cs->waitForReply(cb == NULL ?
+		    Message::CTX_DISABLE_SERVERNAME_CB :
+		    Message::CTX_ENABLE_SERVERNAME_CB, ctx->target);
+		if (!ref)
+			abort();
+		return (ref.result()->ret);
+	}
 	default:
 		abort();
 	}
@@ -304,11 +329,18 @@ PSSL_CTX_use_certificate_ASN1(PSSL_CTX *ctx, int len, unsigned char *d)
 		return (0);
 	}
 
-	const Message::Result *reply = ctx->cs->waitForReply(
-	    Message::CTX_USE_CERTIFICATE_ASN1, d, len);
-	if (reply == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_USE_CERTIFICATE_ASN1,
+		    ERR_R_NO_COMMAND_SOCKET);
 		return (0);
-	return (reply->ret);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::CTX_USE_CERTIFICATE_ASN1,
+	    ctx->target, d, len);
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
 }
 
 int
@@ -388,15 +420,22 @@ PSSL_CTX_use_PrivateKey_ASN1(int type, PSSL_CTX *ctx, const unsigned char *d,
 		return (0);
 	}
 
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_USE_PRIVATEKEY_ASN1,
+		    ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
 	iov[0].iov_base = &type;
 	iov[0].iov_len = sizeof(type);
 	iov[1].iov_base = const_cast<unsigned char *>(d);
 	iov[1].iov_len = len;
-	const Message::Result *reply = ctx->cs->waitForReply(
-	    Message::CTX_USE_PRIVATEKEY_ASN1, iov, 2);
-	if (reply == nullptr)
+	MessageRef ref = cs->waitForReply(Message::CTX_USE_PRIVATEKEY_ASN1,
+	    ctx->target, iov, 2);
+	if (!ref)
 		return (0);
-	return (reply->ret);
+	return (ref.result()->ret);
 }
 
 int
@@ -447,37 +486,54 @@ PSSL_CTX_use_PrivateKey_file(PSSL_CTX *ctx, const char *file, int type)
 int
 PSSL_CTX_check_private_key(PSSL_CTX *ctx)
 {
-	const Message::Result *reply = ctx->cs->waitForReply(
-	    Message::CTX_CHECK_PRIVATE_KEY);
-	if (reply == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_CHECK_PRIVATE_KEY,
+		    ERR_R_NO_COMMAND_SOCKET);
 		return (0);
-	return (reply->ret);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::CTX_CHECK_PRIVATE_KEY,
+	    ctx->target);
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
 }
 
 void
 PSSL_CTX_set_client_hello_cb(PSSL_CTX *ctx, PSSL_client_hello_cb_fn cb,
     void *arg)
 {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
 
 	ctx->client_hello_cb = cb;
 	ctx->client_hello_cb_arg = arg;
-	(void)ctx->cs->waitForReply(cb == nullptr ?
+	cs->waitForReply(cb == nullptr ?
 	    Message::CTX_DISABLE_CLIENT_HELLO_CB :
-	    Message::CTX_ENABLE_CLIENT_HELLO_CB);
+	    Message::CTX_ENABLE_CLIENT_HELLO_CB, ctx->target);
 }
 
 int
 PSSL_CTX_set_srp_username_callback(PSSL_CTX *ctx,
     int (*cb)(PSSL *, int *, void *))
 {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_SET_SRP_USERNAME_CALLBACK,
+		    ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
 	ctx->srp_username_cb = cb;
 
-	const Message::Result *msg = ctx->cs->waitForReply(cb == nullptr ?
+	MessageRef ref = cs->waitForReply(cb == nullptr ?
 	    Message::CTX_DISABLE_SRP_USERNAME_CB :
-	    Message::CTX_ENABLE_SRP_USERNAME_CB);
-	if (msg == nullptr)
+	    Message::CTX_ENABLE_SRP_USERNAME_CB, ctx->target);
+	if (!ref)
 		return (0);
-	if (msg->error != SSL_ERROR_NONE)
+	if (ref.result()->error != SSL_ERROR_NONE)
 		return (0);
 	return (1);
 }
@@ -492,20 +548,24 @@ PSSL_CTX_set_srp_cb_arg(PSSL_CTX *ctx, void *arg)
 static void
 PSSL_CTX_sess_callbacks_updated(PSSL_CTX *ctx)
 {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
 	if (ctx->sess_new_cb == nullptr && ctx->sess_remove_cb == nullptr &&
 	    ctx->sess_get_cb == nullptr) {
 		if (ctx->sess_cbs_enabled) {
-			const Message::Result *msg = ctx->cs->waitForReply(
-			    Message::CTX_DISABLE_SESS_CBS);
-			if (msg == nullptr || msg->error != SSL_ERROR_NONE)
+			MessageRef ref = cs->waitForReply(
+			    Message::CTX_DISABLE_SESS_CBS, ctx->target);
+			if (!ref || ref.result()->error != SSL_ERROR_NONE)
 				abort();
 			ctx->sess_cbs_enabled = false;
 		}
 	} else {
 		if (!ctx->sess_cbs_enabled) {
-			const Message::Result *msg = ctx->cs->waitForReply(
-			    Message::CTX_ENABLE_SESS_CBS);
-			if (msg == nullptr || msg->error != SSL_ERROR_NONE)
+			MessageRef ref = cs->waitForReply(
+			    Message::CTX_ENABLE_SESS_CBS, ctx->target);
+			if (!ref || ref.result()->error != SSL_ERROR_NONE)
 				abort();
 			ctx->sess_cbs_enabled = true;
 		}
@@ -538,28 +598,39 @@ PSSL_CTX_sess_set_get_cb(PSSL_CTX *ctx,
 void
 PSSL_CTX_set_tmp_dh_callback(PSSL_CTX *ctx, DH *(*cb)(PSSL *, int, int))
 {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
 	ctx->tmp_dh_cb = cb;
-	(void)ctx->cs->waitForReply(cb == nullptr ?
-	    Message::CTX_DISABLE_TMP_DH_CB : Message::CTX_ENABLE_TMP_DH_CB);
+	cs->waitForReply(cb == nullptr ? Message::CTX_DISABLE_TMP_DH_CB :
+	    Message::CTX_ENABLE_TMP_DH_CB, ctx->target);
 }
 
 void
 PSSL_CTX_set_info_callback(PSSL_CTX *ctx, void (*cb)(const PSSL *, int, int))
 {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
 	ctx->info_cb = cb;
-	(void)ctx->cs->waitForReply(cb == nullptr ?
-	    Message::CTX_DISABLE_INFO_CB : Message::CTX_ENABLE_INFO_CB);
+	cs->waitForReply(cb == nullptr ? Message::CTX_DISABLE_INFO_CB :
+	    Message::CTX_ENABLE_INFO_CB, ctx->target);
 }
 
 void
 PSSL_CTX_set_alpn_select_cb(PSSL_CTX *ctx, PSSL_CTX_alpn_select_cb_func cb,
     void *arg)
 {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
 	ctx->alpn_select_cb = cb;
 	ctx->alpn_select_cb_arg = arg;
-	(void)ctx->cs->waitForReply(cb == nullptr ?
-	    Message::CTX_DISABLE_ALPN_SELECT_CB :
-	    Message::CTX_ENABLE_ALPN_SELECT_CB);
+	cs->waitForReply(cb == nullptr ? Message::CTX_DISABLE_ALPN_SELECT_CB :
+	    Message::CTX_ENABLE_ALPN_SELECT_CB, ctx->target);
 }
 
 int
@@ -571,11 +642,18 @@ PSSL_CTX_set_cipher_list(PSSL_CTX *ctx, const char *s)
 		return (0);
 	}
 
-	const Message::Result *msg = ctx->cs->waitForReply(
-	    Message::CTX_SET_CIPHER_LIST, s, strlen(s));
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_SET_CIPHER_LIST,
+		    ERR_R_NO_COMMAND_SOCKET);
 		return (0);
-	return (msg->ret);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::CTX_SET_CIPHER_LIST,
+	    ctx->target, s, strlen(s));
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
 }
 
 int
@@ -587,21 +665,32 @@ PSSL_CTX_set_ciphersuites(PSSL_CTX *ctx, const char *s)
 		return (0);
 	}
 
-	const Message::Result *msg = ctx->cs->waitForReply(
-	    Message::CTX_SET_CIPHERSUITES, s, strlen(s));
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_SET_CIPHERSUITES,
+		    ERR_R_NO_COMMAND_SOCKET);
 		return (0);
-	return (msg->ret);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::CTX_SET_CIPHERSUITES,
+	    ctx->target, s, strlen(s));
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
 }
 
 long
 PSSL_CTX_set_timeout(PSSL_CTX *ctx, long time)
 {
-	const Message::Result *msg = ctx->cs->waitForReply(
-	    Message::CTX_SET_TIMEOUT, &time, sizeof(time));
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
 		abort();
-	return (msg->ret);
+
+	MessageRef ref = cs->waitForReply(Message::CTX_SET_TIMEOUT, ctx->target,
+	    &time, sizeof(time));
+	if (!ref)
+		abort();
+	return (ref.result()->ret);
 }
 
 /*
@@ -613,14 +702,26 @@ X509 *
 PSSL_CTX_get0_certificate(const PSSL_CTX *ctxc)
 {
 	PSSL_CTX *ctx = const_cast<PSSL_CTX *>(ctxc);
-	const Message::Result *msg = ctx->cs->waitForReply(
-	    Message::CTX_GET0_CERTIFICATE);
-	if (msg == nullptr)
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_GET0_CERTIFICATE,
+		    ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::CTX_GET0_CERTIFICATE,
+	    ctx->target);
+	if (!ref)
 		return (nullptr);
+	const Message::Result *msg = ref.result();
 	if (msg->error != SSL_ERROR_NONE)
 		return (nullptr);
-	if (msg->bodyLength() == 0)
+	if (msg->bodyLength() == 0) {
+		PROCerr(PROC_F_SSL_CTX_GET0_CERTIFICATE, ERR_R_BAD_MESSAGE);
+		ERR_add_error_data(1, "empty reply body");
 		return (nullptr);
+	}
 	const unsigned char *data =
 	    reinterpret_cast<const unsigned char *>(msg->body());
 	X509 *cert = d2i_X509(NULL, &data, msg->bodyLength());
@@ -635,8 +736,11 @@ void
 PSSL_CTX_set_client_cert_cb(PSSL_CTX *ctx,
     int (*cb)(PSSL *, X509 **, EVP_PKEY **))
 {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
 	ctx->client_cert_cb = cb;
-	(void)ctx->cs->waitForReply(cb == nullptr ?
-	    Message::CTX_DISABLE_CLIENT_CERT_CB :
-	    Message::CTX_ENABLE_CLIENT_CERT_CB);
+	cs->waitForReply(cb == nullptr ? Message::CTX_DISABLE_CLIENT_CERT_CB :
+	    Message::CTX_ENABLE_CLIENT_CERT_CB, ctx->target);
 }

@@ -35,17 +35,8 @@
 #include <openssl/ssl.h>
 
 #include <Messages.h>
-#include <MessageBuffer.h>
 #include "LibMessageSocket.h"
 #include "sslproc_internal.h"
-
-bool
-LibMessageSocket::init()
-{
-	if (!replyBuffer.grow(64))
-		return (false);
-	return (true);
-}
 
 void
 LibMessageSocket::observeReadError(enum ReadError error,
@@ -54,6 +45,9 @@ LibMessageSocket::observeReadError(enum ReadError error,
 	char tmp[16];
 
 	switch (error) {
+	case NO_BUFFER:
+		PROCerr(PROC_F_READ_MESSAGE, ERR_R_NO_BUFFER);
+		break;
 	case READ_ERROR:
 		PROCerr(PROC_F_RECVMSG, ERR_R_IO_ERROR);
 		ERR_add_error_data(1, strerror(errno));
@@ -85,62 +79,78 @@ LibMessageSocket::observeWriteError()
 	ERR_add_error_data(1, strerror(errno));
 }
 
-const Message::Result *
-LibMessageSocket::waitForReply(enum Message::Type type,
+MessageRef
+LibMessageSocket::waitForReply(enum Message::Type type, int target,
     const struct iovec *iov, int iovCnt)
 {
 	if (ERR_peek_error() != 0)
-		return (nullptr);
-	if (!writeMessage(type, iov, iovCnt))
-		return (nullptr);
+		return {};
+	if (!writeMessage(type, target, iov, iovCnt))
+		return {};
 	return (_waitForReply(type));
 }
 
-const Message::Result *
+MessageRef
+LibMessageSocket::waitForReply(enum Message::Type type, int target,
+    const void *payload, size_t payloadLen)
+{
+	if (ERR_peek_error() != 0)
+		return {};
+	if (!writeMessage(type, target, payload, payloadLen))
+		return {};
+	return (_waitForReply(type));
+}
+
+MessageRef
 LibMessageSocket::waitForReply(enum Message::Type type, const void *payload,
     size_t payloadLen, const void *control, size_t controlLen)
 {
 	if (ERR_peek_error() != 0)
-		return (nullptr);
+		return {};
 	if (!writeMessage(type, payload, payloadLen, control, controlLen))
-		return (nullptr);
+		return {};
 	return (_waitForReply(type));
 }
 
-const Message::Result *
+MessageRef
 LibMessageSocket::_waitForReply(enum Message::Type type)
 {
 	for (;;) {
-		int rc = readMessage(replyBuffer);
-
+		MessageRef ref;
+		int rc = readMessage(ref);
 		if (rc == 0) {
 			PROCerr(PROC_F_WAIT_FOR_REPLY, ERR_R_UNEXPECTED_EOF);
-			return (nullptr);
+			return {};
 		}
 		if (rc == -1)
-			return (nullptr);
+			return {};
 
-		const Message::Header *hdr = replyBuffer.hdr();
+		const Message::Header *hdr = ref.hdr();
 		if (hdr->type == Message::RESULT) {
 			char tmp[16], tmp2[16];
-			const Message::Result *result =
-			    reinterpret_cast<const Message::Result *>(hdr);
+			const Message::Result *result = ref.result();
+
+			if (result == nullptr) {
+				PROCerr(PROC_F_WAIT_FOR_REPLY,
+				    ERR_R_BAD_MESSAGE);
+				ERR_add_error_data(1, "reply too short");
+				return {};
+			}
 
 			if (result->error != SSL_ERROR_NONE)
 				setMessageError(result);
 
 			if (result->request == type)
-			    return (result);
+				return (ref);
 
 			PROCerr(PROC_F_WAIT_FOR_REPLY, ERR_R_MISMATCHED_REPLY);
 			snprintf(tmp, sizeof(tmp), "%d", type);
 			snprintf(tmp2, sizeof(tmp2), "%d", result->request);
 			ERR_add_error_data(4, "expected ", tmp, " got ", tmp2);
-			return (nullptr);
+			return {};
 		}
 
-		if (!handleMessage(hdr))
-			return (nullptr);
+		handleMessage(hdr);
 	}
 }
 

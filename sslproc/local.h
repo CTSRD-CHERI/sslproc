@@ -32,17 +32,4 @@
 
 #pragma once
 
-#include <openssl/ssl.h>
-
 bool	initOpenSSL();
-int	servername_cb(SSL *, int *, void *);
-int	client_hello_cb(SSL *, int *, void *);
-int	srp_username_cb(SSL *, int *, void *);
-int	sess_new_cb(SSL *, SSL_SESSION *);
-void	sess_remove_cb(SSL_CTX *, SSL_SESSION *);
-SSL_SESSION *sess_get_cb(SSL *, const unsigned char *, int, int *);
-DH	*tmp_dh_cb(SSL *, int, int);
-void	info_cb(const SSL *, int, int);
-int	alpn_select_cb(SSL *, const unsigned char **, unsigned char *,
-    const unsigned char *, unsigned int, void *);
-int	client_cert_cb(SSL *, X509 **, EVP_PKEY **);

@@ -43,19 +43,21 @@ ControlSocket::~ControlSocket()
 }
 
 bool
-ControlSocket::createContext(const PSSL_METHOD *method)
+ControlSocket::init()
 {
-	const Message::Result *reply = waitForReply(Message::CREATE_CONTEXT,
-	    &method->method, sizeof(method->method));
-	if (reply == nullptr)
+	/* Control socket messages don't recurse. */
+	if (!allocateMessages(1, 64))
 		return (false);
-	if (reply->ret != 0)
+
+	MessageRef ref = waitForReply(Message::NOP);
+	if (!ref)
 		return (false);
+
 	return (true);
 }
 
 bool
-ControlSocket::createSession(int sessionFd)
+ControlSocket::createCommandSocket(int fd)
 {
 	union {
 		struct cmsghdr hdr;
@@ -69,16 +71,15 @@ ControlSocket::createSession(int sessionFd)
 	cmsg->cmsg_type = SCM_RIGHTS;
 	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
 	fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
-	fds[0] = sessionFd;
-	const Message::Result *reply = waitForReply(Message::CREATE_SESSION,
+	fds[0] = fd;
+	MessageRef ref = waitForReply(Message::CREATE_COMMAND_SOCKET,
 	    nullptr, 0, &cmsgbuf, sizeof(cmsgbuf));
-	if (reply == nullptr)
+	if (!ref)
 		return (false);
-	return (reply->ret == 0);
+	return (ref.result()->ret == 0);
 }
 
-bool
+void
 ControlSocket::handleMessage(const Message::Header *hdr)
 {
-	return (false);
 }

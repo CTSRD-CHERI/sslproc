@@ -40,22 +40,55 @@
 #include "Messages.h"
 #include "MessageSocket.h"
 
-int
-MessageSocket::readMessage(MessageBuffer &buffer)
+MessageSocket::~MessageSocket()
 {
+	while (!messages.empty()) {
+		MessageBuffer *buffer = messages.top();
+		messages.pop();
+		delete buffer;
+	}
+}
+
+bool
+MessageSocket::allocateMessages(int count, size_t size, size_t controlSize)
+{
+	for (int i = 0; i < count; i++) {
+		MessageBuffer *buffer = new MessageBuffer();
+		if (!buffer->grow(size)) {
+			delete buffer;
+			return (false);
+		}
+		if (controlSize != 0 && !buffer->controlAlloc(controlSize)) {
+			delete buffer;
+			return (false);
+		}
+		freeMessage(buffer);
+	}
+	return (true);
+}
+
+int
+MessageSocket::readMessage(MessageRef &ref)
+{
+	MessageBuffer *buffer;
 	const Message::Header *hdr;
 	struct msghdr msg;
 	struct iovec iov[1];
 	ssize_t nread;
 
-	buffer.reset();
-	iov[0].iov_base = buffer.data();
-	iov[0].iov_len = buffer.capacity();
+	buffer = messages.top();
+	if (buffer == nullptr) {
+		observeReadError(NO_BUFFER, nullptr);
+		return (-1);
+	}
+	buffer->reset();
+	iov[0].iov_base = buffer->data();
+	iov[0].iov_len = buffer->capacity();
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 1;
-	msg.msg_control = buffer.controlData();
-	msg.msg_controllen = buffer.controlCapacity();
+	msg.msg_control = buffer->controlData();
+	msg.msg_controllen = buffer->controlCapacity();
 	msg.msg_flags = 0;
 	nread = recvmsg(fd, &msg, MSG_PEEK);
 	if (nread == 0)
@@ -64,26 +97,26 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 		observeReadError(READ_ERROR, nullptr);
 		return (-1);
 	}
-	buffer.setLength(nread);
+	buffer->setLength(nread);
 	assert(nread >= sizeof(*hdr));
 	if (msg.msg_flags & MSG_TRUNC) {
-		hdr = buffer.hdr();
+		hdr = buffer->hdr();
 		if (hdr->length >= sizeof(*hdr))
-			buffer.grow(hdr->length);
+			buffer->grow(hdr->length);
 	}
 
-	iov[0].iov_base = buffer.data();
-	iov[0].iov_len = buffer.capacity();
+	iov[0].iov_base = buffer->data();
+	iov[0].iov_len = buffer->capacity();
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 1;
-	msg.msg_control = buffer.controlData();
-	msg.msg_controllen = buffer.controlCapacity();
+	msg.msg_control = buffer->controlData();
+	msg.msg_controllen = buffer->controlCapacity();
 	msg.msg_flags = 0;
 	nread = recvmsg(fd, &msg, 0);
 	assert(nread > 0);
-	buffer.setLength(nread);
-	buffer.setControlLength(msg.msg_controllen);
+	buffer->setLength(nread);
+	buffer->setControlLength(msg.msg_controllen);
 	if (nread < sizeof(*hdr)) {
 		observeReadError(SHORT, nullptr);
 		errno = EBADMSG;
@@ -94,7 +127,7 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 		errno = EBADMSG;
 		return (-1);
 	}
-	hdr = buffer.hdr();
+	hdr = buffer->hdr();
 	if (hdr->length < sizeof(*hdr)) {
 		observeReadError(BAD_MSG_LENGTH, hdr);
 		errno = EBADMSG;
@@ -106,9 +139,18 @@ MessageSocket::readMessage(MessageBuffer &buffer)
 		return (-1);
 	}
 
-	buffer.setLength(nread);
-	buffer.setControlLength(msg.msg_controllen);
+	buffer->setLength(nread);
+	buffer->setControlLength(msg.msg_controllen);
+	messages.pop();
+	ref.reset(this, buffer);
 	return (1);
+}
+
+void
+MessageSocket::freeMessage(MessageBuffer *buffer)
+{
+	if (buffer != nullptr)
+		messages.push(buffer);
 }
 
 bool
@@ -133,8 +175,9 @@ MessageSocket::writeMessage(struct iovec *iov, int iovCnt, const void *control,
 }
 
 bool
-MessageSocket::writeMessage(enum Message::Type type, const void *payload,
-    size_t payloadLen, const void *control, size_t controlLen)
+MessageSocket::writeMessage(enum Message::Type type,
+    const void *payload, size_t payloadLen, const void *control,
+    size_t controlLen)
 {
 	Message::Header hdr;
 	struct iovec iov[2];
@@ -154,15 +197,38 @@ MessageSocket::writeMessage(enum Message::Type type, const void *payload,
 }
 
 bool
-MessageSocket::writeMessage(enum Message::Type type, const struct iovec *iov,
-    int iovCnt)
+MessageSocket::writeMessage(enum Message::Type type, int target,
+    const void *payload,  size_t payloadLen)
 {
-	Message::Header hdr;
+	Message::Targeted hdr;
+	struct iovec iov[2];
+	int cnt;
+
+	hdr.type = type;
+	hdr.length = sizeof(hdr) + payloadLen;
+	hdr.target = target;
+	iov[0].iov_base = &hdr;
+	iov[0].iov_len = sizeof(hdr);
+	iov[1].iov_base = const_cast<void *>(payload);
+	iov[1].iov_len = payloadLen;
+	if (payload == nullptr)
+		cnt = 1;
+	else
+		cnt = 2;
+	return (writeMessage(iov, cnt, nullptr, 0));
+}
+
+bool
+MessageSocket::writeMessage(enum Message::Type type, int target,
+    const struct iovec *iov, int iovCnt)
+{
+	Message::Targeted hdr;
 	struct iovec iov2[iovCnt + 1];
 	int i;
 
 	hdr.type = type;
 	hdr.length = sizeof(hdr);
+	hdr.target = target;
 	for (i = 0; i < iovCnt; i++)
 		hdr.length += iov[i].iov_len;
 	iov2[0].iov_base = &hdr;

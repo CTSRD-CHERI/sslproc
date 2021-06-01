@@ -30,23 +30,49 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
+#include "TargetStore.h"
 
-#include "LibMessageSocket.h"
-#include "sslproc.h"
+int
+TargetStore::allocate(TargetValue &&value)
+{
+	int next;
 
-class SSLSession : public LibMessageSocket {
-public:
-	SSLSession(PSSL *_ssl, int _fd) : LibMessageSocket(_fd), ssl(_ssl),
-					  fd(_fd) {};
-	~SSLSession();
+	for (next = lastTarget + 1;; next++) {
+		if (next == lastTarget)
+			abort();
 
-private:
-	bool handleMessage(const Message::Header *hdr);
+		if (next == NULL_TARGET)
+			continue;
 
-	DataBuffer readBuffer;
+		if (targets.find(next) == targets.end())
+			break;
+	}
 
-	PSSL *ssl;
+	targets.emplace(next, value);
+	lastTarget = next;
+	return (next);
+}
 
-	int fd;
-};
+bool
+TargetStore::insert(int target, TargetValue &&value)
+{
+	auto res = targets.emplace(target, value);
+	return (res.second);
+}
+
+void *
+TargetStore::lookup(int target, const std::type_info &type)
+{
+	auto it = targets.find(target);
+	if (it == targets.end())
+		return (nullptr);
+	if (it->second.type != type)
+		return (nullptr);
+	return (it->second.pointer);
+}
+
+void
+TargetStore::remove(int target)
+{
+	targets.erase(target);
+}

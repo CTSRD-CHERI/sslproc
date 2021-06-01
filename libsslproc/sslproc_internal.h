@@ -52,6 +52,14 @@ int	POPENSSL_init_ssl(void);
 extern int PROC_lib;
 void	PERR_init(void);
 
+class CommandSocket;
+
+CommandSocket *currentCommandSocket();
+
+class TargetStore;
+
+extern TargetStore targets;
+
 __END_DECLS
 
 #define	PROCerr(f,r)	ERR_PUT_error(PROC_lib, (f), (r), __FILE__, __LINE__)
@@ -69,11 +77,30 @@ __END_DECLS
 #define	PROC_F_SSL_CTX_USE_PRIVATEKEY	11
 #define	PROC_F_SSL_CTX_USE_PRIVATEKEY_ASN1	12
 #define	PROC_F_SSL_CTX_USE_PRIVATEKEY_FILE	13
-#define	PROC_F_SSL_HANDLE_MESSAGE	14
+#define	PROC_F_CMDSOCK_HANDLE_MESSAGE	14
 #define	PROC_F_SSL_READ			15
 #define	PROC_F_D2I_SSL_SESSION		16
 #define	PROC_F_SSL_CTX_SET_CIPHER_LIST	17
 #define	PROC_F_SSL_CTX_SET_CIPHERSUITES	18
+#define	PROC_F_CONTROLSOCKET_INIT	19
+#define	PROC_F_CREATECOMMANDSOCKET	20
+#define	PROC_F_SSL_CTX_CTRL		21
+#define	PROC_F_SSL_CTX_CHECK_PRIVATE_KEY	22
+#define	PROC_F_SSL_CTX_SET_SRP_USERNAME_CALLBACK	23
+#define	PROC_F_SSL_CTX_GET0_CERTIFICATE	24
+#define	PROC_F_SSL_CTRL			25
+#define	PROC_F_SSL_GET_PEER_CERTIFICATE	26
+#define	PROC_F_SSL_GET_VERIFY_RESULT	27
+#define	PROC_F_SSL_GET_SRP_USERNAME	28
+#define	PROC_F_SSL_GET_SRP_USERINFO	29
+#define	PROC_F_SSL_FETCH_CIPHER		30
+#define	PROC_F_SSL_SET_SESSION_ID_CONTEXT	31
+#define	PROC_F_SSL_DO_HANDSHAKE		32
+#define	PROC_F_SSL_ACCEPT		33
+#define	PROC_F_SSL_CONNECT		34
+#define	PROC_F_SSL_GET_SERVERNAME	35
+#define	PROC_F_SSL_WRITE		36
+#define	PROC_F_SSL_SHUTDOWN		37
 
 #define	ERR_R_IO_ERROR		(128|ERR_R_FATAL)
 #define	ERR_R_BAD_MESSAGE	(129|ERR_R_FATAL)
@@ -81,6 +108,9 @@ __END_DECLS
 #define	ERR_R_MISMATCHED_REPLY	(131|ERR_R_FATAL)
 #define	ERR_R_MESSAGE_ERROR	(132)
 #define	ERR_R_BAD_VERSION	(133|ERR_R_FATAL)
+#define	ERR_R_NO_BUFFER		(134|ERR_R_FATAL)
+#define	ERR_R_MISSING_TARGET	(135|ERR_R_FATAL)
+#define	ERR_R_NO_COMMAND_SOCKET	(136|ERR_R_FATAL)
 
 /* SSL_METHOD */
 
@@ -110,7 +140,6 @@ struct _PSSL_SESSION {
 
 /* SSL_CTX */
 
-class ControlSocket;
 struct _PSSL;
 
 struct session_map_key {
@@ -147,7 +176,7 @@ namespace std {
 }
 
 struct _PSSL_CTX {
-	ControlSocket *cs;
+	int target;
 	CRYPTO_EX_DATA ex_data;
 	X509 *get0_cert;
 	int (*servername_cb)(struct _PSSL *, int *, void *);
@@ -173,14 +202,12 @@ struct _PSSL_CTX {
 
 /* SSL */
 
-class SSLSession;
-
 struct _PSSL {
+	int target;
 	struct _PSSL_CTX *ctx;
 	CRYPTO_EX_DATA ex_data;
 	BIO *rbio;
 	BIO *wbio;
-	SSLSession *ss;
 	char *servername;
 	char *srp_username;
 	char *srp_userinfo;

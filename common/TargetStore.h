@@ -32,24 +32,50 @@
 
 #pragma once
 
-#include <Messages.h>
-#include <MessageSocket.h>
+#include <typeinfo>
+#include <unordered_map>
 
-class LibMessageSocket : public MessageSocket {
+/*
+ * Some requests can accept a NULL target (e.g. SSL_CTX_ctrl).
+ * NULL_TARGET is reserved as a marker for these cases.
+ */
+#define	NULL_TARGET	0
+
+class TargetStore {
 public:
-	LibMessageSocket(int fd) : MessageSocket(fd) {}
-	MessageRef waitForReply(enum Message::Type type, int target,
-	    const struct iovec *iov, int iovCnt);
-	MessageRef waitForReply(enum Message::Type type, int target,
-	    const void *payload = nullptr, size_t payloadLen = 0);
-	MessageRef waitForReply(enum Message::Type type,
-	    const void *payload = nullptr, size_t payloadLen = 0,
-	    const void *control = nullptr, size_t controlLen = 0);
+	TargetStore()
+	{}
+
+	/* Allocate a new handle associated with an object. */
+	template <class T>
+	int allocate(T *obj)
+	{ return (allocate(TargetValue(typeid(T *), obj))); }
+
+	/* Insert a new mapping for an existing handle. */
+	template <class T>
+	bool insert(int target, T *obj)
+	{ return (insert(target, TargetValue(typeid(T *), obj))); }
+
+	/* Lookup objects by handle. */
+	template <class T>
+	T *lookup(int target)
+	{ return (reinterpret_cast<T *>(lookup(target, typeid(T *)))); }
+
+	void remove(int target);
 private:
-	MessageRef _waitForReply(enum Message::Type type);
-	virtual void handleMessage(const Message::Header *hdr) = 0;
-	virtual void observeReadError(enum ReadError error,
-	    const Message::Header *hdr);
-	virtual void observeWriteError();
-	void setMessageError(const Message::Result *msg);
+	struct TargetValue {
+		TargetValue(const std::type_info &t, void *p)
+		    : type(t), pointer(p)
+		{}
+
+		const std::type_info &type;
+		void *pointer;
+	};
+
+	int allocate(TargetValue &&value);
+	bool insert(int target, TargetValue &&value);
+	void *lookup(int target, const std::type_info &type);
+
+	std::unordered_map<int, TargetValue> targets;
+	int lastTarget;
 };

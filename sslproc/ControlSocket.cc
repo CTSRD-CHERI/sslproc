@@ -41,16 +41,15 @@
 #include "local.h"
 #include "KEvent.h"
 #include "Messages.h"
-#include "MessageBuffer.h"
 #include "MessageSocket.h"
 #include "ControlSocket.h"
-#include "SSLSession.h"
+#include "CommandSocket.h"
 
 bool
 ControlSocket::init()
 {
-	if (!inputBuffer.grow(64) ||
-	    !inputBuffer.controlAlloc(CMSG_SPACE(sizeof(int))))
+	/* Control socket messages don't recurse. */
+	if (!allocateMessages(1, 64, CMSG_SPACE(sizeof(int))))
 		return (false);
 	if (!readEvent.init())
 		return (false);
@@ -67,423 +66,13 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 	case Message::NOP:
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case Message::CREATE_CONTEXT:
-	{
-		if (hdr->length != sizeof(Message::CreateContext)) {
-			writeErrnoReply(hdr->type, -1, EMSGSIZE);
-			break;
-		}
-		if (ctx != nullptr) {
-			writeErrnoReply(hdr->type, -1, EBUSY);
-			break;
-		}
-
-		const Message::CreateContext *msg =
-		    reinterpret_cast<const Message::CreateContext *>(hdr);
-		const SSL_METHOD *method = nullptr;
-		switch (msg->method) {
-		case Message::METHOD_TLS:
-			method = TLS_method();
-			break;
-		case Message::METHOD_TLS_SERVER:
-			method = TLS_server_method();
-			break;
-		case Message::METHOD_TLS_CLIENT:
-			method = TLS_client_method();
-			break;
-		}
-		if (method == nullptr) {
-			writeErrnoReply(hdr->type, -1, EINVAL);
-			break;
-		}
-
-		ctx = SSL_CTX_new(method);
-		if (ctx == NULL)
-			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
-		else
-			writeReplyMessage(hdr->type, 0);
-		break;
-	}
-	case Message::CTX_SET_OPTIONS:
-	case Message::CTX_CLEAR_OPTIONS:
-	{
-		if (hdr->length != sizeof(Message::Options)) {
-			writeErrnoReply(hdr->type, -1, EMSGSIZE);
-			break;
-		}
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		const Message::Options *msg =
-		    reinterpret_cast<const Message::Options *>(hdr);
-		long options;
-
-		if (hdr->type == Message::CTX_SET_OPTIONS)
-			options = SSL_CTX_set_options(ctx, msg->options);
-		else
-			options = SSL_CTX_clear_options(ctx, msg->options);
-		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
-		break;
-	}
-	case Message::CTX_GET_OPTIONS:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		long options = SSL_CTX_get_options(ctx);
-		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
-		break;
-	}
-	case Message::CTX_CTRL:
-	{
-		if (hdr->length < sizeof(Message::Ctrl)) {
-			writeErrnoReply(hdr->type, -1, EMSGSIZE);
-			break;
-		}
-
-		const Message::Ctrl *msg =
-		    reinterpret_cast<const Message::Ctrl *>(hdr);
-		long ret;
-
-		switch (msg->cmd) {
-		case SSL_CTRL_SET_MIN_PROTO_VERSION:
-		case SSL_CTRL_SET_MAX_PROTO_VERSION:
-		case SSL_CTRL_GET_MIN_PROTO_VERSION:
-		case SSL_CTRL_GET_MAX_PROTO_VERSION:
-		case SSL_CTRL_MODE:
-		case SSL_CTRL_CLEAR_MODE:
-		case SSL_CTRL_SET_SESS_CACHE_MODE:
-		case SSL_CTRL_GET_SESS_CACHE_MODE:
-			ret = SSL_CTX_ctrl(ctx, msg->cmd, msg->larg, nullptr);
-			writeReplyMessage(hdr->type, ret);
-			break;
-		case SSL_CTRL_SET_TMP_DH:
-		{
-			const unsigned char *pp =
-			    reinterpret_cast<const unsigned char *>
-			    (msg->body());
-			DH *dh = d2i_DHparams(nullptr, &pp, msg->bodyLength());
-			if (dh == nullptr) {
-				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
-				break;
-			}
-			ret = SSL_CTX_set_tmp_dh(ctx, dh);
-			DH_free(dh);
-			if (ret == 0)
-				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
-			else
-				writeReplyMessage(hdr->type, ret);
-			break;
-		}
-		default:
-			writeErrnoReply(hdr->type, -1, EOPNOTSUPP);
-			break;
-		}
-		break;
-	}
-	case Message::CTX_USE_CERTIFICATE_ASN1:
-	{
-		if (hdr->bodyLength() == 0) {
-			writeErrnoReply(hdr->type, -1, EMSGSIZE);
-			break;
-		}
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		int ret = SSL_CTX_use_certificate_ASN1(ctx, hdr->bodyLength(),
-		    reinterpret_cast<const unsigned char *>(hdr->body()));
-		if (ret != 1)
-			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
-		else
-			writeReplyMessage(hdr->type, 1);
-		break;
-	}
-	case Message::CTX_USE_PRIVATEKEY_ASN1:
-	{
-		if (hdr->length <= sizeof(Message::PKey)) {
-			writeErrnoReply(hdr->type, -1, EMSGSIZE);
-			break;
-		}
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		const Message::PKey *msg =
-		    reinterpret_cast<const Message::PKey *>(hdr);
-		int ret = SSL_CTX_use_PrivateKey_ASN1(msg->pktype, ctx,
-		    reinterpret_cast<const unsigned char *>(msg->key()),
-		    msg->keyLength());
-		if (ret != 1)
-			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
-		else
-			writeReplyMessage(hdr->type, 1);
-		break;
-	}
-	case Message::CTX_CHECK_PRIVATE_KEY:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		int ret = SSL_CTX_check_private_key(ctx);
-		if (ret != 1)
-			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
-		else
-			writeReplyMessage(hdr->type, 1);
-		break;
-	}
-	case Message::CTX_ENABLE_SERVERNAME_CB:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		int ret = SSL_CTX_set_tlsext_servername_callback(ctx,
-		    servername_cb);
-		writeReplyMessage(hdr->type, ret);
-		break;
-	}
-	case Message::CTX_DISABLE_SERVERNAME_CB:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		int ret = SSL_CTX_set_tlsext_servername_callback(ctx, nullptr);
-		writeReplyMessage(hdr->type, ret);
-		break;
-	}
-	case Message::CTX_ENABLE_CLIENT_HELLO_CB:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_client_hello_cb(ctx, client_hello_cb, nullptr);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	}
-	case Message::CTX_DISABLE_CLIENT_HELLO_CB:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_client_hello_cb(ctx, nullptr, nullptr);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	}
-	case Message::CTX_ENABLE_SRP_USERNAME_CB:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_srp_username_callback(ctx, srp_username_cb);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	}
-	case Message::CTX_DISABLE_SRP_USERNAME_CB:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_srp_username_callback(ctx, nullptr);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	}
-	case Message::CTX_ENABLE_SESS_CBS:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-		SSL_CTX_sess_set_new_cb(ctx, sess_new_cb);
-		SSL_CTX_sess_set_remove_cb(ctx, sess_remove_cb);
-		SSL_CTX_sess_set_get_cb(ctx, sess_get_cb);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CTX_DISABLE_SESS_CBS:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-		SSL_CTX_sess_set_new_cb(ctx, nullptr);
-		SSL_CTX_sess_set_remove_cb(ctx, nullptr);
-		SSL_CTX_sess_set_get_cb(ctx, nullptr);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CTX_ENABLE_TMP_DH_CB:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_tmp_dh_callback(ctx, tmp_dh_cb);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CTX_DISABLE_TMP_DH_CB:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_tmp_dh_callback(ctx, nullptr);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CTX_ENABLE_INFO_CB:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_info_callback(ctx, info_cb);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CTX_DISABLE_INFO_CB:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_info_callback(ctx, nullptr);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CTX_ENABLE_ALPN_SELECT_CB:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_alpn_select_cb(ctx, alpn_select_cb, nullptr);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CTX_DISABLE_ALPN_SELECT_CB:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_alpn_select_cb(ctx, nullptr, nullptr);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CTX_SET_CIPHER_LIST:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, 0, ENXIO);
-			break;
-		}
-
-		char *s = strndup(reinterpret_cast<const char *>(hdr->body()),
-		    hdr->bodyLength());
-		int ret = SSL_CTX_set_cipher_list(ctx, s);
-		free(s);
-		if (ret == 0)
-			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
-		else
-			writeReplyMessage(hdr->type, ret);
-		break;
-	}
-	case Message::CTX_SET_CIPHERSUITES:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, 0, ENXIO);
-			break;
-		}
-
-		char *s = strndup(reinterpret_cast<const char *>(hdr->body()),
-		    hdr->bodyLength());
-		int ret = SSL_CTX_set_ciphersuites(ctx, s);
-		free(s);
-		if (ret == 0)
-			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
-		else
-			writeReplyMessage(hdr->type, ret);
-		break;
-	}
-	case Message::CTX_SET_TIMEOUT:
-	{
-		long time;
-
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		if (hdr->bodyLength() != sizeof(time)) {
-			syslog(LOG_WARNING,
-		    "invalid message size for Message::CTX_SET_TIMEOUT");
-			writeErrnoReply(hdr->type, -1, EMSGSIZE);
-			break;
-		}
-
-		time = *reinterpret_cast<const long *>(hdr->body());
-		long ret = SSL_CTX_set_timeout(ctx, time);
-		writeReplyMessage(hdr->type, ret);
-		break;
-	}
-	case Message::CTX_GET0_CERTIFICATE:
-	{
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		X509 *cert = SSL_CTX_get0_certificate(ctx);
-		if (cert == nullptr) {
-			writeReplyMessage(hdr->type, 0);
-			break;
-		}
-
-		unsigned char *buf = NULL;
-		int len = i2d_X509(cert, &buf);
-		if (len < 0) {
-			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
-			break;
-		}
-		writeReplyMessage(hdr->type, 0, buf, len);
-		OPENSSL_free(buf);
-		break;
-	}
-	case Message::CTX_ENABLE_CLIENT_CERT_CB:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_client_cert_cb(ctx, client_cert_cb);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CTX_DISABLE_CLIENT_CERT_CB:
-		if (ctx == nullptr) {
-			writeErrnoReply(hdr->type, -1, ENXIO);
-			break;
-		}
-
-		SSL_CTX_set_client_cert_cb(ctx, nullptr);
-		writeReplyMessage(hdr->type, 0);
-		break;
-	case Message::CREATE_SESSION:
+	case Message::CREATE_COMMAND_SOCKET:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
 		    cmsg->cmsg_type != SCM_RIGHTS ||
 		    cmsg->cmsg_len != CMSG_LEN(sizeof(int))) {
 			syslog(LOG_WARNING,
-		    "invalid control message for Message::CREATE_SESSION");
+	    "invalid control message for Message::CREATE_COMMAND_SOCKET");
 			writeErrnoReply(hdr->type, -1, EBADMSG);
 			break;
 		}
@@ -501,10 +90,10 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			break;
 		}
 
-		SSLSession *ss = new SSLSession(kq, fds[0]);
-		if (!ss->init(ctx)) {
-			syslog(LOG_WARNING, "failed to init SSL sesssion");
-			delete ss;
+		CommandSocket *cs = new CommandSocket(kq, fds[0]);
+		if (!cs->init()) {
+			syslog(LOG_WARNING, "failed to init command socket");
+			delete cs;
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
 		}
@@ -526,16 +115,18 @@ ControlSocket::onEvent(const struct kevent *kevent)
 
 	resid = kevent->data;
 	while (resid > 0) {
-		rc = readMessage(inputBuffer);
+		MessageRef ref;
+
+		rc = readMessage(ref);
 		if (rc == 0)
 			exit(0);
 		if (rc == -1)
 			exit(1);
 
-		assert(inputBuffer.length() <= resid);
-		resid -= inputBuffer.length();
+		assert(ref.length() <= resid);
+		resid -= ref.length();
 
-		handleMessage(inputBuffer.hdr(), inputBuffer.cmsg());
+		handleMessage(ref.hdr(), ref.cmsg());
 	}
 }
 
@@ -544,6 +135,9 @@ ControlSocket::observeReadError(enum ReadError error,
     const Message::Header *hdr)
 {
 	switch (error) {
+	case NO_BUFFER:
+		syslog(LOG_WARNING, "out of message buffers on control socket");
+		break;
 	case READ_ERROR:
 		syslog(LOG_WARNING, "failed to read from control socket: %m");
 		break;

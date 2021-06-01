@@ -71,6 +71,13 @@ public:
 		return reinterpret_cast<const Message::Header *>(data());
 	}
 
+	const Message::Result *result()
+	{
+		if (length() < sizeof(Message::Result))
+			return (nullptr);
+		return reinterpret_cast<const Message::Result *>(data());
+	}
+
 	/* Control message. */
 	bool controlAlloc(size_t amount) { return control.grow(amount); }
 	void *controlData() { return control.data(); }

@@ -37,14 +37,25 @@
  */
 namespace Message {
 	enum Type {
+		/* Messages without a target. */
 		NOP = 0x0001,
 		RESULT,
+
+		/*
+		 * Special message sent only on the control socket to
+		 * allocate a command socket.  Each client thread or
+		 * process needs its own command socket.
+		 */
+		CREATE_COMMAND_SOCKET,
+
+		/* Returns a target for the created context. */
 		CREATE_CONTEXT,
 
 		/* Operations on an SSL_CTX. */
+		FREE_CONTEXT = 0x100,
 
 		/* These three return 'long options' on success. */
-		CTX_SET_OPTIONS = 0x100,
+		CTX_SET_OPTIONS,
 		CTX_CLEAR_OPTIONS,
 		CTX_GET_OPTIONS,
 
@@ -77,16 +88,17 @@ namespace Message {
 		CTX_ENABLE_CLIENT_CERT_CB,
 		CTX_DISABLE_CLIENT_CERT_CB,
 
-		/* Includes session fd in an SCM_RIGHTS control message. */
+		/* Returns a target for the created session. */
 		CREATE_SESSION,
 
 		/* Operations on an SSL. */
+		FREE_SESSION = 0x200,
 
 		/*
 		 * The result of these messages return the return
 		 * value of the associated SSL_* function in 'ret'.
 		 */
-		CONNECT = 0x200,
+		CONNECT,
 		DO_HANDSHAKE,
 		ACCEPT,
 		SHUTDOWN,
@@ -184,11 +196,37 @@ namespace Message {
 		enum ContextMethod method;
 	};
 
+	/* Body for messages targeted at an object. */
+	struct Targeted : public Header {
+		int target;
+#if __SIZEOF_LONG__ == 8
+		/*
+		 * This ensures message bodies containing longs or
+		 * pointers are aligned when the body is written in a
+		 * separate iovec from the the header.  Note that
+		 * using "alignas(void *)" doesn't work as subclasses
+		 * of this feel free to move their members into the
+		 * padding without an explicit pad0 field.
+		 */
+		int pad0;
+#endif
+
+		size_t bodyLength() const
+		{
+			return (length - sizeof(Targeted));
+		}
+
+		const void *body() const
+		{
+			return (this + 1);
+		}
+	};
+
 	/*
 	 * Body for CTX_SET_OPTIONS and
 	 * CTX_CLEAR_OPTIONS.
 	 */
-	struct Options : public Header {
+	struct Options : public Targeted {
 		long	options;
 	};
 
@@ -201,7 +239,7 @@ namespace Message {
 		long	larg;
 	};
 
-	struct Ctrl : public Header, CtrlBody {
+	struct Ctrl : public Targeted, CtrlBody {
 		size_t bodyLength() const
 		{
 			return (length - sizeof(Ctrl));
@@ -214,7 +252,7 @@ namespace Message {
 	};
 
 	/* Body for CTX_USE_PRIVATEKEY_ASN1 */
-	struct PKey : public Header {
+	struct PKey : public Targeted {
 		int	pktype;
 
 		size_t keyLength() const
@@ -231,7 +269,7 @@ namespace Message {
 	/*
 	 * Body for READ and BIO_READ.
 	 */
-	struct Read : public Header {
+	struct Read : public Targeted {
 		int	resid;		/* Max amount of data requested. */
 	};
 
@@ -239,7 +277,7 @@ namespace Message {
 	 * Body for MSG_CB.  The message buffer is stored in
 	 * the body.
 	 */
-	struct MsgCb : public Header {
+	struct MsgCb : public Targeted {
 		int	write_p;
 		int	version;
 		int	content_type;
@@ -256,7 +294,7 @@ namespace Message {
 	};
 
 	/* Body for SESS_NEW_CB. */
-	struct SessNewCb : public Header {
+	struct SessNewCb : public Targeted {
 		long	time;
 		int	compress_id;
 		unsigned int id_len;
@@ -274,14 +312,14 @@ namespace Message {
 	};
 
 	/* Body for TMP_DH_CB. */
-	struct TmpDhCb : public Header {
+	struct TmpDhCb : public Targeted {
 		int	is_export;
 		int	keylength;
 	};
 
 
 	/* Body for INFO_CB. */
-	struct InfoCb : public Header {
+	struct InfoCb : public Targeted {
 		int	where;
 		int	ret;
 	};

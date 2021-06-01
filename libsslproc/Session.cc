@@ -37,8 +37,8 @@
 
 #include "sslproc.h"
 #include "sslproc_internal.h"
-#include "ControlSocket.h"
-#include "SSLSession.h"
+#include "CommandSocket.h"
+#include "TargetStore.h"
 
 /* XXX: The normal version of this does not work with C++. */
 #undef M_ASN1_free_of
@@ -206,10 +206,17 @@ i2d_PSSL_SESSION(PSSL_SESSION *in, unsigned char **pp)
 PSSL *
 PSSL_new(PSSL_CTX *ctx)
 {
-	POPENSSL_init_ssl();
+	if (POPENSSL_init_ssl() != 0)
+		return (nullptr);
 
 	if (ctx == nullptr) {
 		PROCerr(PROC_F_SSL_NEW, ERR_R_PASSED_NULL_PARAMETER);
+		return (nullptr);
+	}
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_NEW, ERR_R_NO_COMMAND_SOCKET);
 		return (nullptr);
 	}
 
@@ -232,21 +239,8 @@ PSSL_new(PSSL_CTX *ctx)
 		return (nullptr);
 	}
 
-	int fds[2];
-	if (socketpair(PF_LOCAL, SOCK_SEQPACKET, 0, fds) == -1) {
-		int save_error = errno;
-
-		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
-		delete ssl;
-		PSSL_CTX_free(ctx);
-		PROCerr(PROC_F_SSL_NEW, ERR_R_INTERNAL_ERROR);
-		ERR_add_error_data(2, "socketpair: ", strerror(save_error));
-		return (nullptr);
-	}
-
-	if (!ctx->cs->createSession(fds[1])) {
-		close(fds[0]);
-		close(fds[1]);
+	MessageRef ref = cs->waitForReply(Message::CREATE_SESSION, ctx->target);
+	if (!ref) {
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
 		delete ssl;
 		PSSL_CTX_free(ctx);
@@ -254,15 +248,25 @@ PSSL_new(PSSL_CTX *ctx)
 		ERR_add_error_data(1, "failed to create remote session");
 		return (nullptr);
 	}
-	close(fds[1]);
 
-	ssl->ss = new SSLSession(ssl, fds[0]);
-	if (!ssl->ss->init()) {
-		delete ssl->ss;
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE || msg->bodyLength() != sizeof(int)) {
+		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
+		delete ssl;
+		PSSL_CTX_free(ctx);
+		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_BAD_MESSAGE);
+		ERR_add_error_data(1, "failed to create remote session");
+		return (nullptr);
+	}
+
+	ssl->target = *reinterpret_cast<const int *>(msg->body());
+	if (!targets.insert(ssl->target, ssl)) {
+		cs->waitForReply(Message::FREE_SESSION, ssl->target);
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
 		delete ssl;
 		PSSL_CTX_free(ctx);
 		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "duplicate target");
 		return (nullptr);
 	}
 
@@ -299,13 +303,20 @@ PSSL_free(PSSL *ssl)
 	if (ssl->refs.fetch_sub(1, std::memory_order_relaxed) > 1)
 		return;
 
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+	MessageRef ref = cs->waitForReply(Message::FREE_SESSION, ssl->target);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		abort();
+	targets.remove(ssl->target);
+
 	PSSL_CTX *ctx = ssl->ctx;
 	free(ssl->pending_cipher.name);
 	free(ssl->current_cipher.name);
 	free(ssl->srp_userinfo);
 	free(ssl->srp_username);
 	free(ssl->servername);
-	delete ssl->ss;
 	BIO_free_all(ssl->wbio);
 	BIO_free_all(ssl->rbio);
 	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
@@ -316,21 +327,24 @@ PSSL_free(PSSL *ssl)
 long
 PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 {
+	CommandSocket *cs = currentCommandSocket();
 	Message::CtrlBody body;
-	const Message::Result *msg;
-	long ret;
 
 	body.cmd = cmd;
 	body.larg = larg;
 	switch (cmd) {
 	case SSL_CTRL_SET_MSG_CALLBACK_ARG:
 		ssl->msg_cb_arg = parg;
-		ret = 1;
-		break;
+		return (1);
 	case SSL_CTRL_SET_TLSEXT_HOSTNAME:
 	{
 		struct iovec iov[2];
 		int cnt;
+
+		if (cs == nullptr) {
+			PROCerr(PROC_F_SSL_CTRL, ERR_R_NO_COMMAND_SOCKET);
+			return (0);
+		}
 
 		iov[0].iov_base = &body;
 		iov[0].iov_len = sizeof(body);
@@ -341,16 +355,15 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 			cnt++;
 		}
 
-		msg = ssl->ss->waitForReply(Message::CTRL, iov, cnt);
-		if (msg == nullptr)
+		MessageRef ref = cs->waitForReply(Message::CTRL, ssl->target,
+		    iov, cnt);
+		if (!ref)
 			return (0);
-		ret = msg->ret;
-		break;
+		return (ref.result()->ret);
 	}
 	default:
 		abort();
 	}
-	return (ret);
 }
 
 int
@@ -380,22 +393,34 @@ PSSL_set_SSL_CTX(PSSL *ssl, PSSL_CTX *ctx)
 	/*
 	 * This is not easy to handle in the current model since each
 	 * context lives in a separate helper.
+	 *
+	 * TODO: Can now implement.
 	 */
 	return (NULL);
 }
 
 X509 *
-PSSL_get_peer_certificate(const PSSL *sslc)
+PSSL_get_peer_certificate(const PSSL *ssl)
 {
-	PSSL *ssl = const_cast<PSSL *>(sslc);
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::GET_PEER_CERTIFICATE);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_GET_PEER_CERTIFICATE,
+		    ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::GET_PEER_CERTIFICATE,
+	    ssl->target);
+	if (!ref)
 		return (nullptr);
+	const Message::Result *msg = ref.result();
 	if (msg->error != SSL_ERROR_NONE)
 		return (nullptr);
-	if (msg->bodyLength() == 0)
+	if (msg->bodyLength() == 0) {
+		PROCerr(PROC_F_SSL_GET_PEER_CERTIFICATE, ERR_R_BAD_MESSAGE);
+		ERR_add_error_data(1, "empty reply body");
 		return (nullptr);
+	}
 
 	const unsigned char *data =
 	    reinterpret_cast<const unsigned char *>(msg->body());
@@ -403,13 +428,19 @@ PSSL_get_peer_certificate(const PSSL *sslc)
 }
 
 long
-PSSL_get_verify_result(const PSSL *sslc)
+PSSL_get_verify_result(const PSSL *ssl)
 {
-	PSSL *ssl = const_cast<PSSL *>(sslc);
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::GET_VERIFY_RESULT);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_GET_VERIFY_RESULT, ERR_R_NO_COMMAND_SOCKET);
 		return (X509_V_ERR_UNSPECIFIED);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::GET_VERIFY_RESULT,
+	    ssl->target);
+	if (!ref)
+		return (X509_V_ERR_UNSPECIFIED);
+	const Message::Result *msg = ref.result();
 	if (msg->error != SSL_ERROR_NONE)
 		return (X509_V_ERR_UNSPECIFIED);
 	return (msg->ret);
@@ -418,18 +449,26 @@ PSSL_get_verify_result(const PSSL *sslc)
 void
 PSSL_set_verify_result(PSSL *ssl, long result)
 {
-	(void)ssl->ss->waitForReply(Message::SET_VERIFY_RESULT, &result,
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	cs->waitForReply(Message::SET_VERIFY_RESULT, ssl->target, &result,
 	    sizeof(result));
 }
 
 int
 PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos, unsigned int len)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::SET_ALPN_PROTOS, protos, len);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::SET_ALPN_PROTOS, ssl->target,
+	    protos, len);
+	if (!ref)
 		return (-1);
-	return (msg->ret);
+	return (ref.result()->ret);
 }
 
 /*
@@ -444,12 +483,24 @@ PSSL_get_srp_username(PSSL *ssl)
 	if (ssl->srp_username != nullptr)
 		return (ssl->srp_username);
 
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::GET_SRP_USERNAME);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_GET_SRP_USERNAME, ERR_R_NO_COMMAND_SOCKET);
 		return (nullptr);
-	if (msg->bodyLength() == 0)
+	}
+
+	MessageRef ref = cs->waitForReply(Message::GET_SRP_USERNAME,
+	    ssl->target);
+	if (!ref)
 		return (nullptr);
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		return (nullptr);
+	if (msg->bodyLength() == 0) {
+		PROCerr(PROC_F_SSL_GET_SRP_USERNAME, ERR_R_BAD_MESSAGE);
+		ERR_add_error_data(1, "empty reply body");
+		return (nullptr);
+	}
 	const char *name = reinterpret_cast<const char *>(msg->body());
 	ssl->srp_username = strndup(name, msg->bodyLength());
 	return (ssl->srp_username);
@@ -467,12 +518,24 @@ PSSL_get_srp_userinfo(PSSL *ssl)
 	if (ssl->srp_userinfo != nullptr)
 		return (ssl->srp_userinfo);
 
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::GET_SRP_USERINFO);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_GET_SRP_USERINFO, ERR_R_NO_COMMAND_SOCKET);
 		return (nullptr);
-	if (msg->bodyLength() == 0)
+	}
+
+	MessageRef ref = cs->waitForReply(Message::GET_SRP_USERINFO,
+	    ssl->target);
+	if (!ref)
 		return (nullptr);
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		return (nullptr);
+	if (msg->bodyLength() == 0) {
+		PROCerr(PROC_F_SSL_GET_SRP_USERINFO, ERR_R_BAD_MESSAGE);
+		ERR_add_error_data(1, "empty reply body");
+		return (nullptr);
+	}
 	const char *info = reinterpret_cast<const char *>(msg->body());
 	ssl->srp_userinfo = strndup(info, msg->bodyLength());
 	return (ssl->srp_userinfo);
@@ -481,11 +544,21 @@ PSSL_get_srp_userinfo(PSSL *ssl)
 static const PSSL_CIPHER *
 PSSL_fetch_cipher(PSSL *ssl, enum Message::Type request, PSSL_CIPHER *cipher)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(request);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_FETCH_CIPHER, ERR_R_NO_COMMAND_SOCKET);
 		return (nullptr);
-	if (msg->length < sizeof(Message::CipherResult))
+	}
+
+	MessageRef ref = cs->waitForReply(request, ssl->target);
+	if (!ref)
 		return (nullptr);
+	const Message::Result *msg = ref.result();
+	if (msg->length < sizeof(Message::CipherResult)) {
+		PROCerr(PROC_F_SSL_FETCH_CIPHER, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "reply too short");
+		return (nullptr);
+	}
 	const Message::CipherResult *cipherMsg =
 	    reinterpret_cast<const Message::CipherResult *>(msg);
 	cipher->bits = cipherMsg->bits;
@@ -519,27 +592,31 @@ int
 PSSL_set_session_id_context(PSSL *ssl, const unsigned char *ctx,
     unsigned int len)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::SET_SESSION_ID_CONTEXT, ctx, len);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_SET_SESSION_ID_CONTEXT,
+		    ERR_R_NO_COMMAND_SOCKET);
 		return (0);
-	return (msg->ret);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::SET_SESSION_ID_CONTEXT,
+	    ssl->target, ctx, len);
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
 }
 
 void
 PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *))
 {
-	if (ssl->msg_cb == cb)
-		return;
-	if (ssl->msg_cb == NULL) {
-		ssl->msg_cb = cb;
-		ssl->ss->waitForReply(Message::ENABLE_MSG_CB);
-	} else if (cb == NULL) {
-		ssl->ss->waitForReply(Message::DISABLE_MSG_CB);
-		ssl->msg_cb = NULL;
-	} else
-		ssl->msg_cb = cb;
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	ssl->msg_cb = cb;
+	cs->waitForReply(cb == nullptr ? Message::DISABLE_MSG_CB :
+	    Message::ENABLE_MSG_CB, ssl->target);
 }
 
 BIO *
@@ -626,27 +703,41 @@ PSSL_get_error(const PSSL *ssl, int i)
 void
 PSSL_set_connect_state(PSSL *ssl)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::SET_CONNECT_STATE);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::SET_CONNECT_STATE,
+	    ssl->target);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
 		abort();
 }
 
 void
 PSSL_set_accept_state(PSSL *ssl)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::SET_ACCEPT_STATE);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::SET_ACCEPT_STATE,
+	    ssl->target);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
 		abort();
 }
 
 int
 PSSL_is_server(PSSL *ssl)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::IS_SERVER);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::IS_SERVER, ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
 		abort();
 	return (msg->ret);
 }
@@ -654,12 +745,19 @@ PSSL_is_server(PSSL *ssl)
 int
 PSSL_do_handshake(PSSL *ssl)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::DO_HANDSHAKE);
-	if (msg == nullptr) {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_DO_HANDSHAKE, ERR_R_NO_COMMAND_SOCKET);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
+
+	MessageRef ref = cs->waitForReply(Message::DO_HANDSHAKE, ssl->target);
+	if (!ref) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	const Message::Result *msg = ref.result();
 	ssl->last_error = msg->error;
 	return (msg->ret);
 }
@@ -667,11 +765,19 @@ PSSL_do_handshake(PSSL *ssl)
 int
 PSSL_accept(PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(Message::ACCEPT);
-	if (msg == nullptr) {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_ACCEPT, ERR_R_NO_COMMAND_SOCKET);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
+
+	MessageRef ref = cs->waitForReply(Message::ACCEPT, ssl->target);
+	if (!ref) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	const Message::Result *msg = ref.result();
 	ssl->last_error = msg->error;
 	return (msg->ret);
 }
@@ -679,11 +785,19 @@ PSSL_accept(PSSL *ssl)
 int
 PSSL_connect(PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(Message::CONNECT);
-	if (msg == nullptr) {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CONNECT, ERR_R_NO_COMMAND_SOCKET);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
+
+	MessageRef ref = cs->waitForReply(Message::CONNECT, ssl->target);
+	if (!ref) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	const Message::Result *msg = ref.result();
 	ssl->last_error = msg->error;
 	return (msg->ret);
 }
@@ -691,8 +805,15 @@ PSSL_connect(PSSL *ssl)
 int
 PSSL_in_init(const PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(Message::IN_INIT);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::IN_INIT, ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
 		abort();
 	return (msg->ret);
 }
@@ -700,8 +821,15 @@ PSSL_in_init(const PSSL *ssl)
 int
 PSSL_in_before(const PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(Message::IN_BEFORE);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::IN_BEFORE, ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
 		abort();
 	return (msg->ret);
 }
@@ -709,9 +837,16 @@ PSSL_in_before(const PSSL *ssl)
 int
 PSSL_is_init_finished(const PSSL *ssl)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::IS_INIT_FINISHED);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::IS_INIT_FINISHED,
+	    ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
 		abort();
 	return (msg->ret);
 }
@@ -719,9 +854,15 @@ PSSL_is_init_finished(const PSSL *ssl)
 int
 PSSL_client_version(const PSSL *ssl)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::CLIENT_VERSION);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::CLIENT_VERSION, ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
 		abort();
 	return (msg->ret);
 }
@@ -754,8 +895,15 @@ PSSL_get_version(const PSSL *ssl)
 int
 PSSL_version(const PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(Message::VERSION);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::VERSION, ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
 		abort();
 	return (msg->ret);
 }
@@ -764,15 +912,25 @@ const char *
 PSSL_get_servername(const PSSL *sslc, const int type)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::GET_SERVERNAME_TYPE, &type,
-		sizeof(type));
-	if (msg == nullptr)
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_GET_SERVERNAME, ERR_R_NO_COMMAND_SOCKET);
 		return (nullptr);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::GET_SERVERNAME, ssl->target,
+	    &type, sizeof(type));
+	if (!ref)
+		return (nullptr);
+	const Message::Result *msg = ref.result();
 	if (msg->error != SSL_ERROR_NONE)
 		return (nullptr);
-	if (msg->bodyLength() == 0)
+	if (msg->bodyLength() == 0) {
+		PROCerr(PROC_F_SSL_GET_SERVERNAME, ERR_R_BAD_MESSAGE);
+		ERR_add_error_data(1, "empty reply body");
 		return (nullptr);
+	}
 	const char *name = reinterpret_cast<const char *>(msg->body());
 	if (ssl->servername != NULL &&
 	    strlen(ssl->servername) == msg->bodyLength() &&
@@ -786,9 +944,16 @@ PSSL_get_servername(const PSSL *sslc, const int type)
 int
 PSSL_get_servername_type(const PSSL *ssl)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::GET_SERVERNAME_TYPE);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::GET_SERVERNAME_TYPE,
+	    ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
 		abort();
 	return (msg->ret);
 }
@@ -796,13 +961,21 @@ PSSL_get_servername_type(const PSSL *ssl)
 int
 PSSL_read(PSSL *ssl, void *buf, int len)
 {
-	int resid = len;
-	const Message::Result *msg = ssl->ss->waitForReply(Message::READ,
-	    &resid, sizeof(resid));
-	if (msg == nullptr) {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_READ, ERR_R_NO_COMMAND_SOCKET);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
+
+	int resid = len;
+	MessageRef ref = cs->waitForReply(Message::READ, ssl->target, &resid,
+	    sizeof(resid));
+	if (!ref) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	const Message::Result *msg = ref.result();
 	if (msg->ret > 0) {
 		char tmp[16], tmp2[16];
 
@@ -833,12 +1006,20 @@ PSSL_read(PSSL *ssl, void *buf, int len)
 int
 PSSL_write(PSSL *ssl, const void *buf, int len)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(Message::WRITE, buf,
-	    len);
-	if (msg == nullptr) {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_WRITE, ERR_R_NO_COMMAND_SOCKET);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
+
+	MessageRef ref = cs->waitForReply(Message::WRITE, ssl->target, buf,
+	    len);
+	if (!ref) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	const Message::Result *msg = ref.result();
 	ssl->last_error = msg->error;
 	return (msg->ret);
 }
@@ -846,31 +1027,45 @@ PSSL_write(PSSL *ssl, const void *buf, int len)
 void
 PSSL_set_shutdown(PSSL *ssl, int mode)
 {
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::SET_SHUTDOWN, &mode, sizeof(mode));
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::SET_SHUTDOWN, ssl->target,
+	    &mode, sizeof(mode));
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
 		abort();
 }
 
 int
-PSSL_get_shutdown(const PSSL *sslc)
+PSSL_get_shutdown(const PSSL *ssl)
 {
-	PSSL *ssl = const_cast<PSSL *>(sslc);
-	const Message::Result *msg =
-	    ssl->ss->waitForReply(Message::GET_SHUTDOWN);
-	if (msg == nullptr)
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
 		abort();
-	return (msg->ret);
+
+	MessageRef ref = cs->waitForReply(Message::GET_SHUTDOWN, ssl->target);
+	if (!ref)
+		abort();
+	return (ref.result()->ret);
 }
 
 int
 PSSL_shutdown(PSSL *ssl)
 {
-	const Message::Result *msg = ssl->ss->waitForReply(Message::SHUTDOWN);
-	if (msg == nullptr) {
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_SHUTDOWN, ERR_R_NO_COMMAND_SOCKET);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
+
+	MessageRef ref = cs->waitForReply(Message::SHUTDOWN, ssl->target);
+	if (!ref) {
+		ssl->last_error = SSL_ERROR_SYSCALL;
+		return (-1);
+	}
+	const Message::Result *msg = ref.result();
 	ssl->last_error = msg->error;
 	return (msg->ret);
 }

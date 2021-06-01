@@ -35,30 +35,69 @@
 #include <openssl/ssl.h>
 
 #include <Messages.h>
-#include "SSLSession.h"
+#include "CommandSocket.h"
+#include "TargetStore.h"
 #include "sslproc_internal.h"
 
-SSLSession::~SSLSession()
+CommandSocket::~CommandSocket()
 {
 	close(fd);
 }
 
 bool
-SSLSession::handleMessage(const Message::Header *hdr)
+CommandSocket::init()
 {
+	if (!allocateMessages(4, 64))
+		return (false);
+	return (true);
+}
+
+static PSSL *
+findSSL(const Message::Targeted *thdr)
+{
+	return (targets.lookup<PSSL>(thdr->target));
+}
+
+static PSSL_CTX *
+findSSL_CTX(const Message::Targeted *thdr)
+{
+	return (targets.lookup<PSSL_CTX>(thdr->target));
+}
+
+void
+CommandSocket::handleMessage(const Message::Header *hdr)
+{
+	const Message::Targeted *thdr;
+	PSSL_CTX *ctx;
+	PSSL *ssl;
 	char tmp[16];
 	long ret;
 
+	if (hdr->length < sizeof(Message::Targeted))
+		thdr = nullptr;
+	else
+		thdr = reinterpret_cast<const Message::Targeted *>(hdr);
 	switch (hdr->type) {
 	case Message::BIO_READ:
 	{
 		if (hdr->length != sizeof(Message::Read)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
-			PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
+			PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE,
+			    ERR_R_BAD_MESSAGE);
 			snprintf(tmp, sizeof(tmp), "%d", hdr->length);
 			ERR_add_error_data(2, "Message::BIO_READ bad length=",
 			    tmp);
-			return (false);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE,
+			    ERR_R_MISSING_TARGET);
+			snprintf(tmp, sizeof(tmp), "%d", thdr->target);
+			ERR_add_error_data(2, "target=", tmp);
+			break;
 		}
 
 		const Message::Read *msg =
@@ -70,11 +109,11 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			 * have if it is not zero.
 			 */
 			if (!readBuffer.grow(msg->resid)) {
-				PROCerr(PROC_F_SSL_HANDLE_MESSAGE,
+				PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE,
 				    ERR_R_MALLOC_FAILURE);
 				ERR_add_error_data(1,
 				    "failed to grow read buffer");
-				return (false);
+				break;
 			}
 		}
 
@@ -91,7 +130,27 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	}
 	case Message::BIO_WRITE:
 	{
-		ret = BIO_write(ssl->wbio, hdr->body(), hdr->bodyLength());
+		if (thdr == nullptr) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE,
+			    ERR_R_BAD_MESSAGE);
+			snprintf(tmp, sizeof(tmp), "%d", hdr->length);
+			ERR_add_error_data(2, "Message::BIO_WRITE bad length=",
+			    tmp);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE,
+			    ERR_R_MISSING_TARGET);
+			snprintf(tmp, sizeof(tmp), "%d", thdr->target);
+			ERR_add_error_data(2, "target=", tmp);
+			break;
+		}
+
+		ret = BIO_write(ssl->wbio, thdr->body(), thdr->bodyLength());
 		int flags = BIO_get_flags(ssl->wbio);
 		writeReplyMessage(hdr->type, ret, &flags, sizeof(flags));
 		break;
@@ -101,19 +160,29 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	{
 		if (hdr->length != sizeof(Message::Ctrl)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
-			PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
+			PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE,
+			    ERR_R_BAD_MESSAGE);
 			snprintf(tmp, sizeof(tmp), "%d", hdr->length);
 			ERR_add_error_data(3,
 			    hdr->type == Message::BIO_CTRL_READ ?
 			    "Message::BIO_CTRL_READ" :
 			    "Message::BIO_CTRL_WRITE",
 			    " bad length=", tmp);
-			return (false);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE,
+			    ERR_R_MISSING_TARGET);
+			snprintf(tmp, sizeof(tmp), "%d", thdr->target);
+			ERR_add_error_data(2, "target=", tmp);
+			break;
 		}
 
 		const Message::Ctrl *msg =
 		    reinterpret_cast<const Message::Ctrl *>(hdr);
-		long ret;
 		BIO *bio;
 
 		if (hdr->type == Message::BIO_CTRL_READ)
@@ -130,14 +199,15 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			break;
 		default:
 			writeErrnoReply(hdr->type, -1, EOPNOTSUPP);
-			PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
+			PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE,
+			    ERR_R_BAD_MESSAGE);
 			snprintf(tmp, sizeof(tmp), "%d", msg->cmd);
 			ERR_add_error_data(3,
 			    hdr->type == Message::BIO_CTRL_READ ?
 			    "Message::BIO_CTRL_READ" :
 			    "Message::BIO_CTRL_WRITE",
 			    " unsupported cmd=", tmp);
-			return (false);
+			break;
 		}
 		break;
 	}
@@ -145,6 +215,12 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	{
 		if (hdr->length < sizeof(Message::MsgCb)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
 			break;
 		}
 
@@ -161,12 +237,18 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	{
 		int al;
 
-		if (hdr->bodyLength() != sizeof(al)) {
+		if (thdr == nullptr || thdr->bodyLength() != sizeof(al)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
 
-		al = *reinterpret_cast<const int *>(hdr->body());
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		al = *reinterpret_cast<const int *>(thdr->body());
 		if (ssl->ctx->servername_cb == NULL)
 			ret = SSL_TLSEXT_ERR_ALERT_FATAL;
 		else
@@ -179,12 +261,18 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	{
 		int al;
 
-		if (hdr->bodyLength() != sizeof(al)) {
+		if (thdr == nullptr || thdr->bodyLength() != sizeof(al)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
 
-		al = *reinterpret_cast<const int *>(hdr->body());
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		al = *reinterpret_cast<const int *>(thdr->body());
 		if (ssl->ctx->client_hello_cb == NULL)
 			ret = 0;
 		else
@@ -197,12 +285,18 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	{
 		int ad;
 
-		if (hdr->bodyLength() != sizeof(ad)) {
+		if (thdr == nullptr || thdr->bodyLength() != sizeof(ad)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
 
-		ad = *reinterpret_cast<const int *>(hdr->body());
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		ad = *reinterpret_cast<const int *>(thdr->body());
 		if (ssl->ctx->srp_username_cb == NULL)
 			ret = SSL_ERROR_NONE;
 		else
@@ -228,6 +322,12 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		if (msg->length != sizeof(Message::SessNewCb) + msg->id_len +
 		    msg->internal_length) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
 			break;
 		}
 
@@ -276,31 +376,43 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	}
 	case Message::SESS_REMOVE_CB:
 	{
-		if (hdr->bodyLength() == 0) {
-			writeErrnoReply(hdr->type, -1, EBADMSG);
+		if (thdr == nullptr || thdr->bodyLength() == 0) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
 
-		auto it = ssl->ctx->sessions.find(session_map_key(
-		    reinterpret_cast<const unsigned char *>(hdr->body()),
-		    hdr->bodyLength()));
-		if (it == ssl->ctx->sessions.end()) {
+		ctx = findSSL_CTX(thdr);
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		auto it = ctx->sessions.find(session_map_key(
+		    reinterpret_cast<const unsigned char *>(thdr->body()),
+		    thdr->bodyLength()));
+		if (it == ctx->sessions.end()) {
 			writeErrnoReply(hdr->type, -1, ENOENT);
 			break;
 		}
 
 		PSSL_SESSION *s = it->second;
-		ssl->ctx->sessions.erase(it);
-		if (ssl->ctx->sess_remove_cb != nullptr)
-			ssl->ctx->sess_remove_cb(ssl->ctx, s);
+		ctx->sessions.erase(it);
+		if (ctx->sess_remove_cb != nullptr)
+			ctx->sess_remove_cb(ctx, s);
 		PSSL_SESSION_free(s);
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
 	case Message::SESS_GET_CB:
 	{
-		if (hdr->bodyLength() == 0) {
-			writeErrnoReply(hdr->type, -1, EBADMSG);
+		if (thdr == nullptr || thdr->bodyLength() == 0) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
 			break;
 		}
 
@@ -311,8 +423,8 @@ SSLSession::handleMessage(const Message::Header *hdr)
 
 		int copy = 1;
 		PSSL_SESSION *s = ssl->ctx->sess_get_cb(ssl,
-		    reinterpret_cast<const unsigned char *>(hdr->body()),
-		    hdr->bodyLength(), &copy);
+		    reinterpret_cast<const unsigned char *>(thdr->body()),
+		    thdr->bodyLength(), &copy);
 		if (s == nullptr) {
 			writeReplyMessage(hdr->type, 0);
 			break;
@@ -350,6 +462,12 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			break;
 		}
 
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
 		const Message::TmpDhCb *msg =
 		    reinterpret_cast<const Message::TmpDhCb *>(hdr);
 
@@ -383,6 +501,12 @@ SSLSession::handleMessage(const Message::Header *hdr)
 			break;
 		}
 
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
 		const Message::InfoCb *msg =
 		    reinterpret_cast<const Message::InfoCb *>(hdr);
 
@@ -393,6 +517,17 @@ SSLSession::handleMessage(const Message::Header *hdr)
 	}
 	case Message::ALPN_SELECT_CB:
 	{
+		if (thdr == nullptr) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
 		if (ssl->ctx->alpn_select_cb == nullptr) {
 			writeReplyMessage(hdr->type, SSL_TLSEXT_ERR_NOACK);
 			break;
@@ -401,13 +536,24 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		const unsigned char *out = nullptr;
 		unsigned char outlen = 0;
 		ret = ssl->ctx->alpn_select_cb(ssl, &out, &outlen,
-		    reinterpret_cast<const unsigned char *>(hdr->body()),
-		    hdr->bodyLength(), ssl->ctx->alpn_select_cb_arg);
+		    reinterpret_cast<const unsigned char *>(thdr->body()),
+		    thdr->bodyLength(), ssl->ctx->alpn_select_cb_arg);
 		writeReplyMessage(hdr->type, ret, out, outlen);
 		break;
 	}
 	case Message::CLIENT_CERT_CB:
 	{
+		if (thdr == nullptr) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
 		if (ssl->ctx->client_cert_cb == nullptr) {
 			writeReplyMessage(hdr->type, 0);
 			break;
@@ -458,11 +604,9 @@ SSLSession::handleMessage(const Message::Header *hdr)
 		break;
 	}
 	default:
-		PROCerr(PROC_F_SSL_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
+		PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);
 		ERR_add_error_data(2, "unknown message type=", tmp);
-		return (false);
+		break;
 	}
-
-	return (true);
 }

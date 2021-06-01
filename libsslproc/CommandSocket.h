@@ -32,24 +32,19 @@
 
 #pragma once
 
-#include <Messages.h>
-#include <MessageSocket.h>
+#include "LibMessageSocket.h"
+#include "sslproc.h"
 
-class LibMessageSocket : public MessageSocket {
+class CommandSocket : public LibMessageSocket {
 public:
-	LibMessageSocket(int fd) : MessageSocket(fd) {}
-	MessageRef waitForReply(enum Message::Type type, int target,
-	    const struct iovec *iov, int iovCnt);
-	MessageRef waitForReply(enum Message::Type type, int target,
-	    const void *payload = nullptr, size_t payloadLen = 0);
-	MessageRef waitForReply(enum Message::Type type,
-	    const void *payload = nullptr, size_t payloadLen = 0,
-	    const void *control = nullptr, size_t controlLen = 0);
+	CommandSocket(int _fd) : LibMessageSocket(_fd), fd(_fd) {}
+	~CommandSocket();
+	bool init();
+
 private:
-	MessageRef _waitForReply(enum Message::Type type);
-	virtual void handleMessage(const Message::Header *hdr) = 0;
-	virtual void observeReadError(enum ReadError error,
-	    const Message::Header *hdr);
-	virtual void observeWriteError();
-	void setMessageError(const Message::Result *msg);
+	void handleMessage(const Message::Header *hdr);
+
+	DataBuffer readBuffer;
+
+	int fd;
 };

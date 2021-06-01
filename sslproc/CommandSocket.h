@@ -35,35 +35,35 @@
 #include <openssl/ssl.h>
 
 #include "KEvent.h"
-#include "MessageBuffer.h"
 #include "ProcMessageSocket.h"
 
-class SSLSession : public KEventListener, ProcMessageSocket {
+class CommandSocket : public KEventListener, public ProcMessageSocket {
 public:
-	SSLSession(KQueue *kq, int _fd) : ProcMessageSocket(_fd),
+	CommandSocket(KQueue *kq, int _fd) : ProcMessageSocket(_fd),
 	    readEvent(kq, _fd, EVFILT_READ, this), fd(_fd) {}
-	~SSLSession();
-	bool init(SSL_CTX *ctx);
+	~CommandSocket();
+	bool init();
 	virtual void onEvent(const struct kevent *);
-	const Message::Result *sendRequest(enum Message::Type type,
+	MessageRef sendRequest(enum Message::Type type, const SSL *ssl,
 	    struct iovec *iov, int iovCnt);
-	const Message::Result *sendRequest(enum Message::Type type,
+	MessageRef sendRequest(enum Message::Type type, const SSL *ssl,
 	    const void *payload = nullptr, size_t payloadLen = 0);
-	bool isSSL(const SSL *_ssl) const { return (ssl == _ssl); }
+	MessageRef sendRequest(enum Message::Type type, const SSL_CTX *ctx,
+	    const void *payload = nullptr, size_t payloadLen = 0);
 
 private:
-	const Message::Result *_waitForReply(enum Message::Type type);
+	MessageRef sendRequest(enum Message::Type type, int target,
+	    struct iovec *iov, int iovCnt);
+	MessageRef sendRequest(enum Message::Type type, int target,
+	    const void *payload = nullptr, size_t payloadLen = 0);
+	MessageRef _waitForReply(enum Message::Type type);
 	bool handleMessage(const Message::Header *hdr);
 	virtual void observeReadError(enum ReadError,
 	    const Message::Header *hdr);
 	virtual void observeWriteError();
 
 	KEvent readEvent;
-	MessageBuffer inputBuffer;
-	MessageBuffer replyBuffer;
 	DataBuffer readBuffer;
-
-	SSL *ssl;
 
 	int fd;
 	bool writeFailed = false;
