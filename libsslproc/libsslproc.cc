@@ -94,7 +94,7 @@ createCommandSocket()
 		return (nullptr);
 
 	int fds[2];
-	if (socketpair(PF_LOCAL, SOCK_SEQPACKET, 0, fds) == -1) {
+	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, fds) == -1) {
 		PROCerr(PROC_F_CONTROLSOCKET_INIT, ERR_R_INTERNAL_ERROR);
 		ERR_add_error_data(2, "socketpair: ", strerror(errno));
 		return (nullptr);

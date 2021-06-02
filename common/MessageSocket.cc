@@ -55,6 +55,7 @@ MessageSocket::~MessageSocket()
 bool
 MessageSocket::allocateMessages(int count, size_t size, size_t controlSize)
 {
+	assert(size >= sizeof(Message::Header));
 	for (int i = 0; i < count; i++) {
 		MessageBuffer *buffer = new MessageBuffer();
 		if (!buffer->grow(size)) {
@@ -71,7 +72,7 @@ MessageSocket::allocateMessages(int count, size_t size, size_t controlSize)
 }
 
 int
-MessageSocket::readMessage(MessageRef &ref)
+MessageDatagramSocket::readMessage(MessageRef &ref)
 {
 	MessageBuffer *buffer;
 	const Message::Header *hdr;
@@ -154,6 +155,73 @@ MessageSocket::readMessage(MessageRef &ref)
 	return (1);
 }
 
+int
+MessageStreamSocket::readMessage(MessageRef &ref)
+{
+	MessageBuffer *buffer;
+	const Message::Header *hdr;
+	size_t payloadLen;
+	ssize_t nread;
+
+	buffer = messages.top();
+	if (buffer == nullptr) {
+		observeReadError(NO_BUFFER, nullptr);
+		return (-1);
+	}
+	buffer->reset();
+
+	/* Read the header. */
+	nread = read(fd, buffer->data(), sizeof(*hdr));
+	if (nread == 0)
+		return (0);
+	if (nread == -1) {
+		observeReadError(READ_ERROR, nullptr);
+		return (-1);
+	}
+	if (nread != sizeof(*hdr)) {
+		observeReadError(SHORT, nullptr);
+		return (-1);
+	}
+	buffer->setLength(nread);
+
+	/* Validate the header. */
+	hdr = buffer->hdr();
+	if (hdr->length < sizeof(*hdr)) {
+		observeReadError(BAD_MSG_LENGTH, hdr);
+		errno = EBADMSG;
+		return (-1);
+	}
+	if (buffer->capacity() < hdr->length) {
+		if (!buffer->grow(hdr->length)) {
+			observeReadError(GROW_FAIL, hdr);
+			errno = ENOMEM;
+			return (-1);
+		}
+		hdr = buffer->hdr();
+	}
+
+	/* Read the payload. */
+	payloadLen = hdr->length - sizeof(*hdr);
+	if (payloadLen != 0) {
+		nread = read(fd, reinterpret_cast<char *>(buffer->data()) +
+		    sizeof(*hdr), payloadLen);
+		if (nread == -1) {
+			observeReadError(READ_ERROR, nullptr);
+			return (-1);
+		}
+		if (nread != payloadLen) {
+			observeReadError(TRUNCATED, nullptr);
+			errno = EBADMSG;
+			return (-1);
+		}
+		buffer->setLength(sizeof(*hdr) + nread);
+	}
+
+	messages.pop();
+	ref.reset(this, buffer);
+	return (1);
+}
+
 void
 MessageSocket::freeMessage(MessageBuffer *buffer)
 {
@@ -175,7 +243,7 @@ MessageSocket::writeMessage(struct iovec *iov, int iovCnt)
 }
 
 bool
-MessageSocket::writeMessage(enum Message::Type type,
+MessageDatagramSocket::writeMessage(enum Message::Type type,
     const void *payload, size_t payloadLen, const void *control,
     size_t controlLen)
 {

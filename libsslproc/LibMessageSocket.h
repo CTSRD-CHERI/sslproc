@@ -32,25 +32,146 @@
 
 #pragma once
 
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+
 #include <Messages.h>
 #include <MessageSocket.h>
+#include "sslproc_internal.h"
 
-class LibMessageSocket : public MessageSocket {
+namespace LibMessageSocketHelpers {
+	void observeReadError(enum MessageSocket::ReadError error,
+	    const Message::Header *hdr);
+	void observeWriteError();
+	void setMessageError(const Message::Result *msg);
+};
+
+template<class Base>
+class LibMessageSocket : public Base {
 public:
-	LibMessageSocket(int fd) : MessageSocket(fd) {}
+	LibMessageSocket(int fd) : Base(fd) {}
 	~LibMessageSocket() = default;
 	MessageRef waitForReply(enum Message::Type type, int target,
 	    const struct iovec *iov, int iovCnt);
 	MessageRef waitForReply(enum Message::Type type, int target,
 	    const void *payload = nullptr, size_t payloadLen = 0);
 	MessageRef waitForReply(enum Message::Type type,
-	    const void *payload = nullptr, size_t payloadLen = 0,
-	    const void *control = nullptr, size_t controlLen = 0);
+	    const void *payload = nullptr, size_t payloadLen = 0);
+	MessageRef waitForReply(enum Message::Type type,
+	    const void *payload, size_t payloadLen,
+	    const void *control, size_t controlLen);
 private:
 	MessageRef _waitForReply(enum Message::Type type);
 	virtual void handleMessage(const Message::Header *hdr) = 0;
-	virtual void observeReadError(enum ReadError error,
+	virtual void observeReadError(enum Base::ReadError error,
 	    const Message::Header *hdr);
 	virtual void observeWriteError();
-	void setMessageError(const Message::Result *msg);
 };
+
+template<class Base>
+void
+LibMessageSocket<Base>::observeReadError(enum Base::ReadError error,
+    const Message::Header *hdr)
+{
+	LibMessageSocketHelpers::observeReadError(error, hdr);
+}
+
+template<class Base>
+void
+LibMessageSocket<Base>::observeWriteError()
+{
+	LibMessageSocketHelpers::observeWriteError();
+}
+
+template<class Base>
+MessageRef
+LibMessageSocket<Base>::waitForReply(enum Message::Type type, int target,
+    const struct iovec *iov, int iovCnt)
+{
+	if (ERR_peek_error() != 0)
+		return {};
+	if (!Base::writeMessage(type, target, iov, iovCnt))
+		return {};
+	return (_waitForReply(type));
+}
+
+template<class Base>
+MessageRef
+LibMessageSocket<Base>::waitForReply(enum Message::Type type, int target,
+    const void *payload, size_t payloadLen)
+{
+	if (ERR_peek_error() != 0)
+		return {};
+	if (!Base::writeMessage(type, target, payload, payloadLen))
+		return {};
+	return (_waitForReply(type));
+}
+
+template<class Base>
+MessageRef
+LibMessageSocket<Base>::waitForReply(enum Message::Type type,
+    const void *payload, size_t payloadLen)
+{
+	if (ERR_peek_error() != 0)
+		return {};
+	if (!Base::writeMessage(type, payload, payloadLen))
+		return {};
+	return (_waitForReply(type));
+}
+
+template<class Base>
+MessageRef
+LibMessageSocket<Base>::waitForReply(enum Message::Type type,
+    const void *payload, size_t payloadLen, const void *control,
+    size_t controlLen)
+{
+	if (ERR_peek_error() != 0)
+		return {};
+	if (!Base::writeMessage(type, payload, payloadLen, control, controlLen))
+		return {};
+	return (_waitForReply(type));
+}
+
+template<class Base>
+MessageRef
+LibMessageSocket<Base>::_waitForReply(enum Message::Type type)
+{
+	for (;;) {
+		MessageRef ref;
+		int rc = Base::readMessage(ref);
+		if (rc == 0) {
+			PROCerr(PROC_F_WAIT_FOR_REPLY, ERR_R_UNEXPECTED_EOF);
+			return {};
+		}
+		if (rc == -1)
+			return {};
+
+		const Message::Header *hdr = ref.hdr();
+		if (hdr->type == Message::RESULT) {
+			char tmp[16], tmp2[16];
+			const Message::Result *result = ref.result();
+
+			if (result == nullptr) {
+				PROCerr(PROC_F_WAIT_FOR_REPLY,
+				    ERR_R_BAD_MESSAGE);
+				ERR_add_error_data(1, "reply too short");
+				return {};
+			}
+
+			if (result->error != SSL_ERROR_NONE)
+				LibMessageSocketHelpers::setMessageError(
+				    result);
+
+			if (result->request == type)
+				return (ref);
+
+			PROCerr(PROC_F_WAIT_FOR_REPLY, ERR_R_MISMATCHED_REPLY);
+			snprintf(tmp, sizeof(tmp), "%d", type);
+			snprintf(tmp2, sizeof(tmp2), "%d", result->request);
+			ERR_add_error_data(4, "expected ", tmp, " got ", tmp2);
+			return {};
+		}
+
+		handleMessage(hdr);
+	}
+}

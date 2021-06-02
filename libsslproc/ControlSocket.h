@@ -34,7 +34,7 @@
 
 #include "LibMessageSocket.h"
 
-class ControlSocket : public LibMessageSocket {
+class ControlSocket : public LibMessageSocket<MessageDatagramSocket> {
 public:
 	ControlSocket(int fd) : LibMessageSocket(fd) {}
 	~ControlSocket() = default;

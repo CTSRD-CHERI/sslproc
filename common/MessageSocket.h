@@ -47,7 +47,6 @@ class MessageRef;
 class MessageSocket {
 public:
 	void freeMessage(MessageBuffer *);
-protected:
 	enum ReadError {
 		NO_BUFFER,
 		READ_ERROR,
@@ -57,20 +56,16 @@ protected:
 		BAD_MSG_LENGTH,
 		LENGTH_MISMATCH
 	};
-
+protected:
 	MessageSocket(int _fd) : fd(_fd) {};
 	~MessageSocket();
 
 	bool allocateMessages(int count, size_t size, size_t controlSize = 0);
-	int readMessage(MessageRef &ref);
-	bool writeMessage(enum Message::Type type, const void *payload,
-	    size_t payloadLen, const void *control, size_t controlLen);
+	virtual int readMessage(MessageRef &ref) = 0;
 	bool writeMessage(enum Message::Type type,
-	    const void *payload = nullptr,
-	    size_t payloadLen = 0);
+	    const void *payload = nullptr, size_t payloadLen = 0);
 	bool writeMessage(enum Message::Type type, int target,
-	    const void *payload = nullptr,
-	    size_t payloadLen = 0);
+	    const void *payload = nullptr, size_t payloadLen = 0);
 	bool writeMessage(enum Message::Type type, int target,
 	    const struct iovec *iov, int iovCnt);
 	void writeErrorReply(enum Message::Type type, long ret, int errorType,
@@ -90,6 +85,27 @@ private:
 
 	int fd;
 	std::stack<MessageBuffer *> messages;
+
+	friend class MessageDatagramSocket;
+	friend class MessageStreamSocket;
+};
+
+class MessageDatagramSocket : public MessageSocket {
+protected:
+	MessageDatagramSocket(int _fd): MessageSocket(_fd) {}
+	~MessageDatagramSocket() = default;
+	virtual int readMessage(MessageRef &ref);
+	bool writeMessage(enum Message::Type type,
+	    const void *payload = nullptr,
+	    size_t payloadLen = 0, const void *control = nullptr,
+	    size_t controlLen = 0);
+};
+
+class MessageStreamSocket : public MessageSocket {
+protected:
+	MessageStreamSocket(int _fd): MessageSocket(_fd) {}
+	~MessageStreamSocket() = default;
+	virtual int readMessage(MessageRef &ref);
 };
 
 class MessageRef {

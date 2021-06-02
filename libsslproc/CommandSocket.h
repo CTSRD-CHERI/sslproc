@@ -35,7 +35,7 @@
 #include "LibMessageSocket.h"
 #include "sslproc.h"
 
-class CommandSocket : public LibMessageSocket {
+class CommandSocket : public LibMessageSocket<MessageStreamSocket> {
 public:
 	CommandSocket(int fd) : LibMessageSocket(fd) {}
 	~CommandSocket() = default;
