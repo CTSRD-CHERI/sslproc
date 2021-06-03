@@ -34,11 +34,11 @@
 
 #include <openssl/ssl.h>
 
-#include "ProcMessageSocket.h"
+#include "MessageSocket.h"
 
-class CommandSocket : public ProcMessageSocket {
+class CommandSocket : public MessageSocket {
 public:
-	CommandSocket(int fd) : ProcMessageSocket(fd) {}
+	CommandSocket(int fd) : MessageSocket(fd) {}
 	~CommandSocket() = default;
 	bool init();
 	void run();
@@ -55,6 +55,8 @@ private:
 	MessageRef sendRequest(enum Message::Type type, int target,
 	    const void *payload = nullptr, size_t payloadLen = 0);
 	MessageRef _waitForReply(enum Message::Type type);
+	void writeSSLErrorReply(enum Message::Type type, long ret,
+	    int errorType);
 	bool handleMessage(const Message::Header *hdr);
 	virtual void observeReadError(enum ReadError,
 	    const Message::Header *hdr);

@@ -32,11 +32,11 @@
 
 #pragma once
 
-#include "ProcMessageSocket.h"
+#include "MessageSocket.h"
 
-class ControlSocket : ProcMessageSocket {
+class ControlSocket : MessageSocket {
 public:
-	ControlSocket(int fd) : ProcMessageSocket(fd) {}
+	ControlSocket(int fd) : MessageSocket(fd) {}
 	~ControlSocket() = default;
 	bool init();
 	void run();
