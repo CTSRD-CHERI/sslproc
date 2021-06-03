@@ -34,16 +34,14 @@
 
 #include <openssl/ssl.h>
 
-#include "KEvent.h"
 #include "ProcMessageSocket.h"
 
-class CommandSocket : public KEventListener, public ProcMessageSocket {
+class CommandSocket : public ProcMessageSocket {
 public:
-	CommandSocket(KQueue *kq, int fd) : ProcMessageSocket(fd),
-	    readEvent(kq, fd, EVFILT_READ, this) {}
+	CommandSocket(int fd) : ProcMessageSocket(fd) {}
 	~CommandSocket() = default;
 	bool init();
-	virtual void onEvent(const struct kevent *);
+	void run();
 	MessageRef sendRequest(enum Message::Type type, const SSL *ssl,
 	    struct iovec *iov, int iovCnt);
 	MessageRef sendRequest(enum Message::Type type, const SSL *ssl,
@@ -62,7 +60,6 @@ private:
 	    const Message::Header *hdr);
 	virtual void observeWriteError();
 
-	KEvent readEvent;
 	DataBuffer readBuffer;
 
 	bool writeFailed = false;

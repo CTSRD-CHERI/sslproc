@@ -54,17 +54,12 @@
 #include <syslog.h>
 
 #include "local.h"
-#include "KEvent.h"
 #include "ControlSocket.h"
 
 int
 main(int ac, char **av)
 {
 	openlog("sslproc", LOG_PID | LOG_NDELAY, LOG_DAEMON);
-
-	KQueue kq;
-	if (!kq.init())
-		return (1);
 
 	if (!initOpenSSL()) {
 		syslog(LOG_ERR, "failed to initialize OpenSSL");
@@ -88,11 +83,11 @@ main(int ac, char **av)
 		return (1);
 	}
 
-	ControlSocket controlSocket(&kq, 3);
+	ControlSocket controlSocket(3);
 
 	if (!controlSocket.init())
 		return (1);
 
-	kq.run();
+	controlSocket.run();
 	return (0);
 }

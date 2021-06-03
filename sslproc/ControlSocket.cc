@@ -39,7 +39,6 @@
 #include <openssl/ssl.h>
 
 #include "local.h"
-#include "KEvent.h"
 #include "Messages.h"
 #include "MessageSocket.h"
 #include "ControlSocket.h"
@@ -50,8 +49,6 @@ ControlSocket::init()
 {
 	/* Control socket messages don't recurse. */
 	if (!allocateMessages(1, 64, CMSG_SPACE(sizeof(int))))
-		return (false);
-	if (!readEvent.init())
 		return (false);
 	return (true);
 }
@@ -90,7 +87,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			break;
 		}
 
-		CommandSocket *cs = new CommandSocket(kq, fds[0]);
+		CommandSocket *cs = new CommandSocket(fds[0]);
 		if (!cs->init()) {
 			syslog(LOG_WARNING, "failed to init command socket");
 			delete cs;
@@ -106,25 +103,16 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 }
 
 void
-ControlSocket::onEvent(const struct kevent *kevent)
+ControlSocket::run()
 {
-	int rc, resid;
-
-	if (kevent->flags & EV_EOF)
-		exit(0);
-
-	resid = kevent->data;
-	while (resid > 0) {
+	for (;;) {
 		MessageRef ref;
 
-		rc = readMessage(ref);
+		int rc = readMessage(ref);
 		if (rc == 0)
 			exit(0);
 		if (rc == -1)
 			exit(1);
-
-		assert(ref.length() <= resid);
-		resid -= ref.length();
 
 		handleMessage(ref.hdr(), ref.cmsg());
 	}

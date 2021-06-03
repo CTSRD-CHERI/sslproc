@@ -31,8 +31,8 @@
  */
 
 #include <sys/event.h>
-#include <assert.h>
 #include <errno.h>
+#include <pthread.h>
 #include <string.h>
 #include <syslog.h>
 
@@ -43,23 +43,10 @@
 #include "TargetStore.h"
 #include "CommandSocket.h"
 
+static pthread_attr_t attr;
 static TargetStore targets;
-static CommandSocket *currentSocket;
+static thread_local CommandSocket *currentSocket;
 static BIO_METHOD *readBioMethod, *writeBioMethod;
-
-class SetCurrentSession {
-public:
-	SetCurrentSession(CommandSocket *cs)
-	{
-		assert(currentSocket == nullptr);
-		currentSocket = cs;
-	}
-
-	~SetCurrentSession()
-	{
-		currentSocket = nullptr;
-	}
-};
 
 static void
 msg_cb(int write_p, int version, int content_type, const void *buf,
@@ -361,13 +348,28 @@ client_cert_cb(SSL *ssl, X509 **certp, EVP_PKEY **pkeyp)
 	return (1);
 }
 
+static void *
+commandSocketRun(void *arg)
+{
+	CommandSocket *cs = reinterpret_cast<CommandSocket *>(arg);
+
+	currentSocket = cs;
+	cs->run();
+	delete cs;
+	return (nullptr);
+}
+
 bool
 CommandSocket::init()
 {
 	if (!allocateMessages(4, 64))
 		return (false);
-	if (!readEvent.init())
+
+	pthread_t thread;
+	int error = pthread_create(&thread, &attr, commandSocketRun, this);
+	if (error != 0)
 		return (false);
+
 	return (true);
 }
 
@@ -1388,35 +1390,18 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 }
 
 void
-CommandSocket::onEvent(const struct kevent *kevent)
+CommandSocket::run()
 {
-	int rc, resid;
-
-	if (kevent->flags & EV_EOF) {
-		delete this;
-		return;
-	}
-
-	SetCurrentSession scs(this);
-
-	resid = kevent->data;
-	while (resid > 0) {
+	for (;;) {
 		MessageRef ref;
 
-		rc = readMessage(ref);
+		int rc = readMessage(ref);
 		if (rc == 0 || rc == -1)
-			goto error;
-
-		assert(ref.length() <= resid);
-		resid -= ref.length();
+			return;
 
 		if (!handleMessage(ref.hdr()) || writeFailed)
-			goto error;
+			return;
 	}
-	return;
-
-error:
-	delete this;
 }
 
 void
@@ -1785,5 +1770,13 @@ initOpenSSL()
 	BIO_meth_set_write(writeBioMethod, writeBioWrite);
 	BIO_meth_set_puts(writeBioMethod, writeBioPuts);
 	BIO_meth_set_ctrl(writeBioMethod, writeBioCtrl);
+
+	int error = pthread_attr_init(&attr);
+	if (error != 0)
+		return (false);
+	error = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	if (error != 0)
+		return (false);
+
 	return (true);
 }

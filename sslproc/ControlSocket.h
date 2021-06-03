@@ -32,23 +32,18 @@
 
 #pragma once
 
-#include "KEvent.h"
 #include "ProcMessageSocket.h"
 
-class ControlSocket : public KEventListener, ProcMessageSocket {
+class ControlSocket : ProcMessageSocket {
 public:
-	ControlSocket(KQueue *_kq, int fd) : ProcMessageSocket(fd), kq(_kq),
-	    readEvent(_kq, fd, EVFILT_READ, this) {};
+	ControlSocket(int fd) : ProcMessageSocket(fd) {}
 	~ControlSocket() = default;
 	bool init();
-	virtual void onEvent(const struct kevent *);
+	void run();
 private:
 	virtual void observeReadError(enum ReadError,
 	    const Message::Header *hdr);
 	virtual void observeWriteError();
 	void handleMessage(const Message::Header *hdr,
 	    const struct cmsghdr *cmsg);
-
-	KQueue *kq;
-	KEvent readEvent;
 };
