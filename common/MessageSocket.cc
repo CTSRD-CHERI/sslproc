@@ -34,6 +34,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <openssl/ssl.h>
 
@@ -47,6 +48,7 @@ MessageSocket::~MessageSocket()
 		messages.pop();
 		delete buffer;
 	}
+	close(fd);
 }
 
 bool

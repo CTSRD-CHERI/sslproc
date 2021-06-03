@@ -39,9 +39,9 @@
 
 class CommandSocket : public KEventListener, public ProcMessageSocket {
 public:
-	CommandSocket(KQueue *kq, int _fd) : ProcMessageSocket(_fd),
-	    readEvent(kq, _fd, EVFILT_READ, this), fd(_fd) {}
-	~CommandSocket();
+	CommandSocket(KQueue *kq, int fd) : ProcMessageSocket(fd),
+	    readEvent(kq, fd, EVFILT_READ, this) {}
+	~CommandSocket() = default;
 	bool init();
 	virtual void onEvent(const struct kevent *);
 	MessageRef sendRequest(enum Message::Type type, const SSL *ssl,
@@ -65,6 +65,5 @@ private:
 	KEvent readEvent;
 	DataBuffer readBuffer;
 
-	int fd;
 	bool writeFailed = false;
 };

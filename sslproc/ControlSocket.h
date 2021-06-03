@@ -37,8 +37,9 @@
 
 class ControlSocket : public KEventListener, ProcMessageSocket {
 public:
-	ControlSocket(KQueue *_kq, int _fd) : ProcMessageSocket(_fd), kq(_kq),
-	    readEvent(_kq, _fd, EVFILT_READ, this) {};
+	ControlSocket(KQueue *_kq, int fd) : ProcMessageSocket(fd), kq(_kq),
+	    readEvent(_kq, fd, EVFILT_READ, this) {};
+	~ControlSocket() = default;
 	bool init();
 	virtual void onEvent(const struct kevent *);
 private:

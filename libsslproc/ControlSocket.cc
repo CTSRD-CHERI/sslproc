@@ -31,16 +31,10 @@
  */
 
 #include <stdlib.h>
-#include <unistd.h>
 
 #include <Messages.h>
 #include "ControlSocket.h"
 #include "sslproc_internal.h"
-
-ControlSocket::~ControlSocket()
-{
-	close(fd);
-}
 
 bool
 ControlSocket::init()

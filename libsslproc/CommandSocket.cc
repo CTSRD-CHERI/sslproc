@@ -30,19 +30,12 @@
  * SUCH DAMAGE.
  */
 
-#include <unistd.h>
-
 #include <openssl/ssl.h>
 
 #include <Messages.h>
 #include "CommandSocket.h"
 #include "TargetStore.h"
 #include "sslproc_internal.h"
-
-CommandSocket::~CommandSocket()
-{
-	close(fd);
-}
 
 bool
 CommandSocket::init()

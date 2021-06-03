@@ -36,12 +36,10 @@
 
 class ControlSocket : public LibMessageSocket {
 public:
-	ControlSocket(int _fd) : LibMessageSocket(_fd), fd(_fd) {};
-	~ControlSocket();
+	ControlSocket(int fd) : LibMessageSocket(fd) {}
+	~ControlSocket() = default;
 	bool init();
 	bool createCommandSocket(int fd);
 private:
 	void handleMessage(const Message::Header *hdr);
-
-	int fd;
 };

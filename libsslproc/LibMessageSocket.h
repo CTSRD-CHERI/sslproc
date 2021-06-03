@@ -38,6 +38,7 @@
 class LibMessageSocket : public MessageSocket {
 public:
 	LibMessageSocket(int fd) : MessageSocket(fd) {}
+	~LibMessageSocket() = default;
 	MessageRef waitForReply(enum Message::Type type, int target,
 	    const struct iovec *iov, int iovCnt);
 	MessageRef waitForReply(enum Message::Type type, int target,

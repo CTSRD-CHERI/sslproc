@@ -35,7 +35,6 @@
 #include <errno.h>
 #include <string.h>
 #include <syslog.h>
-#include <unistd.h>
 
 #include <openssl/ssl.h>
 
@@ -370,11 +369,6 @@ CommandSocket::init()
 	if (!readEvent.init())
 		return (false);
 	return (true);
-}
-
-CommandSocket::~CommandSocket()
-{
-	close(fd);
 }
 
 static SSL *

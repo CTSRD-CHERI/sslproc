@@ -37,14 +37,12 @@
 
 class CommandSocket : public LibMessageSocket {
 public:
-	CommandSocket(int _fd) : LibMessageSocket(_fd), fd(_fd) {}
-	~CommandSocket();
+	CommandSocket(int fd) : LibMessageSocket(fd) {}
+	~CommandSocket() = default;
 	bool init();
 
 private:
 	void handleMessage(const Message::Header *hdr);
 
 	DataBuffer readBuffer;
-
-	int fd;
 };
