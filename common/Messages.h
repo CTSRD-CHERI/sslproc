@@ -136,6 +136,7 @@ namespace Message {
 		SET_SESSION_ID_CONTEXT,
 		CLIENT_VERSION,
 		VERSION,
+		SET_SSL_CTX,
 
 		/*
 		 * Requests to operate on the BIOs belonging to an

@@ -1417,6 +1417,44 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		ret = SSL_version(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
+	case Message::SET_SSL_CTX:
+	{
+		int ctx_target;
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (thdr->bodyLength() != sizeof(ctx_target)) {
+			syslog(LOG_WARNING,
+		    "invalid message length %d for Message::SET_SSL_CTX",
+			    hdr->length);
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		ctx_target = *reinterpret_cast<const int *>(thdr->body());
+		if (ctx_target == NULL_TARGET)
+			ctx = nullptr;
+		else {
+			ctx = targets.lookup<SSL_CTX>(ctx_target);
+			if (ctx == nullptr) {
+				writeErrnoReply(hdr->type, -1, ENOENT);
+				break;
+			}
+		}
+		ctx = SSL_set_SSL_CTX(ssl, ctx);
+		if (ctx == nullptr)
+			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
+		else {
+			ctx_target = reinterpret_cast<uintptr_t>
+			    (SSL_CTX_get_app_data(ctx));
+			writeReplyMessage(hdr->type, 0, &ctx_target,
+			    sizeof(ctx_target));
+		}
+		break;
+	}
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

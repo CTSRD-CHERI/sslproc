@@ -387,16 +387,45 @@ PSSL_get_SSL_CTX(const PSSL *ssl)
 PSSL_CTX *
 PSSL_set_SSL_CTX(PSSL *ssl, PSSL_CTX *ctx)
 {
+	char tmp[16];
+
 	if (ssl->ctx == ctx)
 		return (ctx);
 
-	/*
-	 * This is not easy to handle in the current model since each
-	 * context lives in a separate helper.
-	 *
-	 * TODO: Can now implement.
-	 */
-	return (NULL);
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_SET_SSL_CTX, ERR_R_NO_COMMAND_SOCKET);
+		return (nullptr);
+	}
+
+	int ctx_target = ctx == nullptr ? NULL_TARGET : ctx->target;
+	MessageRef ref = cs->waitForReply(Message::SET_SSL_CTX, ssl->target,
+	    &ctx_target, sizeof(ctx_target));
+	if (!ref)
+		return (nullptr);
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		return (nullptr);
+	if (msg->bodyLength() != sizeof(ctx_target)) {
+		PROCerr(PROC_F_SSL_SET_SSL_CTX, ERR_R_BAD_MESSAGE);
+		snprintf(tmp, sizeof(tmp), "%zu", msg->bodyLength());
+		ERR_add_error_data(2, "invalid length=", tmp);
+		return (nullptr);
+	}
+	ctx_target = *reinterpret_cast<const int *>(msg->body());
+
+	ctx = targets.lookup<PSSL_CTX>(ctx_target);
+	if (ctx == nullptr) {
+		PROCerr(PROC_F_SSL_SET_SSL_CTX, ERR_R_MISSING_TARGET);
+		snprintf(tmp, sizeof(tmp), "%d", ctx_target);
+		ERR_add_error_data(2, "target=", tmp);
+		return (nullptr);
+	}
+
+	PSSL_CTX_up_ref(ctx);
+	PSSL_CTX_free(ssl->ctx);
+	ssl->ctx = ctx;
+	return (ctx);
 }
 
 X509 *
