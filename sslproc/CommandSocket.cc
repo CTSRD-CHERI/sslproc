@@ -1415,6 +1415,10 @@ CommandSocket::observeReadError(enum ReadError error,
 	case READ_ERROR:
 		syslog(LOG_WARNING, "failed to read from command socket: %m");
 		break;
+	case GROW_FAIL:
+		syslog(LOG_WARNING,
+		    "failed to grow command socket message buffer");
+		break;
 	case SHORT:
 		syslog(LOG_WARNING, "command socket message too short");
 		break;

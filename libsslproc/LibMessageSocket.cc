@@ -52,6 +52,10 @@ LibMessageSocket::observeReadError(enum ReadError error,
 		PROCerr(PROC_F_RECVMSG, ERR_R_IO_ERROR);
 		ERR_add_error_data(1, strerror(errno));
 		break;
+	case GROW_FAIL:
+		PROCerr(PROC_F_READ_MESSAGE, ERR_R_MALLOC_FAILURE);
+		ERR_add_error_data(1, "failed to grow message buffer");
+		break;
 	case SHORT:
 		PROCerr(PROC_F_READ_MESSAGE, ERR_R_BAD_MESSAGE);
 		ERR_add_error_data(1, "too short");

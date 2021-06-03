@@ -103,8 +103,13 @@ MessageSocket::readMessage(MessageRef &ref)
 	assert(nread >= sizeof(*hdr));
 	if (msg.msg_flags & MSG_TRUNC) {
 		hdr = buffer->hdr();
-		if (hdr->length >= sizeof(*hdr))
-			buffer->grow(hdr->length);
+		if (hdr->length >= sizeof(*hdr)) {
+			if (!buffer->grow(hdr->length)) {
+				observeReadError(GROW_FAIL, hdr);
+				errno = ENOMEM;
+				return (-1);
+			}
+		}
 	}
 
 	iov[0].iov_base = buffer->data();

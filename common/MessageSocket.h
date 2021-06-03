@@ -51,6 +51,7 @@ protected:
 	enum ReadError {
 		NO_BUFFER,
 		READ_ERROR,
+		GROW_FAIL,
 		SHORT,
 		TRUNCATED,
 		BAD_MSG_LENGTH,

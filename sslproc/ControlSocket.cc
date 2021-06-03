@@ -129,6 +129,10 @@ ControlSocket::observeReadError(enum ReadError error,
 	case READ_ERROR:
 		syslog(LOG_WARNING, "failed to read from control socket: %m");
 		break;
+	case GROW_FAIL:
+		syslog(LOG_WARNING,
+		    "failed to grow control socket message buffer");
+		break;
 	case SHORT:
 		syslog(LOG_WARNING, "control message too short");
 		break;
