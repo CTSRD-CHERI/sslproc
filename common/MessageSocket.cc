@@ -31,6 +31,7 @@
  */
 
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
@@ -161,15 +162,42 @@ MessageSocket::freeMessage(MessageBuffer *buffer)
 }
 
 bool
-MessageSocket::writeMessage(struct iovec *iov, int iovCnt, const void *control,
+MessageSocket::writeMessage(struct iovec *iov, int iovCnt)
+{
+	ssize_t nwritten;
+
+	nwritten = writev(fd, iov, iovCnt);
+	if (nwritten == -1) {
+		observeWriteError();
+		return (false);
+	}
+	return (true);
+}
+
+bool
+MessageSocket::writeMessage(enum Message::Type type,
+    const void *payload, size_t payloadLen, const void *control,
     size_t controlLen)
 {
+	Message::Header hdr;
 	struct msghdr msg;
 	ssize_t nwritten;
+	struct iovec iov[2];
+	int cnt;
+
+	hdr.type = type;
+	hdr.length = sizeof(hdr) + payloadLen;
+	iov[0].iov_base = &hdr;
+	iov[0].iov_len = sizeof(hdr);
+	iov[1].iov_base = const_cast<void *>(payload);
+	iov[1].iov_len = payloadLen;
 
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_iov = iov;
-	msg.msg_iovlen = iovCnt;
+	if (payload == nullptr)
+		msg.msg_iovlen = 1;
+	else
+		msg.msg_iovlen = 2;
 	msg.msg_control = const_cast<void *>(control);
 	msg.msg_controllen = controlLen;
 	msg.msg_flags = 0;
@@ -183,8 +211,7 @@ MessageSocket::writeMessage(struct iovec *iov, int iovCnt, const void *control,
 
 bool
 MessageSocket::writeMessage(enum Message::Type type,
-    const void *payload, size_t payloadLen, const void *control,
-    size_t controlLen)
+    const void *payload, size_t payloadLen)
 {
 	Message::Header hdr;
 	struct iovec iov[2];
@@ -200,7 +227,7 @@ MessageSocket::writeMessage(enum Message::Type type,
 		cnt = 1;
 	else
 		cnt = 2;
-	return (writeMessage(iov, cnt, control, controlLen));
+	return (writeMessage(iov, cnt));
 }
 
 bool
@@ -222,7 +249,7 @@ MessageSocket::writeMessage(enum Message::Type type, int target,
 		cnt = 1;
 	else
 		cnt = 2;
-	return (writeMessage(iov, cnt, nullptr, 0));
+	return (writeMessage(iov, cnt));
 }
 
 bool
@@ -241,7 +268,7 @@ MessageSocket::writeMessage(enum Message::Type type, int target,
 	iov2[0].iov_base = &hdr;
 	iov2[0].iov_len = sizeof(hdr);
 	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
-	return (writeMessage(iov2, iovCnt + 1, NULL, 0));
+	return (writeMessage(iov2, iovCnt + 1));
 }
 
 void
@@ -265,7 +292,7 @@ MessageSocket::writeReplyMessage(enum Message::Type type, long ret, int error,
 		cnt = 1;
 	else
 		cnt = 2;
-	writeMessage(iov, cnt, nullptr, 0);
+	writeMessage(iov, cnt);
 }
 
 void
@@ -293,7 +320,7 @@ MessageSocket::writeReplyMessage(enum Message::Type type, long ret,
 	iov2[0].iov_base = &result;
 	iov2[0].iov_len = sizeof(result);
 	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
-	writeMessage(iov2, iovCnt + 1, nullptr, 0);
+	writeMessage(iov2, iovCnt + 1);
 }
 
 void

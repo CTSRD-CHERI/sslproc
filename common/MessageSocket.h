@@ -63,10 +63,11 @@ protected:
 
 	bool allocateMessages(int count, size_t size, size_t controlSize = 0);
 	int readMessage(MessageRef &ref);
+	bool writeMessage(enum Message::Type type, const void *payload,
+	    size_t payloadLen, const void *control, size_t controlLen);
 	bool writeMessage(enum Message::Type type,
 	    const void *payload = nullptr,
-	    size_t payloadLen = 0, const void *control = nullptr,
-	    size_t controlLen = 0);
+	    size_t payloadLen = 0);
 	bool writeMessage(enum Message::Type type, int target,
 	    const void *payload = nullptr,
 	    size_t payloadLen = 0);
@@ -83,8 +84,7 @@ protected:
 	    const Message::Header *hdr) = 0;
 	virtual void observeWriteError() = 0;
 private:
-	bool writeMessage(struct iovec *iov, int iovCnt,
-	    const void *control, size_t controlLen);
+	bool writeMessage(struct iovec *iov, int iovCnt);
 	void writeReplyMessage(enum Message::Type type, long ret, int error,
 	    const void *payload, size_t payloadLen);
 
