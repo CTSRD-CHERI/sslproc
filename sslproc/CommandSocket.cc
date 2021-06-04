@@ -471,7 +471,8 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		}
 
 		int target = targets.allocate(ctx);
-		SSL_CTX_set_app_data(ctx, reinterpret_cast<void *>(target));
+		SSL_CTX_set_app_data(ctx, reinterpret_cast<void *>
+		    (static_cast<intptr_t>(target)));
 		writeReplyMessage(hdr->type, 0, &target, sizeof(target));
 		break;
 	}
@@ -919,7 +920,8 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		SSL_set_mode(ssl, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 
 		int target = targets.allocate(ssl);
-		SSL_set_app_data(ssl, reinterpret_cast<void *>(target));
+		SSL_set_app_data(ssl, reinterpret_cast<void *>
+		    (static_cast<intptr_t>(target)));
 		writeReplyMessage(hdr->type, 0, &target, sizeof(target));
 		break;
 	}
@@ -1448,7 +1450,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		if (ctx == nullptr)
 			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
 		else {
-			ctx_target = reinterpret_cast<uintptr_t>
+			ctx_target = reinterpret_cast<intptr_t>
 			    (SSL_CTX_get_app_data(ctx));
 			writeReplyMessage(hdr->type, 0, &ctx_target,
 			    sizeof(ctx_target));
@@ -1581,7 +1583,7 @@ MessageRef
 CommandSocket::sendRequest(enum Message::Type type, const SSL *ssl,
     struct iovec *iov, int iovCnt)
 {
-	int target = reinterpret_cast<uintptr_t>(SSL_get_app_data(ssl));
+	int target = reinterpret_cast<intptr_t>(SSL_get_app_data(ssl));
 
 	return (sendRequest(type, target, iov, iovCnt));
 }
@@ -1590,7 +1592,7 @@ MessageRef
 CommandSocket::sendRequest(enum Message::Type type, const SSL *ssl,
     const void *payload, size_t payloadLen)
 {
-	int target = reinterpret_cast<uintptr_t>(SSL_get_app_data(ssl));
+	int target = reinterpret_cast<intptr_t>(SSL_get_app_data(ssl));
 
 	return (sendRequest(type, target, payload, payloadLen));
 }
@@ -1599,7 +1601,7 @@ MessageRef
 CommandSocket::sendRequest(enum Message::Type type, const SSL_CTX *ctx,
     const void *payload, size_t payloadLen)
 {
-	int target = reinterpret_cast<uintptr_t>(SSL_CTX_get_app_data(ctx));
+	int target = reinterpret_cast<intptr_t>(SSL_CTX_get_app_data(ctx));
 
 	return (sendRequest(type, target, payload, payloadLen));
 }
