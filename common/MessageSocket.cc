@@ -88,13 +88,18 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 	buffer->reset();
 	iov[0].iov_base = buffer->data();
 	iov[0].iov_len = buffer->capacity();
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_iov = iov;
-	msg.msg_iovlen = 1;
-	msg.msg_control = buffer->controlData();
-	msg.msg_controllen = buffer->controlCapacity();
-	msg.msg_flags = 0;
-	nread = recvmsg(fd, &msg, MSG_PEEK);
+	for (;;) {
+		memset(&msg, 0, sizeof(msg));
+		msg.msg_iov = iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = buffer->controlData();
+		msg.msg_controllen = buffer->controlCapacity();
+		msg.msg_flags = 0;
+		nread = recvmsg(fd, &msg, MSG_PEEK);
+		if (nread == -1 && errno == EINTR)
+			continue;
+		break;
+	}
 	if (nread == 0)
 		return (0);
 	if (nread == -1) {
@@ -116,13 +121,18 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 
 	iov[0].iov_base = buffer->data();
 	iov[0].iov_len = buffer->capacity();
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_iov = iov;
-	msg.msg_iovlen = 1;
-	msg.msg_control = buffer->controlData();
-	msg.msg_controllen = buffer->controlCapacity();
-	msg.msg_flags = 0;
-	nread = recvmsg(fd, &msg, 0);
+	for (;;) {
+		memset(&msg, 0, sizeof(msg));
+		msg.msg_iov = iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = buffer->controlData();
+		msg.msg_controllen = buffer->controlCapacity();
+		msg.msg_flags = 0;
+		nread = recvmsg(fd, &msg, 0);
+		if (nread == -1 && errno == EINTR)
+			continue;
+		break;
+	}
 	assert(nread > 0);
 	buffer->setLength(nread);
 	buffer->setControlLength(msg.msg_controllen);
@@ -155,6 +165,30 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 	return (1);
 }
 
+static ssize_t
+readBuffer(int fd, void *buf, size_t len)
+{
+	char *cp;
+	ssize_t nread, total;
+
+	cp = reinterpret_cast<char *>(buf);
+	total = 0;
+	while (len != 0) {
+		nread = read(fd, cp, len);
+		if (nread == 0)
+			return (total);
+		if (nread == -1) {
+			if (errno == EINTR)
+				continue;
+			return (-1);
+		}
+		total += nread;
+		cp += nread;
+		len -= nread;
+	}
+	return (total);
+}
+
 int
 MessageStreamSocket::readMessage(MessageRef &ref)
 {
@@ -171,7 +205,7 @@ MessageStreamSocket::readMessage(MessageRef &ref)
 	buffer->reset();
 
 	/* Read the header. */
-	nread = read(fd, buffer->data(), sizeof(*hdr));
+	nread = readBuffer(fd, buffer->data(), sizeof(*hdr));
 	if (nread == 0)
 		return (0);
 	if (nread == -1) {
@@ -203,8 +237,9 @@ MessageStreamSocket::readMessage(MessageRef &ref)
 	/* Read the payload. */
 	payloadLen = hdr->length - sizeof(*hdr);
 	if (payloadLen != 0) {
-		nread = read(fd, reinterpret_cast<char *>(buffer->data()) +
-		    sizeof(*hdr), payloadLen);
+		nread = readBuffer(fd,
+		    reinterpret_cast<char *>(buffer->data()) + sizeof(*hdr),
+		    payloadLen);
 		if (nread == -1) {
 			observeReadError(READ_ERROR, nullptr);
 			return (-1);
