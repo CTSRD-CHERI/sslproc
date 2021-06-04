@@ -51,6 +51,9 @@ namespace Message {
 		/* Returns a target for the created context. */
 		CREATE_CONTEXT,
 
+		/* Returns a target for the created context. */
+		CREATE_CONF_CONTEXT,
+
 		/* Operations on an SSL_CTX. */
 		FREE_CONTEXT = 0x100,
 
@@ -169,6 +172,14 @@ namespace Message {
 		INFO_CB,
 		ALPN_SELECT_CB,
 		CLIENT_CERT_CB,
+
+		/* Operations on an SSL_CONF_CTX. */
+		FREE_CONF_CONTEXT = 0x500,
+		CONF_CTX_FINISH,
+		CONF_CTX_SET_FLAGS,
+		CONF_CMD,
+		CONF_CMD_VALUE_TYPE,
+		CONF_CTX_SET_SSL_CTX,
 	};
 
 	struct Header {

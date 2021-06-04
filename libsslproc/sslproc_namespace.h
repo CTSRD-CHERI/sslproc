@@ -30,22 +30,38 @@
  * SUCH DAMAGE.
  */
 
+/* Types */
+
+#define	SSL_CONF_CTX		PSSL_CONF_CTX
+#define	SSL_METHOD		PSSL_METHOD
+#define	SSL_CIPHER		PSSL_CIPHER
+#define	SSL_SESSION		PSSL_SESSION
+#define	SSL_CTX			PSSL_CTX
+#define	SSL			PSSL
+
+/* SSL_CONF_CTX */
+
+#define	SSL_CONF_CTX_new	PSSL_CONF_CTX_new
+#define	SSL_CONF_CTX_finish	PSSL_CONF_CTX_finish
+#define	SSL_CONF_CTX_free	PSSL_CONF_CTX_free
+#define	SSL_CONF_CTX_set_flags	PSSL_CONF_CTX_set_flags
+#define	SSL_CONF_cmd_value_type	PSSL_CONF_cmd_value_type
+#define	SSL_CONF_cmd		PSSL_CONF_cmd
+#define	SSL_CONF_CTX_set_ssl_ctx	PSSL_CONF_CTX_set_ssl_ctx
+
 /* SSL_METHOD */
 
-#define	SSL_METHOD		PSSL_METHOD
 #define	TLS_method		PTLS_method
 #define	TLS_server_method	PTLS_server_method
 #define	TLS_client_method	PTLS_client_method
 
 /* SSL_CIPHER */
 
-#define	SSL_CIPHER		PSSL_CIPHER
 #define	SSL_CIPHER_get_name	PSSL_CIPHER_get_name
 #define	SSL_CIPHER_get_bits	PSSL_CIPHER_get_bits
 
 /* SSL_SESSION */
 
-#define	SSL_SESSION		PSSL_SESSION
 #define	SSL_SESSION_new		PSSL_SESSION_new
 #define	SSL_SESSION_up_ref	PSSL_SESSION_up_ref
 #define	SSL_SESSION_free	PSSL_SESSION_free
@@ -57,7 +73,6 @@
 
 /* SSL_CTX */
 
-#define	SSL_CTX			PSSL_CTX
 #define	SSL_CTX_new		PSSL_CTX_new
 #define	SSL_CTX_up_ref		PSSL_CTX_up_ref
 #define	SSL_CTX_free		PSSL_CTX_free
@@ -94,7 +109,6 @@
 
 /* SSL */
 
-#define	SSL			PSSL
 #define	SSL_new			PSSL_new
 #define	SSL_up_ref		PSSL_up_ref
 #define	SSL_free		PSSL_free

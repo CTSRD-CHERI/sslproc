@@ -38,12 +38,39 @@
 
 __BEGIN_DECLS
 
-/* OPENSSL_init? */
+/* Types */
 
-/* SSL_METHOD */
+struct _PSSL_CONF_CTX;
+typedef struct _PSSL_CONF_CTX PSSL_CONF_CTX;
 
 struct _PSSL_METHOD;
 typedef struct _PSSL_METHOD PSSL_METHOD;
+
+struct _PSSL_CIPHER;
+typedef struct _PSSL_CIPHER PSSL_CIPHER;
+
+struct _PSSL_SESSION;
+typedef struct _PSSL_SESSION PSSL_SESSION;
+
+struct _PSSL_CTX;
+typedef struct _PSSL_CTX PSSL_CTX;
+
+struct _PSSL;
+typedef struct _PSSL PSSL;
+
+/* OPENSSL_init? */
+
+/* SSL_CONF_CTX */
+
+PSSL_CONF_CTX *PSSL_CONF_CTX_new(void);
+int PSSL_CONF_CTX_finish(PSSL_CONF_CTX *cctx);
+void PSSL_CONF_CTX_free(PSSL_CONF_CTX *cctx);
+unsigned int PSSL_CONF_CTX_set_flags(PSSL_CONF_CTX *cctx, unsigned int flags);
+int PSSL_CONF_cmd(PSSL_CONF_CTX *cctx, const char *cmd, const char *value);
+int PSSL_CONF_cmd_value_type(PSSL_CONF_CTX *cctx, const char *cmd);
+void PSSL_CONF_CTX_set_ssl_ctx(PSSL_CONF_CTX *cctx, PSSL_CTX *ctx);
+
+/* SSL_METHOD */
 
 const PSSL_METHOD *PTLS_method(void);
 const PSSL_METHOD *PTLS_server_method(void);
@@ -51,16 +78,10 @@ const PSSL_METHOD *PTLS_client_method(void);
 
 /* SSL_CIPHER */
 
-struct _PSSL_CIPHER;
-typedef struct _PSSL_CIPHER PSSL_CIPHER;
-
 const char *PSSL_CIPHER_get_name(const PSSL_CIPHER *c);
 int PSSL_CIPHER_get_bits(const PSSL_CIPHER *c, int *alg_bits);
 
 /* SSL_SESSION */
-
-struct _PSSL_SESSION;
-typedef struct _PSSL_SESSION PSSL_SESSION;
 
 PSSL_SESSION *PSSL_SESSION_new(void);
 int PSSL_SESSION_up_ref(PSSL_SESSION *s);
@@ -74,12 +95,6 @@ PSSL_SESSION *d2i_PSSL_SESSION(PSSL_SESSION **a, const unsigned char **pp,
 int i2d_PSSL_SESSION(PSSL_SESSION *in, unsigned char **pp);
 
 /* SSL_CTX */
-
-struct _PSSL_CTX;
-typedef struct _PSSL_CTX PSSL_CTX;
-
-struct _PSSL;
-typedef struct _PSSL PSSL;
 
 PSSL_CTX *PSSL_CTX_new(const PSSL_METHOD *method);
 int PSSL_CTX_up_ref(PSSL_CTX *ctx);

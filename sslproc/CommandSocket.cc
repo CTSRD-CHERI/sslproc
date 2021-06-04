@@ -425,10 +425,19 @@ findSSL_CTX(const Message::Targeted *thdr)
 	return (targets.lookup<SSL_CTX>(thdr->target));
 }
 
+static SSL_CONF_CTX *
+findSSL_CONF_CTX(const Message::Targeted *thdr)
+{
+	if (thdr == nullptr)
+		return (nullptr);
+	return (targets.lookup<SSL_CONF_CTX>(thdr->target));
+}
+
 bool
 CommandSocket::handleMessage(const Message::Header *hdr)
 {
 	const Message::Targeted *thdr;
+	SSL_CONF_CTX *cctx;
 	SSL_CTX *ctx;
 	SSL *ssl;
 	long ret;
@@ -1455,6 +1464,166 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			writeReplyMessage(hdr->type, 0, &ctx_target,
 			    sizeof(ctx_target));
 		}
+		break;
+	}
+	case Message::CREATE_CONF_CONTEXT:
+	{
+		cctx = SSL_CONF_CTX_new();
+		if (cctx == nullptr) {
+			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
+			break;
+		}
+
+		int target = targets.allocate(cctx);
+		writeReplyMessage(hdr->type, 0, &target, sizeof(target));
+		break;
+	}
+	case Message::FREE_CONF_CONTEXT:
+		cctx = findSSL_CONF_CTX(thdr);
+		if (cctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		targets.remove(thdr->target);
+		SSL_CONF_CTX_free(cctx);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	case Message::CONF_CTX_FINISH:
+		cctx = findSSL_CONF_CTX(thdr);
+		if (cctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		ret = SSL_CONF_CTX_finish(cctx);
+		if (ret == 0)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, ret);
+		break;
+	case Message::CONF_CTX_SET_FLAGS:
+	{
+		unsigned int flags;
+
+		cctx = findSSL_CONF_CTX(thdr);
+		if (cctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (thdr->bodyLength() != sizeof(flags)) {
+			syslog(LOG_WARNING,
+		    "invalid message length %d for Message::CONF_CTX_SET_FLAGS",
+			    hdr->length);
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		flags = *reinterpret_cast<const unsigned int *>(thdr->body());
+		ret = SSL_CONF_CTX_set_flags(cctx, flags);
+		writeReplyMessage(hdr->type, ret);
+		break;
+	}
+	case Message::CONF_CMD:
+	{
+		cctx = findSSL_CONF_CTX(thdr);
+		if (cctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (thdr->bodyLength() == 0) {
+			syslog(LOG_WARNING,
+			    "empty message body for Message::CONF_CMD");
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		const char *cmd = reinterpret_cast<const char *>(thdr->body());
+		const char *value = reinterpret_cast<const char *>
+		    (memchr(cmd, '\0', thdr->bodyLength()));
+		if (value == nullptr) {
+			/* 'cmd' was not terminated. */
+			syslog(LOG_WARNING,
+			    "invalid message body for Message::CONF_CMD");
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+
+		if (value == cmd + (thdr->bodyLength() - 1)) {
+			/* no 'value'. */
+			syslog(LOG_WARNING,
+			    "invalid message body for Message::CONF_CMD");
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+
+		value++;
+		if (memchr(value, '\0', thdr->bodyLength() - (value - cmd)) !=
+		    cmd + (thdr->bodyLength() - 1)) {
+			/* 'value' terminated early or not at all. */
+			syslog(LOG_WARNING,
+			    "invalid message body for Message::CONF_CMD");
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+
+		ret = SSL_CONF_cmd(cctx, cmd, value);
+
+		/*
+		 * Depending on the flags set, non-zero return values
+		 * may optionally report errors.
+		 */
+		if (ERR_peek_error())
+			writeSSLErrorReply(hdr->type, ret, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, ret);
+		break;
+	}
+	case Message::CONF_CMD_VALUE_TYPE:
+	{
+		cctx = findSSL_CONF_CTX(thdr);
+		if (cctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		char *cmd = strndup(reinterpret_cast<const char *>
+		    (thdr->body()), thdr->bodyLength());
+		ret = SSL_CONF_cmd_value_type(cctx, cmd);
+		free(cmd);
+		writeReplyMessage(hdr->type, ret);
+		break;
+	}
+	case Message::CONF_CTX_SET_SSL_CTX:
+	{
+		int ctx_target;
+
+		cctx = findSSL_CONF_CTX(thdr);
+		if (cctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (thdr->bodyLength() != sizeof(ctx_target)) {
+			syslog(LOG_WARNING,
+	    "invalid message length %d for Message::CONF_CTX_SET_SSL_CTX",
+			    hdr->length);
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		ctx_target = *reinterpret_cast<const int *>(thdr->body());
+		if (ctx_target == NULL_TARGET)
+			ctx = nullptr;
+		else {
+			ctx = targets.lookup<SSL_CTX>(ctx_target);
+			if (ctx == nullptr) {
+				writeErrnoReply(hdr->type, -1, ENOENT);
+				break;
+			}
+		}
+		SSL_CONF_CTX_set_ssl_ctx(cctx, ctx);
+		writeReplyMessage(hdr->type, 0);
 		break;
 	}
 	default:

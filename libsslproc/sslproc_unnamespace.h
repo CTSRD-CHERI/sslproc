@@ -30,22 +30,38 @@
  * SUCH DAMAGE.
  */
 
+/* Types */
+
+#undef SSL_CONF_CTX
+#undef SSL_METHOD
+#undef SSL_CIPHER
+#undef SSL_SESSION
+#undef SSL_CTX
+#undef SSL
+
+/* SSL_CONF_CTX */
+
+#undef SSL_CONF_CTX_new
+#undef SSL_CONF_CTX_finish
+#undef SSL_CONF_CTX_free
+#undef SSL_CONF_CTX_set_flags
+#undef SSL_CONF_cmd_value_type
+#undef SSL_CONF_cmd
+#undef SSL_CONF_CTX_set_ssl_ctx
+
 /* SSL_METHOD */
 
-#undef SSL_METHOD
 #undef TLS_method
 #undef TLS_server_method
 #undef TLS_client_method
 
 /* SSL_CIPHER */
 
-#undef SSL_CIPHER
 #undef SSL_CIPHER_get_name
 #undef SSL_CIPHER_get_bits
 
 /* SSL_SESSION */
 
-#undef SSL_SESSION
 #undef SSL_SESSION_new
 #undef SSL_SESSION_up_ref
 #undef SSL_SESSION_free
@@ -57,7 +73,6 @@
 
 /* SSL_CTX */
 
-#undef SSL_CTX
 #undef SSL_CTX_new
 #undef SSL_CTX_up_ref
 #undef SSL_CTX_free
@@ -94,7 +109,6 @@
 
 /* SSL */
 
-#undef SSL
 #undef SSL_new
 #undef SSL_up_ref
 #undef SSL_free

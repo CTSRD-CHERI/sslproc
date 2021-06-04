@@ -620,6 +620,73 @@ test_ssl_memory_ping_pong(void)
 	PASS();
 }
 
+static void
+test_conf(void)
+{
+	SSL_CONF_CTX *cctx;
+	SSL_CTX *ctx;
+	unsigned int flags;
+	int ret;
+
+	cctx = SSL_CONF_CTX_new();
+	if (cctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create conf context");
+	}
+
+	flags = SSL_CONF_CTX_set_flags(cctx, SSL_CONF_FLAG_CMDLINE |
+	    SSL_CONF_FLAG_CLIENT);
+	if (flags != (SSL_CONF_FLAG_CMDLINE | SSL_CONF_FLAG_CLIENT)) {
+		ERR_print_errors_fp(stdout);
+		SSL_CONF_CTX_free(cctx);
+		FAIL("failed to set conf flags");
+	}
+
+	ret = SSL_CONF_cmd_value_type(cctx, "-min_protocol");
+	if (ret != SSL_CONF_TYPE_STRING) {
+		ERR_print_errors_fp(stdout);
+		SSL_CONF_CTX_free(cctx);
+		FAIL("failed to get min_protocol type");
+	}
+
+	ret = SSL_CONF_cmd(cctx, "-min_protocol", "TLSv1.2");
+	if (ret != 0) {
+		ERR_print_errors_fp(stdout);
+		SSL_CONF_CTX_free(cctx);
+		FAIL("didn't fail to set min_protocol");
+	}
+	ERR_clear_error();
+
+	ctx = SSL_CTX_new(TLS_client_method());
+	if (ctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create context");
+	}
+
+	SSL_CONF_CTX_set_ssl_ctx(cctx, ctx);
+
+	ret = SSL_CONF_cmd(cctx, "-min_protocol", "TLSv1.2");
+	if (ret != 2) {
+		ERR_print_errors_fp(stdout);
+		SSL_CONF_CTX_free(cctx);
+		SSL_CTX_free(ctx);
+		FAIL("failed to set min_protocol");
+	}
+
+	ret = SSL_CONF_CTX_finish(cctx);
+	if (ret != 1) {
+		ERR_print_errors_fp(stdout);
+		SSL_CONF_CTX_free(cctx);
+		SSL_CTX_free(ctx);
+		FAIL("failed to finish");
+	}
+
+	SSL_CONF_CTX_free(cctx);
+	SSL_CTX_free(ctx);
+
+	PASS();
+}
+
 int
 main(int ac, char **av)
 {
@@ -654,6 +721,7 @@ main(int ac, char **av)
 	test_ssl_app_data();
 	test_ssl_handshake_states();
 	test_ssl_memory_ping_pong();
+	test_conf();
 
 	return (0);
 }
