@@ -112,6 +112,11 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	ctx->sess_get_cb = nullptr;
 	ctx->sess_cbs_enabled = false;
 	ctx->tmp_dh_cb = nullptr;
+	ctx->info_cb = nullptr;
+	ctx->alpn_select_cb = nullptr;
+	ctx->alpn_select_cb_arg = nullptr;
+	ctx->client_cert_cb = nullptr;
+	ctx->verify_cb = nullptr;
 	ctx->refs = 1;
 	return (ctx);
 }
@@ -743,4 +748,24 @@ PSSL_CTX_set_client_cert_cb(PSSL_CTX *ctx,
 	ctx->client_cert_cb = cb;
 	cs->waitForReply(cb == nullptr ? Message::CTX_DISABLE_CLIENT_CERT_CB :
 	    Message::CTX_ENABLE_CLIENT_CERT_CB, ctx->target);
+}
+
+void
+PSSL_CTX_set_verify(PSSL_CTX *ctx, int mode, PSSL_verify_cb cb)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	ctx->verify_cb = cb;
+
+	struct {
+		int mode;
+		int cb_set;
+	} body;
+
+	body.mode = mode;
+	body.cb_set = cb != nullptr;
+	cs->waitForReply(Message::CTX_SET_VERIFY, ctx->target, &body,
+	    sizeof(body));
 }

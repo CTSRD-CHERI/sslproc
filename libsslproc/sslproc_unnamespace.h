@@ -106,6 +106,8 @@
 #undef SSL_CTX_set_timeout
 #undef SSL_CTX_get0_certificate
 #undef SSL_CTX_set_client_cert_cb
+#undef SSL_verify_cb
+#undef SSL_CTX_set_verify
 
 /* SSL */
 
@@ -152,3 +154,4 @@
 #undef SSL_set_shutdown
 #undef SSL_get_shutdown
 #undef SSL_shutdown
+#undef SSL_get_ex_data_X509_STORE_CTX_idx

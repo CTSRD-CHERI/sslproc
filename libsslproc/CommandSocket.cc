@@ -596,6 +596,59 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		OPENSSL_free(pkey_buf);
 		break;
 	}
+	case Message::VERIFY_CB:
+	{
+		if (hdr->length < sizeof(Message::VerifyCb)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		const Message::VerifyCb *msg =
+		    reinterpret_cast<const Message::VerifyCb *>(hdr);
+
+		X509 *cert;
+		const unsigned char *pp =
+		    reinterpret_cast<const unsigned char *>(msg->cert());
+		if (msg->certLength() == 0) {
+			cert = nullptr;
+		} else {
+			cert = d2i_X509(nullptr, &pp, msg->certLength());
+			if (cert == nullptr) {
+				writeErrnoReply(hdr->type, -1, EBADMSG);
+				break;
+			}
+		}
+
+		X509_STORE_CTX *x509_ctx = X509_STORE_CTX_new();
+		if (x509_ctx == nullptr) {
+			X509_free(cert);
+			writeErrnoReply(hdr->type, -1, ENOMEM);
+			break;
+		}
+
+		X509_STORE_CTX_set_ex_data(x509_ctx,
+		    PSSL_get_ex_data_X509_STORE_CTX_idx(), ssl);
+
+		X509_STORE_CTX_set_error(x509_ctx, msg->x509_error);
+		X509_STORE_CTX_set_error_depth(x509_ctx, msg->x509_error_depth);
+		X509_STORE_CTX_set_current_cert(x509_ctx, cert);
+
+		ret = ssl->ctx->verify_cb(msg->preverify_ok, x509_ctx);
+
+		X509_STORE_CTX_free(x509_ctx);
+		X509_free(cert);
+
+		int x509_error = X509_STORE_CTX_get_error(x509_ctx);
+		writeReplyMessage(hdr->type, ret, &x509_error,
+		    sizeof(x509_error));
+		break;
+	}
 	default:
 		PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

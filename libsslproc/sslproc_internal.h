@@ -52,6 +52,8 @@ int	POPENSSL_init_ssl(void);
 extern int PROC_lib;
 void	PERR_init(void);
 
+void	SSL_init(void);
+
 class CommandSocket;
 
 CommandSocket *currentCommandSocket();
@@ -207,6 +209,7 @@ struct _PSSL_CTX {
 	    unsigned char *, const unsigned char *, unsigned int, void *);
 	void *alpn_select_cb_arg;
 	int (*client_cert_cb)(struct _PSSL *, X509 **, EVP_PKEY **);
+	int (*verify_cb)(int, X509_STORE_CTX *);
 	bool sess_cbs_enabled;
 	std::unordered_map<session_map_key, struct _PSSL_SESSION *> sessions;
 	std::atomic_int refs;

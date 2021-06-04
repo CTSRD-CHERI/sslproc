@@ -106,6 +106,8 @@
 #define	SSL_CTX_set_timeout	PSSL_CTX_set_timeout
 #define	SSL_CTX_get0_certificate	PSSL_CTX_get0_certificate
 #define	SSL_CTX_set_client_cert_cb	PSSL_CTX_set_client_cert_cb
+#define	SSL_verify_cb		PSSL_verify_cb
+#define	SSL_CTX_set_verify	PSSL_CTX_set_verify
 
 /* SSL */
 
@@ -152,3 +154,4 @@
 #define	SSL_set_shutdown	PSSL_set_shutdown
 #define	SSL_get_shutdown	PSSL_get_shutdown
 #define	SSL_shutdown		PSSL_shutdown
+#define	SSL_get_ex_data_X509_STORE_CTX_idx PSSL_get_ex_data_X509_STORE_CTX_idx

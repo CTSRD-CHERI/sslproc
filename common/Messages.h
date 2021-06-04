@@ -90,6 +90,7 @@ namespace Message {
 		CTX_GET0_CERTIFICATE,
 		CTX_ENABLE_CLIENT_CERT_CB,
 		CTX_DISABLE_CLIENT_CERT_CB,
+		CTX_SET_VERIFY,
 
 		/* Returns a target for the created session. */
 		CREATE_SESSION,
@@ -172,6 +173,7 @@ namespace Message {
 		INFO_CB,
 		ALPN_SELECT_CB,
 		CLIENT_CERT_CB,
+		VERIFY_CB,
 
 		/* Operations on an SSL_CONF_CTX. */
 		FREE_CONF_CONTEXT = 0x500,
@@ -278,6 +280,12 @@ namespace Message {
 		}
 	};
 
+	/* Body for CTX_SET_VERIFY */
+	struct SetVerify : public Targeted {
+		int	mode;
+		int	cb_set;
+	};
+
 	/*
 	 * Body for READ and BIO_READ.
 	 */
@@ -334,6 +342,23 @@ namespace Message {
 	struct InfoCb : public Targeted {
 		int	where;
 		int	ret;
+	};
+
+	/* Body for VERIFY_CB. */
+	struct VerifyCb: public Targeted {
+		int	preverify_ok;
+		int	x509_error;
+		int	x509_error_depth;
+
+		size_t certLength() const
+		{
+			return (length - sizeof(VerifyCb));
+		}
+
+		const void *cert() const
+		{
+			return (this + 1);
+		}
 	};
 
 	/*
@@ -397,5 +422,10 @@ namespace Message {
 			return (reinterpret_cast<const char *>(cert()) +
 			    cert_len);
 		}
+	};
+
+	/* Response from VERIFY_CB */
+	struct VerifyCbResult : public Result {
+		int	x509_error;
 	};
 }

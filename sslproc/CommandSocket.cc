@@ -349,6 +349,65 @@ client_cert_cb(SSL *ssl, X509 **certp, EVP_PKEY **pkeyp)
 	return (1);
 }
 
+static int
+verify_cb(int preverify_ok, X509_STORE_CTX *x509_ctx)
+{
+	struct {
+		int preverify_ok;
+		int x509_error;
+		int x509_error_depth;
+	} body;
+
+	body.preverify_ok = preverify_ok;
+	body.x509_error = X509_STORE_CTX_get_error(x509_ctx);
+	body.x509_error_depth = X509_STORE_CTX_get_error_depth(x509_ctx);
+
+	CommandSocket *cs = currentSocket;
+	if (cs == nullptr) {
+		syslog(LOG_WARNING, "%s: invoked without active command socket",
+		    __func__);
+		return (0);
+	}
+
+	SSL *ssl = reinterpret_cast<SSL *>(X509_STORE_CTX_get_ex_data(x509_ctx,
+	    SSL_get_ex_data_X509_STORE_CTX_idx()));
+	if (ssl == nullptr) {
+		syslog(LOG_WARNING, "%s: could not lookup SSL session",
+		    __func__);
+		return (0);
+	}
+
+	X509 *cert = X509_STORE_CTX_get_current_cert(x509_ctx);
+	unsigned char *cert_buf = nullptr;
+	int cert_len = 0;
+	if (cert != nullptr) {
+		cert_len = i2d_X509(cert, &cert_buf);
+		if (cert_len < 0) {
+			syslog(LOG_WARNING, "%s: could not serialize cert",
+			    __func__);
+			return (0);
+		}
+	}
+
+	struct iovec iov[2];
+	iov[0].iov_base = &body;
+	iov[0].iov_len = sizeof(body);
+	iov[1].iov_base = cert_buf;
+	iov[1].iov_len = cert_len;
+	MessageRef ref = cs->sendRequest(Message::VERIFY_CB, ssl, iov, 2);
+	OPENSSL_free(cert_buf);
+	if (!ref)
+		return (0);
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		return (0);
+	if (msg->length == sizeof(Message::VerifyCbResult))
+		X509_STORE_CTX_set_error(x509_ctx,
+		    reinterpret_cast<const Message::VerifyCbResult *>(msg)->
+		    x509_error);
+	return (msg->ret);
+}
+
 static void *
 commandSocketRun(void *arg)
 {
@@ -888,6 +947,26 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		SSL_CTX_set_client_cert_cb(ctx, nullptr);
 		writeReplyMessage(hdr->type, 0);
 		break;
+	case Message::CTX_SET_VERIFY:
+	{
+		if (hdr->length != sizeof(Message::SetVerify)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ctx = findSSL_CTX(thdr);
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		const Message::SetVerify *msg =
+		    reinterpret_cast<const Message::SetVerify *>(hdr);
+		SSL_CTX_set_verify(ctx, msg->mode, msg->cb_set ?
+		    verify_cb : nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	case Message::CREATE_SESSION:
 	{
 		ctx = findSSL_CTX(thdr);

@@ -139,6 +139,8 @@ long PSSL_CTX_set_timeout(PSSL_CTX *ctx, long time);
 X509 *PSSL_CTX_get0_certificate(const PSSL_CTX *ctx);
 void PSSL_CTX_set_client_cert_cb(PSSL_CTX *ctx,
     int (*cb)(PSSL *, X509 **, EVP_PKEY **));
+typedef int (*PSSL_verify_cb)(int preverify_ok, X509_STORE_CTX *x509_ctx);
+void PSSL_CTX_set_verify(PSSL_CTX *ctx, int mode, PSSL_verify_cb cb);
 
 /* SSL */
 
@@ -188,5 +190,6 @@ int PSSL_write(PSSL *ssl, const void *buf, int len);
 void PSSL_set_shutdown(PSSL *ssl, int mode);
 int PSSL_get_shutdown(const PSSL *ssl);
 int PSSL_shutdown(PSSL *ssl);
+int PSSL_get_ex_data_X509_STORE_CTX_idx(void);
 
 __END_DECLS

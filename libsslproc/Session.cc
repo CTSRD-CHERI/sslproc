@@ -1098,3 +1098,18 @@ PSSL_shutdown(PSSL *ssl)
 	ssl->last_error = msg->error;
 	return (msg->ret);
 }
+
+static int X509_ex_data_PSSL_idx;
+
+int
+PSSL_get_ex_data_X509_STORE_CTX_idx(void)
+{
+	return (X509_ex_data_PSSL_idx);
+}
+
+void
+SSL_init(void)
+{
+	X509_ex_data_PSSL_idx = X509_STORE_CTX_get_ex_new_index(0, NULL, NULL,
+	    NULL, NULL);
+}

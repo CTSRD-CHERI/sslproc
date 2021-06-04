@@ -148,6 +148,7 @@ POPENSSL_init_ssl(void)
 
 	PERR_init();
 	ControlSocket_init();
+	SSL_init();
 	initted.store(1);
 	return (0);
 }
