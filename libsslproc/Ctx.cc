@@ -792,3 +792,15 @@ PSSL_CTX_load_verify_locations(PSSL_CTX *ctx, const char *CAfile,
 		return (0);
 	return (ref.result()->ret);
 }
+
+X509_STORE *
+PSSL_CTX_get_cert_store(const PSSL_CTX *ctx)
+{
+	/*
+	 * XXX: Cannot safely implement this as some callers expect to
+	 * be able to modify the returned context and effect permament
+	 * changes in 'ctx'.  In addition, the lifetime is poorly
+	 * defined as no reference is returned.
+	 */
+	return (nullptr);
+}

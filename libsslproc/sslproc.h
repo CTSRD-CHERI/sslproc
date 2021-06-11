@@ -143,6 +143,7 @@ typedef int (*PSSL_verify_cb)(int preverify_ok, X509_STORE_CTX *x509_ctx);
 void PSSL_CTX_set_verify(PSSL_CTX *ctx, int mode, PSSL_verify_cb cb);
 int PSSL_CTX_load_verify_locations(PSSL_CTX *ctx, const char *CAfile,
     const char *CApath);
+X509_STORE *PSSL_CTX_get_cert_store(const PSSL_CTX *ctx);
 
 /* SSL */
 
