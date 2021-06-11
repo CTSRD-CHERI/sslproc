@@ -97,6 +97,8 @@ static ERR_STRING_DATA PROC_strings[] = {
 	{ERR_PACK(0, PROC_F_SSL_CONF_CTX_NEW, 0), "PSSL_CONF_CTX_new"},
 	{ERR_PACK(0, PROC_F_SSL_CONF_CTX_FINISH, 0), "PSSL_CONF_CTX_finish"},
 	{ERR_PACK(0, PROC_F_SSL_CONF_CMD, 0), "PSSL_CONF_cmd"},
+	{ERR_PACK(0, PROC_F_SSL_CTX_LOAD_VERIFY_LOCATIONS, 0),
+	 "PSSL_CTX_load_verify_locations"},
 	{ERR_PACK(0, 0, ERR_R_IO_ERROR), "I/O error"},
 	{ERR_PACK(0, 0, ERR_R_BAD_MESSAGE), "invalid message"},
 	{ERR_PACK(0, 0, ERR_R_UNEXPECTED_EOF), "unexpected EOF"},

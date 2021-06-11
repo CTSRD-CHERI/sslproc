@@ -108,6 +108,7 @@
 #define	SSL_CTX_set_client_cert_cb	PSSL_CTX_set_client_cert_cb
 #define	SSL_verify_cb		PSSL_verify_cb
 #define	SSL_CTX_set_verify	PSSL_CTX_set_verify
+#define	SSL_CTX_load_verify_locations	PSSL_CTX_load_verify_locations
 
 /* SSL */
 

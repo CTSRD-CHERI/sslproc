@@ -769,3 +769,26 @@ PSSL_CTX_set_verify(PSSL_CTX *ctx, int mode, PSSL_verify_cb cb)
 	cs->waitForReply(Message::CTX_SET_VERIFY, ctx->target, &body,
 	    sizeof(body));
 }
+
+int
+PSSL_CTX_load_verify_locations(PSSL_CTX *ctx, const char *CAfile,
+    const char *CApath)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CTX_LOAD_VERIFY_LOCATIONS,
+		    ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	struct iovec iov[2];
+	iov[0].iov_base = const_cast<char *>(CAfile);
+	iov[0].iov_len = strlen(CAfile) + 1;
+	iov[1].iov_base = const_cast<char *>(CApath);
+	iov[1].iov_len = strlen(CApath) + 1;
+	MessageRef ref = cs->waitForReply(Message::CTX_LOAD_VERIFY_LOCATIONS,
+	    ctx->target, iov, 2);
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
+}

@@ -108,6 +108,7 @@
 #undef SSL_CTX_set_client_cert_cb
 #undef SSL_verify_cb
 #undef SSL_CTX_set_verify
+#undef SSL_CTX_load_verify_locations
 
 /* SSL */
 

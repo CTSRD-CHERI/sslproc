@@ -35,6 +35,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <syslog.h>
+#include <vector>
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -48,6 +49,28 @@ static pthread_attr_t attr;
 static TargetStore targets;
 static thread_local CommandSocket *currentSocket;
 static BIO_METHOD *readBioMethod, *writeBioMethod;
+
+/*
+ * Return a vector of pointers to nul-terminated C strings in a
+ * buffer.  If the buffer is not nul-terminated, an empty vector is
+ * returned.
+ */
+static std::vector<const char *>
+parseStrings(const void *buf, size_t len)
+{
+	const char *cp = reinterpret_cast<const char *>(buf);
+	const char *end = cp + len - 1;
+
+	if (*end != '\0')
+		return {};
+
+	std::vector<const char *> strings;
+	while (cp < end) {
+		strings.push_back(cp);
+		cp += strlen(cp) + 1;
+	}
+	return (strings);
+}
 
 static void
 msg_cb(int write_p, int version, int content_type, const void *buf,
@@ -967,6 +990,38 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case Message::CTX_LOAD_VERIFY_LOCATIONS:
+	{
+		ctx = findSSL_CTX(thdr);
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (thdr->bodyLength() == 0) {
+			syslog(LOG_WARNING,
+	    "empty message body for Message::CTX_LOAD_VERIFY_LOCATIONS");
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		std::vector<const char *> strings = parseStrings(thdr->body(),
+		    thdr->bodyLength());
+		if (strings.size() != 2) {
+			syslog(LOG_WARNING,
+	    "invalid message body for Message::CTX_LOAD_VERIFY_LOCATIONS");
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+
+		ret = SSL_CTX_load_verify_locations(ctx, strings[0],
+		    strings[1]);
+		if (ret == 0)
+			writeSSLErrorReply(hdr->type, ret, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, ret);
+		break;
+	}
 	case Message::CREATE_SESSION:
 	{
 		ctx = findSSL_CTX(thdr);
@@ -1618,36 +1673,16 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			break;
 		}
 
-		const char *cmd = reinterpret_cast<const char *>(thdr->body());
-		const char *value = reinterpret_cast<const char *>
-		    (memchr(cmd, '\0', thdr->bodyLength()));
-		if (value == nullptr) {
-			/* 'cmd' was not terminated. */
+		std::vector<const char *> strings = parseStrings(thdr->body(),
+		    thdr->bodyLength());
+		if (strings.size() != 2) {
 			syslog(LOG_WARNING,
 			    "invalid message body for Message::CONF_CMD");
 			writeErrnoReply(hdr->type, -1, EBADMSG);
 			break;
 		}
 
-		if (value == cmd + (thdr->bodyLength() - 1)) {
-			/* no 'value'. */
-			syslog(LOG_WARNING,
-			    "invalid message body for Message::CONF_CMD");
-			writeErrnoReply(hdr->type, -1, EBADMSG);
-			break;
-		}
-
-		value++;
-		if (memchr(value, '\0', thdr->bodyLength() - (value - cmd)) !=
-		    cmd + (thdr->bodyLength() - 1)) {
-			/* 'value' terminated early or not at all. */
-			syslog(LOG_WARNING,
-			    "invalid message body for Message::CONF_CMD");
-			writeErrnoReply(hdr->type, -1, EBADMSG);
-			break;
-		}
-
-		ret = SSL_CONF_cmd(cctx, cmd, value);
+		ret = SSL_CONF_cmd(cctx, strings[0], strings[1]);
 
 		/*
 		 * Depending on the flags set, non-zero return values

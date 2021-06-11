@@ -91,6 +91,7 @@ namespace Message {
 		CTX_ENABLE_CLIENT_CERT_CB,
 		CTX_DISABLE_CLIENT_CERT_CB,
 		CTX_SET_VERIFY,
+		CTX_LOAD_VERIFY_LOCATIONS,
 
 		/* Returns a target for the created session. */
 		CREATE_SESSION,
