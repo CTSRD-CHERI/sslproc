@@ -42,6 +42,7 @@
 
 #include "local.h"
 #include "Messages.h"
+#include "MessageHelpers.h"
 #include "TargetStore.h"
 #include "CommandSocket.h"
 
@@ -49,28 +50,6 @@ static pthread_attr_t attr;
 static TargetStore targets;
 static thread_local CommandSocket *currentSocket;
 static BIO_METHOD *readBioMethod, *writeBioMethod;
-
-/*
- * Return a vector of pointers to nul-terminated C strings in a
- * buffer.  If the buffer is not nul-terminated, an empty vector is
- * returned.
- */
-static std::vector<const char *>
-parseStrings(const void *buf, size_t len)
-{
-	const char *cp = reinterpret_cast<const char *>(buf);
-	const char *end = cp + len - 1;
-
-	if (*end != '\0')
-		return {};
-
-	std::vector<const char *> strings;
-	while (cp < end) {
-		strings.push_back(cp);
-		cp += strlen(cp) + 1;
-	}
-	return (strings);
-}
 
 static void
 msg_cb(int write_p, int version, int content_type, const void *buf,
