@@ -382,6 +382,93 @@ PSSL_get_ex_data(const PSSL *ssl, int idx)
 	return (CRYPTO_get_ex_data(&ssl->ex_data, idx));
 }
 
+int
+PSSL_use_certificate(PSSL *ssl, X509 *x)
+{
+	unsigned char *buf;
+	int len, ret;
+
+	buf = NULL;
+	len = i2d_X509(x, &buf);
+	if (len < 0) {
+		PROCerr(PROC_F_SSL_USE_CERTIFICATE, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "failed to encode X509");
+		return (0);
+	}
+
+	ret = PSSL_use_certificate_ASN1(ssl, buf, len);
+	OPENSSL_free(buf);
+	return (ret);
+}
+
+int
+PSSL_use_certificate_ASN1(PSSL *ssl, const unsigned char *d, int len)
+{
+	if (d == NULL) {
+		PROCerr(PROC_F_SSL_USE_CERTIFICATE_ASN1,
+		    ERR_R_PASSED_NULL_PARAMETER);
+		return (0);
+	}
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_USE_CERTIFICATE_ASN1,
+		    ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::USE_CERTIFICATE_ASN1,
+	    ssl->target, d, len);
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
+}
+
+int
+PSSL_use_certificate_file(PSSL *ssl, const char *file, int type)
+{
+	BIO *bio;
+	X509 *x;
+	char tmp[16];
+	int ret;
+
+	bio = BIO_new_file(file, "r");
+	if (bio == NULL) {
+		PROCerr(PROC_F_SSL_USE_CERTIFICATE_FILE,
+		    ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "failed to open file ", file);
+		return (0);
+	}
+
+	switch (type) {
+	case SSL_FILETYPE_PEM:
+		x = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+		if (x == NULL)
+			PROCerr(PROC_F_SSL_USE_CERTIFICATE_FILE,
+			    ERR_R_PEM_LIB);
+		break;
+	case SSL_FILETYPE_ASN1:
+		x = d2i_X509_bio(bio, NULL);
+		if (x == NULL)
+			PROCerr(PROC_F_SSL_USE_CERTIFICATE_FILE,
+			    ERR_R_ASN1_LIB);
+		break;
+	default:
+		x = NULL;
+		PROCerr(PROC_F_SSL_USE_CERTIFICATE_FILE,
+		    ERR_R_PASSED_INVALID_ARGUMENT);
+		snprintf(tmp, sizeof(tmp), "%d", type);
+		ERR_add_error_data(2, "type=", tmp);
+		break;
+	}
+	BIO_free_all(bio);
+	if (x == NULL)
+		return (0);
+	ret = PSSL_use_certificate(ssl, x);
+	X509_free(x);
+	return (ret);
+}
+
 PSSL_CTX *
 PSSL_get_SSL_CTX(const PSSL *ssl)
 {

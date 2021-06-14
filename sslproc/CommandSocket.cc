@@ -1476,6 +1476,25 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		}
 		break;
 	}
+	case Message::USE_CERTIFICATE_ASN1:
+		if (thdr == nullptr || thdr->bodyLength() == 0) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		ret = SSL_use_certificate_ASN1(ssl,
+		    reinterpret_cast<const unsigned char *>(thdr->body()),
+		    thdr->bodyLength());
+		if (ret != 1)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, 1);
+		break;
 	case Message::SET_SHUTDOWN:
 	{
 		int mode;

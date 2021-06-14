@@ -123,6 +123,8 @@
 #define	SSL_ctrl		PSSL_ctrl
 #define	SSL_set_ex_data		PSSL_set_ex_data
 #define	SSL_get_ex_data		PSSL_get_ex_data
+#define	SSL_use_certificate	PSSL_use_certificate
+#define	SSL_use_certificate_ASN1	PSSL_use_certificate_ASN1
 #define	SSL_get_SSL_CTX		PSSL_get_SSL_CTX
 #define	SSL_set_SSL_CTX		PSSL_set_SSL_CTX
 #define	SSL_get_peer_certificate	PSSL_get_peer_certificate

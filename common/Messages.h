@@ -130,6 +130,10 @@ namespace Message {
 		GET_SERVERNAME,
 		GET_SERVERNAME_TYPE,
 		CTRL,
+
+		/* Message body is a ASN1-serialized X509 object. */
+		USE_CERTIFICATE_ASN1,
+
 		SET_SHUTDOWN,
 		GET_SHUTDOWN,
 		GET_PEER_CERTIFICATE,
