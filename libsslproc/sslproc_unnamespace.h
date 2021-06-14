@@ -112,6 +112,8 @@
 #undef SSL_CTX_get_cert_store
 #undef SSL_CTX_set_client_CA_list
 #undef SSL_CTX_get_client_CA_list
+#undef SSL_CTX_set_default_passwd_cb
+#undef SSL_CTX_set_default_passwd_cb_userdata
 
 /* SSL */
 
@@ -159,3 +161,5 @@
 #undef SSL_get_shutdown
 #undef SSL_shutdown
 #undef SSL_get_ex_data_X509_STORE_CTX_idx
+#undef SSL_set_default_passwd_cb
+#undef SSL_set_default_passwd_cb_userdata

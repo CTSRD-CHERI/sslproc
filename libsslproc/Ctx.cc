@@ -119,6 +119,8 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	ctx->alpn_select_cb_arg = nullptr;
 	ctx->client_cert_cb = nullptr;
 	ctx->verify_cb = nullptr;
+	ctx->default_passwd_cb = PEM_def_callback;
+	ctx->default_passwd_cb_userdata = nullptr;
 	ctx->refs = 1;
 	return (ctx);
 }
@@ -863,4 +865,16 @@ PSSL_CTX_get_client_CA_list(const PSSL_CTX *cctx)
 		sk_X509_NAME_pop_free(ctx->client_CA_list, X509_NAME_free);
 	ctx->client_CA_list = sk;
 	return (sk);
+}
+
+void
+PSSL_CTX_set_default_passwd_cb(PSSL_CTX *ctx, pem_password_cb *cb)
+{
+	ctx->default_passwd_cb = cb == nullptr ? PEM_def_callback : cb;
+}
+
+void
+PSSL_CTX_set_default_passwd_cb_userdata(PSSL_CTX *ctx, void *data)
+{
+	ctx->default_passwd_cb_userdata = data;
 }

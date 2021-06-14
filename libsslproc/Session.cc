@@ -278,6 +278,10 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->srp_userinfo = nullptr;
 	memset(&ssl->current_cipher, 0, sizeof(ssl->current_cipher));
 	memset(&ssl->pending_cipher, 0, sizeof(ssl->pending_cipher));
+	ssl->msg_cb = nullptr;
+	ssl->msg_cb_arg = nullptr;
+	ssl->default_passwd_cb = PEM_def_callback;
+	ssl->default_passwd_cb_userdata = nullptr;
 	ssl->refs = 1;
 	return (ssl);
 }
@@ -1105,6 +1109,18 @@ int
 PSSL_get_ex_data_X509_STORE_CTX_idx(void)
 {
 	return (X509_ex_data_PSSL_idx);
+}
+
+void
+PSSL_set_default_passwd_cb(PSSL *ssl, pem_password_cb *cb)
+{
+	ssl->default_passwd_cb = cb == nullptr ? PEM_def_callback : cb;
+}
+
+void
+PSSL_set_default_passwd_cb_userdata(PSSL *ssl, void *data)
+{
+	ssl->default_passwd_cb_userdata = data;
 }
 
 void

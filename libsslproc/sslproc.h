@@ -34,6 +34,7 @@
 
 #include <sys/cdefs.h>
 
+#include <openssl/pem.h>
 #include <openssl/x509.h>
 
 __BEGIN_DECLS
@@ -146,6 +147,8 @@ int PSSL_CTX_load_verify_locations(PSSL_CTX *ctx, const char *CAfile,
 X509_STORE *PSSL_CTX_get_cert_store(const PSSL_CTX *ctx);
 void PSSL_CTX_set_client_CA_list(PSSL_CTX *ctx, STACK_OF(X509_NAME) *list);
 STACK_OF(X509_NAME) *PSSL_CTX_get_client_CA_list(const PSSL_CTX *ctx);
+void PSSL_CTX_set_default_passwd_cb(PSSL_CTX *ctx, pem_password_cb *cb);
+void PSSL_CTX_set_default_passwd_cb_userdata(PSSL_CTX *ctx, void *data);
 
 /* SSL */
 
@@ -196,5 +199,7 @@ void PSSL_set_shutdown(PSSL *ssl, int mode);
 int PSSL_get_shutdown(const PSSL *ssl);
 int PSSL_shutdown(PSSL *ssl);
 int PSSL_get_ex_data_X509_STORE_CTX_idx(void);
+void PSSL_set_default_passwd_cb(PSSL *ssl, pem_password_cb *cb);
+void PSSL_set_default_passwd_cb_userdata(PSSL *ssl, void *data);
 
 __END_DECLS

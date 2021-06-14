@@ -177,6 +177,13 @@ namespace Message {
 		ALPN_SELECT_CB,
 		CLIENT_CERT_CB,
 		VERIFY_CB,
+		DEFAULT_PASSWD_CB,
+
+		/*
+		 * This callback is invoked on an SSL_CTX instead of
+		 * an SSL.
+		 */
+		CTX_DEFAULT_PASSWD_CB,
 
 		/* Operations on an SSL_CONF_CTX. */
 		FREE_CONF_CONTEXT = 0x500,
@@ -359,6 +366,21 @@ namespace Message {
 		}
 
 		const void *cert() const
+		{
+			return (this + 1);
+		}
+	};
+
+	/* Body for DEFAULT_PASSWD_CB and CTX_DEFAULT_PASSWD_CB. */
+	struct DefaultPasswdCb: public Targeted {
+		int	rwflag;
+
+		size_t bufLength() const
+		{
+			return (length - sizeof(DefaultPasswdCb));
+		}
+
+		const void *buf() const
 		{
 			return (this + 1);
 		}

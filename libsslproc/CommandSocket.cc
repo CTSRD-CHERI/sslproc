@@ -649,6 +649,64 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		    sizeof(x509_error));
 		break;
 	}
+	case Message::DEFAULT_PASSWD_CB:
+	{
+		if (hdr->length < sizeof(Message::DefaultPasswdCb)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		const Message::DefaultPasswdCb *msg =
+		    reinterpret_cast<const Message::DefaultPasswdCb *>(hdr);
+
+		char buf[msg->bufLength()];
+		memcpy(buf, msg->buf(), msg->bufLength());
+
+		int ret = ssl->default_passwd_cb(buf, sizeof(buf), msg->rwflag,
+		    ssl->default_passwd_cb_userdata);
+		if (ret <= 0)
+			writeReplyMessage(hdr->type, ret);
+		else if (ret > sizeof(buf))
+			writeErrnoReply(hdr->type, -1, E2BIG);
+		else
+			writeReplyMessage(hdr->type, ret, buf, ret);
+		break;
+	}
+	case Message::CTX_DEFAULT_PASSWD_CB:
+	{
+		if (hdr->length < sizeof(Message::DefaultPasswdCb)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ctx = findSSL_CTX(thdr);
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		const Message::DefaultPasswdCb *msg =
+		    reinterpret_cast<const Message::DefaultPasswdCb *>(hdr);
+
+		char buf[msg->bufLength()];
+		memcpy(buf, msg->buf(), msg->bufLength());
+
+		int ret = ctx->default_passwd_cb(buf, sizeof(buf), msg->rwflag,
+		    ctx->default_passwd_cb_userdata);
+		if (ret <= 0)
+			writeReplyMessage(hdr->type, ret);
+		else if (ret > sizeof(buf))
+			writeErrnoReply(hdr->type, -1, E2BIG);
+		else
+			writeReplyMessage(hdr->type, ret, buf, ret);
+		break;
+	}
 	default:
 		PROCerr(PROC_F_CMDSOCK_HANDLE_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->type);

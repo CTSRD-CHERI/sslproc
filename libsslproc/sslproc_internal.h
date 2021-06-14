@@ -38,6 +38,7 @@
 
 #include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <openssl/pem.h>
 
 #include <Messages.h>
 
@@ -212,6 +213,8 @@ struct _PSSL_CTX {
 	void *alpn_select_cb_arg;
 	int (*client_cert_cb)(struct _PSSL *, X509 **, EVP_PKEY **);
 	int (*verify_cb)(int, X509_STORE_CTX *);
+	pem_password_cb *default_passwd_cb;
+	void *default_passwd_cb_userdata;
 	bool sess_cbs_enabled;
 	std::unordered_map<session_map_key, struct _PSSL_SESSION *> sessions;
 	std::atomic_int refs;
@@ -232,6 +235,8 @@ struct _PSSL {
 	struct _PSSL_CIPHER pending_cipher;
 	void (*msg_cb)(int, int, int, const void *, size_t, struct _PSSL *, void *);
 	void *msg_cb_arg;
+	pem_password_cb *default_passwd_cb;
+	void *default_passwd_cb_userdata;
 	std::atomic_int refs;
 	int last_error;
 };

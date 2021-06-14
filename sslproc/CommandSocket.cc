@@ -410,6 +410,96 @@ verify_cb(int preverify_ok, X509_STORE_CTX *x509_ctx)
 	return (msg->ret);
 }
 
+static int
+default_passwd_cb(char *buf, int num, int rwflag, void *userdata)
+{
+	CommandSocket *cs = currentSocket;
+	if (cs == nullptr) {
+		syslog(LOG_WARNING, "%s: invoked without active command socket",
+		    __func__);
+		memset(buf, 0, num);
+		return (-1);
+	}
+
+	SSL *ssl = reinterpret_cast<SSL *>(userdata);
+
+	struct iovec iov[2];
+	iov[0].iov_base = &rwflag;
+	iov[0].iov_len = sizeof(rwflag);
+	iov[1].iov_base = buf;
+	iov[1].iov_len = num;
+	MessageRef ref = cs->sendRequest(Message::DEFAULT_PASSWD_CB, ssl, iov,
+	    2);
+	if (!ref) {
+		memset(buf, 0, num);
+		return (-1);
+	}
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE) {
+		memset(buf, 0, num);
+		return (-1);
+	}
+	if (msg->ret < 0)
+		return (msg->ret);
+	if (msg->ret > num) {
+		syslog(LOG_WARNING, "%s: reply body too large", __func__);
+		memset(buf, 0, num);
+		return (-1);
+	}
+	if (msg->bodyLength() != msg->ret) {
+		syslog(LOG_WARNING, "%s: reply body length mismatch", __func__);
+		memset(buf, 0, num);
+		return (-1);
+	}
+	memcpy(buf, msg->body(), msg->ret);
+	return (msg->ret);
+}
+
+static int
+ctx_default_passwd_cb(char *buf, int num, int rwflag, void *userdata)
+{
+	CommandSocket *cs = currentSocket;
+	if (cs == nullptr) {
+		syslog(LOG_WARNING, "%s: invoked without active command socket",
+		    __func__);
+		memset(buf, 0, num);
+		return (-1);
+	}
+
+	SSL_CTX *ctx = reinterpret_cast<SSL_CTX *>(userdata);
+
+	struct iovec iov[2];
+	iov[0].iov_base = &rwflag;
+	iov[0].iov_len = sizeof(rwflag);
+	iov[1].iov_base = buf;
+	iov[1].iov_len = num;
+	MessageRef ref = cs->sendRequest(Message::CTX_DEFAULT_PASSWD_CB, ctx,
+	    iov, 2);
+	if (!ref) {
+		memset(buf, 0, num);
+		return (-1);
+	}
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE) {
+		memset(buf, 0, num);
+		return (-1);
+	}
+	if (msg->ret < 0)
+		return (msg->ret);
+	if (msg->ret > num) {
+		syslog(LOG_WARNING, "%s: reply body too large", __func__);
+		memset(buf, 0, num);
+		return (-1);
+	}
+	if (msg->bodyLength() != msg->ret) {
+		syslog(LOG_WARNING, "%s: reply body length mismatch", __func__);
+		memset(buf, 0, num);
+		return (-1);
+	}
+	memcpy(buf, msg->body(), msg->ret);
+	return (msg->ret);
+}
+
 static void *
 commandSocketRun(void *arg)
 {
@@ -543,6 +633,8 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		int target = targets.allocate(ctx);
 		SSL_CTX_set_app_data(ctx, reinterpret_cast<void *>
 		    (static_cast<intptr_t>(target)));
+		SSL_CTX_set_default_passwd_cb(ctx, ctx_default_passwd_cb);
+		SSL_CTX_set_default_passwd_cb_userdata(ctx, ctx);
 		writeReplyMessage(hdr->type, 0, &target, sizeof(target));
 		break;
 	}
@@ -1099,6 +1191,8 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		int target = targets.allocate(ssl);
 		SSL_set_app_data(ssl, reinterpret_cast<void *>
 		    (static_cast<intptr_t>(target)));
+		SSL_set_default_passwd_cb(ssl, default_passwd_cb);
+		SSL_set_default_passwd_cb_userdata(ssl, ssl);
 		writeReplyMessage(hdr->type, 0, &target, sizeof(target));
 		break;
 	}
