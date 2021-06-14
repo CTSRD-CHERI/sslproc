@@ -194,6 +194,7 @@ struct _PSSL_CTX {
 	int target;
 	CRYPTO_EX_DATA ex_data;
 	X509 *get0_cert;
+	STACK_OF(X509_NAME) *client_CA_list;
 	int (*servername_cb)(struct _PSSL *, int *, void *);
 	void *servername_cb_arg;
 	int (*client_hello_cb)(struct _PSSL *, int *, void *);

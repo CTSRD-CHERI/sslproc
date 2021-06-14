@@ -36,6 +36,7 @@
 
 #include "sslproc.h"
 #include "sslproc_internal.h"
+#include "MessageHelpers.h"
 #include "CommandSocket.h"
 #include "TargetStore.h"
 
@@ -101,6 +102,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 	}
 
 	ctx->get0_cert = nullptr;
+	ctx->client_CA_list = nullptr;
 	ctx->servername_cb = nullptr;
 	ctx->servername_cb_arg = nullptr;
 	ctx->client_hello_cb = nullptr;
@@ -152,6 +154,8 @@ PSSL_CTX_free(PSSL_CTX *ctx)
 
 	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_CTX, ctx, &ctx->ex_data);
 	X509_free(ctx->get0_cert);
+	if (ctx->client_CA_list != nullptr)
+		sk_X509_NAME_pop_free(ctx->client_CA_list, X509_NAME_free);
 	delete ctx;
 }
 
@@ -803,4 +807,60 @@ PSSL_CTX_get_cert_store(const PSSL_CTX *ctx)
 	 * defined as no reference is returned.
 	 */
 	return (nullptr);
+}
+
+void
+PSSL_CTX_set_client_CA_list(PSSL_CTX *ctx, STACK_OF(X509_NAME) *list)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	if (list == nullptr || sk_X509_NAME_num(list) == 0) {
+		MessageRef ref = cs->waitForReply(
+		    Message::CTX_SET_CLIENT_CA_LIST, ctx->target);
+		if (!ref || ref.result()->error != SSL_ERROR_NONE)
+			abort();
+		return;
+	}
+
+	std::vector<struct iovec> vector = serializeCAList(list);
+	if (vector.empty())
+		abort();
+	MessageRef ref = cs->waitForReply(Message::CTX_SET_CLIENT_CA_LIST,
+	    ctx->target, vector.data(), static_cast<int>(vector.size()));
+	freeIOVector(vector);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		abort();
+}
+
+STACK_OF(X509_NAME) *
+PSSL_CTX_get_client_CA_list(const PSSL_CTX *cctx)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	PSSL_CTX *ctx = const_cast<PSSL_CTX *>(cctx);
+	MessageRef ref = cs->waitForReply(Message::CTX_GET_CLIENT_CA_LIST,
+	    ctx->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		abort();
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+	STACK_OF(X509_NAME) *sk = parseCAList(msg->body(), msg->bodyLength());
+	if (sk == nullptr)
+		abort();
+
+	/*
+	 * Cache the returned result since the caller doesn't
+	 * explicitly free the returned list.
+	 */
+	if (ctx->client_CA_list != nullptr)
+		sk_X509_NAME_pop_free(ctx->client_CA_list, X509_NAME_free);
+	ctx->client_CA_list = sk;
+	return (sk);
 }

@@ -34,7 +34,10 @@
 
 /* Helper routines for parsing chunks of data in message bodies. */
 
+#include <sys/uio.h>
 #include <vector>
+
+#include <openssl/x509.h>
 
 /*
  * Return a vector of pointers to nul-terminated C strings in a
@@ -42,3 +45,21 @@
  * returned.
  */
 std::vector<const char *> parseStrings(const void *buf, size_t len);
+
+/*
+ * Free a dynamically allocated vector of iovecs.  Assumes each buffer
+ * in the iovec is allocated by OPENSSL_malloc().
+ */
+void freeIOVector(std::vector<struct iovec> &vector);
+
+/*
+ * Serializes a list of CA's stored as X509_NAME objects.  The returned
+ * vector should be freed with freeIOVector().
+ */
+std::vector<struct iovec> serializeCAList(STACK_OF(X509_NAME) *names);
+
+/*
+ * Parses a serialized list of CA's and returns a stack of X509_NAME
+ * objects.
+ */
+STACK_OF(X509_NAME) *parseCAList(const void *buf, size_t len);

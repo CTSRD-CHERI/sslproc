@@ -1001,6 +1001,61 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			writeReplyMessage(hdr->type, ret);
 		break;
 	}
+	case Message::CTX_SET_CLIENT_CA_LIST:
+	{
+		ctx = findSSL_CTX(thdr);
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (thdr->bodyLength() == 0) {
+			SSL_CTX_set_client_CA_list(ctx, nullptr);
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		STACK_OF(X509_NAME) *sk = parseCAList(thdr->body(),
+		    thdr->bodyLength());
+		if (sk == nullptr) {
+			syslog(LOG_WARNING,
+		    "invalid message body for Message::CTX_SET_CLIENT_CA_LIST");
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+
+		SSL_CTX_set_client_CA_list(ctx, sk);
+		sk_X509_NAME_pop_free(sk, X509_NAME_free);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case Message::CTX_GET_CLIENT_CA_LIST:
+	{
+		ctx = findSSL_CTX(thdr);
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		STACK_OF(X509_NAME) *sk = SSL_CTX_get_client_CA_list(ctx);
+		if (sk == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		std::vector<struct iovec> vector = serializeCAList(sk);
+		if (vector.empty()) {
+			syslog(LOG_WARNING,
+	    "failed to serialize CA list for Message::CTX_GET_CLIENT_CA_LIST");
+			writeErrnoReply(hdr->type, -1, EINVAL);
+			break;
+		}
+
+		writeReplyMessage(hdr->type, 0, vector.data(),
+		    static_cast<int>(vector.size()));
+		freeIOVector(vector);
+		break;
+	}
 	case Message::CREATE_SESSION:
 	{
 		ctx = findSSL_CTX(thdr);
