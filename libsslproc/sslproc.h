@@ -181,6 +181,8 @@ long PSSL_get_verify_result(const PSSL *ssl);
 void PSSL_set_verify_result(PSSL *ssl, long result);
 int PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos,
     unsigned int len);
+int PSSL_set_cipher_list(PSSL *ssl, const char *s);
+int PSSL_set_ciphersuites(PSSL *ssl, const char *s);
 char *PSSL_get_srp_username(PSSL *ssl);
 char *PSSL_get_srp_userinfo(PSSL *ssl);
 const PSSL_CIPHER *PSSL_get_current_cipher(const PSSL *ssl);

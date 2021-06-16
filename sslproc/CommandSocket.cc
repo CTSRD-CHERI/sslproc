@@ -1714,6 +1714,42 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case Message::SET_CIPHER_LIST:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, 0, ENOENT);
+			break;
+		}
+
+		char *s = strndup(reinterpret_cast<const char *>(thdr->body()),
+		    thdr->bodyLength());
+		ret = SSL_set_cipher_list(ssl, s);
+		free(s);
+		if (ret == 0)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, ret);
+		break;
+	}
+	case Message::SET_CIPHERSUITES:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, 0, ENOENT);
+			break;
+		}
+
+		char *s = strndup(reinterpret_cast<const char *>(thdr->body()),
+		    thdr->bodyLength());
+		ret = SSL_set_ciphersuites(ssl, s);
+		free(s);
+		if (ret == 0)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, ret);
+		break;
+	}
 	case Message::GET_SRP_USERNAME:
 	{
 		ssl = findSSL(thdr);

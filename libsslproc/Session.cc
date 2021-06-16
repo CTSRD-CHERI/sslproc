@@ -673,6 +673,50 @@ PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos, unsigned int len)
 	return (ref.result()->ret);
 }
 
+int
+PSSL_set_cipher_list(PSSL *ssl, const char *s)
+{
+	if (s == nullptr) {
+		PROCerr(PROC_F_SSL_SET_CIPHER_LIST,
+		    ERR_R_PASSED_NULL_PARAMETER);
+		return (0);
+	}
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_SET_CIPHER_LIST, ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::SET_CIPHER_LIST, ssl->target,
+	    s, strlen(s));
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
+}
+
+int
+PSSL_set_ciphersuites(PSSL *ssl, const char *s)
+{
+	if (s == nullptr) {
+		PROCerr(PROC_F_SSL_SET_CIPHERSUITES,
+		    ERR_R_PASSED_NULL_PARAMETER);
+		return (0);
+	}
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_SET_CIPHERSUITES, ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::SET_CIPHERSUITES,
+	    ssl->target, s, strlen(s));
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
+}
+
 /*
  * SSL_get_srp_username() returns a pointer to an internal string that
  * is not reference-counted.  To avoid leaking memory, cache the
