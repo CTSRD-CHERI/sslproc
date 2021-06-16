@@ -114,6 +114,7 @@
 #define	SSL_CTX_get_client_CA_list	PSSL_CTX_get_client_CA_list
 #define	SSL_CTX_set_default_passwd_cb	PSSL_CTX_set_default_passwd_cb
 #define	SSL_CTX_set_default_passwd_cb_userdata	PSSL_CTX_set_default_passwd_cb_userdata
+#define	SSL_CTX_use_certificate_chain_file	PSSL_CTX_use_certificate_chain_file
 
 /* SSL */
 
@@ -165,3 +166,4 @@
 #define	SSL_get_ex_data_X509_STORE_CTX_idx PSSL_get_ex_data_X509_STORE_CTX_idx
 #define	SSL_set_default_passwd_cb	PSSL_set_default_passwd_cb
 #define	SSL_set_default_passwd_cb_userdata	PSSL_set_default_passwd_cb_userdata
+#define	SSL_use_certificate_chain_file	PSSL_use_certificate_chain_file
