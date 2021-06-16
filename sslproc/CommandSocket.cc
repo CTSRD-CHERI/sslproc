@@ -736,6 +736,26 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 				writeReplyMessage(hdr->type, ret);
 			break;
 		}
+		case SSL_CTRL_CHAIN_CERT:
+		{
+			const unsigned char *pp =
+			    reinterpret_cast<const unsigned char *>
+			    (msg->body());
+			X509 *x = d2i_X509(nullptr, &pp, msg->bodyLength());
+			if (x == nullptr) {
+				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+				break;
+			}
+
+			/* This always donates the reference. */
+			ret = SSL_CTX_add0_chain_cert(ctx, x);
+			if (ret != 0) {
+				X509_free(x);
+				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+			} else
+				writeReplyMessage(hdr->type, ret);
+			break;
+		}
 		default:
 			writeErrnoReply(hdr->type, -1, EOPNOTSUPP);
 			break;
@@ -1468,6 +1488,26 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			ret = SSL_ctrl(ssl, msg->cmd, msg->larg, name);
 			free(name);
 			writeReplyMessage(hdr->type, ret);
+			break;
+		}
+		case SSL_CTRL_CHAIN_CERT:
+		{
+			const unsigned char *pp =
+			    reinterpret_cast<const unsigned char *>
+			    (msg->body());
+			X509 *x = d2i_X509(nullptr, &pp, msg->bodyLength());
+			if (x == nullptr) {
+				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+				break;
+			}
+
+			/* This always donates the reference. */
+			ret = SSL_add0_chain_cert(ssl, x);
+			if (ret != 0) {
+				X509_free(x);
+				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+			} else
+				writeReplyMessage(hdr->type, ret);
 			break;
 		}
 		default:

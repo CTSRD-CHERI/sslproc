@@ -150,6 +150,11 @@ STACK_OF(X509_NAME) *PSSL_CTX_get_client_CA_list(const PSSL_CTX *ctx);
 void PSSL_CTX_set_default_passwd_cb(PSSL_CTX *ctx, pem_password_cb *cb);
 void PSSL_CTX_set_default_passwd_cb_userdata(PSSL_CTX *ctx, void *data);
 
+#define	PSSL_CTX_add0_chain_cert(ctx, x509)				\
+	PSSL_CTX_ctrl(ctx, SSL_CTRL_CHAIN_CERT, 0, (char *)(x509))
+#define	PSSL_CTX_add1_chain_cert(ctx, x509)				\
+	PSSL_CTX_ctrl(ctx, SSL_CTRL_CHAIN_CERT, 1, (char *)(x509))
+
 /* SSL */
 
 PSSL *PSSL_new(PSSL_CTX *ctx);
@@ -204,5 +209,10 @@ int PSSL_shutdown(PSSL *ssl);
 int PSSL_get_ex_data_X509_STORE_CTX_idx(void);
 void PSSL_set_default_passwd_cb(PSSL *ssl, pem_password_cb *cb);
 void PSSL_set_default_passwd_cb_userdata(PSSL *ssl, void *data);
+
+#define	PSSL_add0_chain_cert(ssl, x509)					\
+	PSSL_ctrl(ssl, SSL_CTRL_CHAIN_CERT, 0, (char *)(x509))
+#define	PSSL_add1_chain_cert(ssl, x509)					\
+	PSSL_ctrl(ssl, SSL_CTRL_CHAIN_CERT, 1, (char *)(x509))
 
 __END_DECLS

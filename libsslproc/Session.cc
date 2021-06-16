@@ -365,6 +365,44 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 			return (0);
 		return (ref.result()->ret);
 	}
+	case SSL_CTRL_CHAIN_CERT:
+	{
+		X509 *x = reinterpret_cast<X509 *>(parg);
+
+		unsigned char *asn1 = nullptr;
+		int len = i2d_X509(x, &asn1);
+		if (len <= 0)
+			return (0);
+
+		if (cs == nullptr) {
+			PROCerr(PROC_F_SSL_CTRL, ERR_R_NO_COMMAND_SOCKET);
+			return (0);
+		}
+
+		struct iovec iov[2];
+
+		iov[0].iov_base = &body;
+		iov[0].iov_len = sizeof(body);
+		iov[1].iov_base = asn1;
+		iov[1].iov_len = len;
+		MessageRef ref = cs->waitForReply(Message::CTRL, ssl->target,
+		    iov, 2);
+		OPENSSL_free(asn1);
+		if (!ref)
+			return (0);
+		if (ref.result()->error != SSL_ERROR_NONE ||
+		    ref.result()->ret != 1)
+			return (0);
+
+		/*
+		 * Since we don't store the pointer internally, explicitly
+		 * free the caller's reference for add0 and don't add a
+		 * reference for the internal pointer for add1.
+		 */
+		if (larg == 0)
+			X509_free(x);
+		return (1);
+	}
 	default:
 		abort();
 	}
