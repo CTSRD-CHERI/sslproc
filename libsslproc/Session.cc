@@ -37,6 +37,7 @@
 
 #include "sslproc.h"
 #include "sslproc_internal.h"
+#include "MessageHelpers.h"
 #include "CommandSocket.h"
 #include "TargetStore.h"
 
@@ -364,6 +365,49 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 		if (!ref)
 			return (0);
 		return (ref.result()->ret);
+	}
+	case SSL_CTRL_CHAIN:
+	{
+		STACK_OF(X509) *sk = reinterpret_cast<STACK_OF(X509) *>(parg);
+
+		if (cs == nullptr) {
+			PROCerr(PROC_F_SSL_CTRL, ERR_R_NO_COMMAND_SOCKET);
+			return (0);
+		}
+
+		std::vector<struct iovec> vector;
+		if (sk != nullptr) {
+			vector = sk_X509_serialize(sk);
+			if (vector.empty()) {
+				PROCerr(PROC_F_SSL_CTRL, ERR_R_INTERNAL_ERROR);
+				ERR_add_error_data(1,
+				    "failed to serialize certificate chain");
+				return (0);
+			}
+		}
+
+		struct iovec iov[vector.size() + 1];
+
+		iov[0].iov_base = &body;
+		iov[0].iov_len = sizeof(body);
+		memcpy(&iov[1], vector.data(), vector.size() * sizeof(iov[0]));
+		MessageRef ref = cs->waitForReply(Message::CTRL, ssl->target,
+		    iov, static_cast<int>(vector.size()) + 1);
+		freeIOVector(vector);
+		if (!ref)
+			return (0);
+		if (ref.result()->error != SSL_ERROR_NONE ||
+		    ref.result()->ret != 1)
+			return (0);
+
+		/*
+		 * Since we don't store the pointer internally, explicitly
+		 * free the caller's reference for set0 and don't add a
+		 * reference for the internal pointer for set1.
+		 */
+		if (larg == 0)
+			sk_X509_pop_free(sk, X509_free);
+		return (1);
 	}
 	case SSL_CTRL_CHAIN_CERT:
 	{

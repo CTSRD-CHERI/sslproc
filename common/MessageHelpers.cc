@@ -159,4 +159,5 @@ error:									\
 	return nullptr;							\
 }
 
+SERIALIZE_STACK_DEFINE(X509);
 SERIALIZE_STACK_DEFINE(X509_NAME);

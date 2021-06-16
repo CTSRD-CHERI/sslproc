@@ -60,4 +60,5 @@ void freeIOVector(std::vector<struct iovec> &vector);
 std::vector<struct iovec> sk_##T##_serialize(STACK_OF(T) *);		\
 STACK_OF(T) *sk_##T##_parse(const void *buf, size_t len)
 
+SERIALIZE_STACK_DECLARE(X509);
 SERIALIZE_STACK_DECLARE(X509_NAME);

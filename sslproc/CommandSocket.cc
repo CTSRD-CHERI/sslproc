@@ -736,6 +736,32 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 				writeReplyMessage(hdr->type, ret);
 			break;
 		}
+		case SSL_CTRL_CHAIN:
+		{
+			STACK_OF(X509) *sk;
+
+			if (msg->bodyLength() == 0)
+				sk = nullptr;
+			else {
+				sk = sk_X509_parse(msg->body(),
+				    msg->bodyLength());
+				if (sk == nullptr) {
+					syslog(LOG_WARNING,
+	    "invalid message body for Message::CTX_CTRL(SSL_CTRL_CHAIN)");
+					writeErrnoReply(hdr->type, 0, EBADMSG);
+					break;
+				}
+			}
+
+			/* This always donates the reference. */
+			ret = SSL_CTX_set0_chain(ctx, sk);
+			if (ret == 0) {
+				sk_X509_pop_free(sk, X509_free);
+				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+			} else
+				writeReplyMessage(hdr->type, ret);
+			break;
+		}
 		case SSL_CTRL_CHAIN_CERT:
 		{
 			const unsigned char *pp =
@@ -1488,6 +1514,32 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			ret = SSL_ctrl(ssl, msg->cmd, msg->larg, name);
 			free(name);
 			writeReplyMessage(hdr->type, ret);
+			break;
+		}
+		case SSL_CTRL_CHAIN:
+		{
+			STACK_OF(X509) *sk;
+
+			if (msg->bodyLength() == 0)
+				sk = nullptr;
+			else {
+				sk = sk_X509_parse(msg->body(),
+				    msg->bodyLength());
+				if (sk == nullptr) {
+					syslog(LOG_WARNING,
+	    "invalid message body for Message::CTRL(SSL_CTRL_CHAIN)");
+					writeErrnoReply(hdr->type, 0, EBADMSG);
+					break;
+				}
+			}
+
+			/* This always donates the reference. */
+			ret = SSL_set0_chain(ssl, sk);
+			if (ret == 0) {
+				sk_X509_pop_free(sk, X509_free);
+				writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+			} else
+				writeReplyMessage(hdr->type, ret);
 			break;
 		}
 		case SSL_CTRL_CHAIN_CERT:
