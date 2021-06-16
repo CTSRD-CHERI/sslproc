@@ -1127,7 +1127,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			break;
 		}
 
-		STACK_OF(X509_NAME) *sk = parseCAList(thdr->body(),
+		STACK_OF(X509_NAME) *sk = sk_X509_NAME_parse(thdr->body(),
 		    thdr->bodyLength());
 		if (sk == nullptr) {
 			syslog(LOG_WARNING,
@@ -1155,7 +1155,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			break;
 		}
 
-		std::vector<struct iovec> vector = serializeCAList(sk);
+		std::vector<struct iovec> vector = sk_X509_NAME_serialize(sk);
 		if (vector.empty()) {
 			syslog(LOG_WARNING,
 	    "failed to serialize CA list for Message::CTX_GET_CLIENT_CA_LIST");

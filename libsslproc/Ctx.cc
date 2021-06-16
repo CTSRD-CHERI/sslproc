@@ -864,7 +864,7 @@ PSSL_CTX_set_client_CA_list(PSSL_CTX *ctx, STACK_OF(X509_NAME) *list)
 		return;
 	}
 
-	std::vector<struct iovec> vector = serializeCAList(list);
+	std::vector<struct iovec> vector = sk_X509_NAME_serialize(list);
 	if (vector.empty())
 		abort();
 	MessageRef ref = cs->waitForReply(Message::CTX_SET_CLIENT_CA_LIST,
@@ -891,7 +891,8 @@ PSSL_CTX_get_client_CA_list(const PSSL_CTX *cctx)
 		abort();
 	if (msg->bodyLength() == 0)
 		return (nullptr);
-	STACK_OF(X509_NAME) *sk = parseCAList(msg->body(), msg->bodyLength());
+	STACK_OF(X509_NAME) *sk = sk_X509_NAME_parse(msg->body(),
+	    msg->bodyLength());
 	if (sk == nullptr)
 		abort();
 

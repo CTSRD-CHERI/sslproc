@@ -53,13 +53,11 @@ std::vector<const char *> parseStrings(const void *buf, size_t len);
 void freeIOVector(std::vector<struct iovec> &vector);
 
 /*
- * Serializes a list of CA's stored as X509_NAME objects.  The returned
- * vector should be freed with freeIOVector().
+ * Routines to serialize and then de-serialize (parse) an OpenSSL
+ * stack of objects (STACK_OF(T)).
  */
-std::vector<struct iovec> serializeCAList(STACK_OF(X509_NAME) *names);
+#define	SERIALIZE_STACK_DECLARE(T)					\
+std::vector<struct iovec> sk_##T##_serialize(STACK_OF(T) *);		\
+STACK_OF(T) *sk_##T##_parse(const void *buf, size_t len)
 
-/*
- * Parses a serialized list of CA's and returns a stack of X509_NAME
- * objects.
- */
-STACK_OF(X509_NAME) *parseCAList(const void *buf, size_t len);
+SERIALIZE_STACK_DECLARE(X509_NAME);
