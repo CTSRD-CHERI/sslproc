@@ -150,6 +150,7 @@ STACK_OF(X509_NAME) *PSSL_CTX_get_client_CA_list(const PSSL_CTX *ctx);
 void PSSL_CTX_set_default_passwd_cb(PSSL_CTX *ctx, pem_password_cb *cb);
 void PSSL_CTX_set_default_passwd_cb_userdata(PSSL_CTX *ctx, void *data);
 int PSSL_CTX_use_certificate_chain_file(PSSL_CTX *ctx, const char *file);
+void PSSL_CTX_set_post_handshake_auth(PSSL_CTX *ctx, int val);
 
 #define	PSSL_CTX_set0_chain(ctx, sk)					\
 	PSSL_CTX_ctrl(ctx, SSL_CTRL_CHAIN, 0, (char *)(sk))

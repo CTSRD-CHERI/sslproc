@@ -94,6 +94,7 @@ namespace Message {
 		CTX_LOAD_VERIFY_LOCATIONS,
 		CTX_SET_CLIENT_CA_LIST,
 		CTX_GET_CLIENT_CA_LIST,
+		CTX_SET_POST_HANDSHAKE_AUTH,
 
 		/* Returns a target for the created session. */
 		CREATE_SESSION,

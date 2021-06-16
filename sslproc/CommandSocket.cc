@@ -1194,6 +1194,22 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		freeIOVector(vector);
 		break;
 	}
+	case Message::CTX_SET_POST_HANDSHAKE_AUTH:
+		ctx = findSSL_CTX(thdr);
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (thdr->bodyLength() != sizeof(int)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		SSL_CTX_set_post_handshake_auth(ctx,
+		    *reinterpret_cast<const int*>(thdr->body()));
+		writeReplyMessage(hdr->type, 0);
+		break;
 	case Message::CREATE_SESSION:
 	{
 		ctx = findSSL_CTX(thdr);

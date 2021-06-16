@@ -115,6 +115,7 @@
 #define	SSL_CTX_set_default_passwd_cb	PSSL_CTX_set_default_passwd_cb
 #define	SSL_CTX_set_default_passwd_cb_userdata	PSSL_CTX_set_default_passwd_cb_userdata
 #define	SSL_CTX_use_certificate_chain_file	PSSL_CTX_use_certificate_chain_file
+#define	SSL_CTX_set_post_handshake_auth	PSSL_CTX_set_post_handshake_auth
 
 /* SSL */
 

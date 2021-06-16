@@ -961,3 +961,14 @@ PSSL_CTX_set_default_passwd_cb_userdata(PSSL_CTX *ctx, void *data)
 {
 	ctx->default_passwd_cb_userdata = data;
 }
+
+void
+PSSL_CTX_set_post_handshake_auth(PSSL_CTX *ctx, int val)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	cs->waitForReply(Message::CTX_SET_POST_HANDSHAKE_AUTH, ctx->target,
+	    &val, sizeof(val));
+}

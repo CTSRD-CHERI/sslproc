@@ -115,6 +115,7 @@
 #undef SSL_CTX_set_default_passwd_cb
 #undef SSL_CTX_set_default_passwd_cb_userdata
 #undef SSL_CTX_use_certificate_chain_file
+#undef SSL_CTX_set_post_handshake_auth
 
 /* SSL */
 
