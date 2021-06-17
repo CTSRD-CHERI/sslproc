@@ -716,6 +716,34 @@ PSSL_set_verify_result(PSSL *ssl, long result)
 }
 
 int
+PSSL_get_verify_mode(const PSSL *ssl)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::GET_VERIFY_MODE,
+	    ssl->target);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		abort();
+	return (ref.result()->ret);
+}
+
+int
+PSSL_get_verify_depth(const PSSL *ssl)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::GET_VERIFY_DEPTH,
+	    ssl->target);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		abort();
+	return (ref.result()->ret);
+}
+
+int
 PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos, unsigned int len)
 {
 	CommandSocket *cs = currentCommandSocket();

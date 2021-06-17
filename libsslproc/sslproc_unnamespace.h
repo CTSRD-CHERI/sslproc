@@ -136,6 +136,8 @@
 #undef SSL_get_peer_certificate
 #undef SSL_get_verify_result
 #undef SSL_set_verify_result
+#undef SSL_get_verify_mode
+#undef SSL_get_verify_depth
 #undef SSL_set_alpn_protos
 #undef SSL_set_cipher_list
 #undef SSL_set_ciphersuites
