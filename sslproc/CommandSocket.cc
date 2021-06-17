@@ -2035,6 +2035,42 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case Message::SET_OPTIONS:
+	case Message::CLEAR_OPTIONS:
+	{
+		if (hdr->length != sizeof(Message::Options)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		const Message::Options *msg =
+		    reinterpret_cast<const Message::Options *>(hdr);
+		long options;
+
+		if (hdr->type == Message::SET_OPTIONS)
+			options = SSL_set_options(ssl, msg->options);
+		else
+			options = SSL_clear_options(ssl, msg->options);
+		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
+		break;
+	}
+	case Message::GET_OPTIONS:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		long options = SSL_get_options(ssl);
+		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
+		break;
+	}
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

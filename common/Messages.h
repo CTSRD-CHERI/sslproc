@@ -153,6 +153,11 @@ namespace Message {
 		VERSION,
 		SET_SSL_CTX,
 
+		/* These three return 'long options' on success. */
+		SET_OPTIONS,
+		CLEAR_OPTIONS,
+		GET_OPTIONS,
+
 		/*
 		 * Requests to operate on the BIOs belonging to an
 		 * SSL.  The target identifies the SSL.
@@ -255,8 +260,8 @@ namespace Message {
 	};
 
 	/*
-	 * Body for CTX_SET_OPTIONS and
-	 * CTX_CLEAR_OPTIONS.
+	 * Body for CTX_SET_OPTIONS, CTX_CLEAR_OPTIONS, SET_OPTIONS,
+	 * and CLEAR_OPTIONS.
 	 */
 	struct Options : public Targeted {
 		long	options;

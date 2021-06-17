@@ -122,6 +122,9 @@
 #define	SSL_new			PSSL_new
 #define	SSL_up_ref		PSSL_up_ref
 #define	SSL_free		PSSL_free
+#define	SSL_set_options		PSSL_set_options
+#define	SSL_clear_options	PSSL_clear_options
+#define	SSL_get_options		PSSL_get_options
 #define	SSL_ctrl		PSSL_ctrl
 #define	SSL_set_ex_data		PSSL_set_ex_data
 #define	SSL_get_ex_data		PSSL_get_ex_data

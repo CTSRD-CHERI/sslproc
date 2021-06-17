@@ -320,6 +320,56 @@ test_ssl_refs(void)
 }
 
 static void
+test_ssl_options(void)
+{
+	SSL_CTX *ctx;
+	SSL *ssl;
+	long options, new;
+
+	ctx = SSL_CTX_new(TLS_method());
+	if (ctx == NULL) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create context");
+	}
+
+	ssl = SSL_new(ctx);
+	if (ssl == NULL) {
+		ERR_print_errors_fp(stdout);
+		SSL_CTX_free(ctx);
+		FAIL("failed to create session");
+	}
+	SSL_CTX_free(ctx);
+
+	options = SSL_get_options(ssl);
+	dprintf("initial options: %#lx\n", options);
+
+	new = SSL_set_options(ssl, SSL_OP_NO_ENCRYPT_THEN_MAC);
+	dprintf("options after set: %#lx\n", new);
+
+	if (SSL_get_options(ssl) != new) {
+		SSL_free(ssl);
+		FAIL("failed to get updated options after set");
+	}
+
+	new = SSL_clear_options(ssl, SSL_OP_NO_ENCRYPT_THEN_MAC);
+	dprintf("options after clear: %#lx\n", new);
+
+	if (SSL_get_options(ssl) != new) {
+		SSL_free(ssl);
+		FAIL("failed to get updated options after clear");
+	}
+
+	if (new != options) {
+		SSL_free(ssl);
+		FAIL("final options don't match initial options\n");
+	}
+
+	SSL_free(ssl);
+
+	PASS();
+}
+
+static void
 test_ssl_app_data(void)
 {
 	SSL_CTX *ctx;
@@ -828,6 +878,7 @@ main(int ac, char **av)
 	test_ctx_mode();
 	test_ssl_create();
 	test_ssl_refs();
+	test_ssl_options();
 	test_ssl_app_data();
 	test_ssl_handshake_states();
 	test_ssl_memory_ping_pong();

@@ -330,6 +330,62 @@ PSSL_free(PSSL *ssl)
 }
 
 long
+PSSL_set_options(PSSL *ssl, long options)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::SET_OPTIONS, ssl->target,
+	    &options, sizeof(options));
+
+	/* No way to return errors. */
+	if (!ref)
+		abort();
+	const Message::Result *reply = ref.result();
+	if (reply->ret != 0)
+		abort();
+	return (*reinterpret_cast<const long *>(reply->body()));
+}
+
+long
+PSSL_clear_options(PSSL *ssl, long options)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::CLEAR_OPTIONS, ssl->target,
+	    &options, sizeof(options));
+
+	/* No way to return errors. */
+	if (!ref)
+		abort();
+	const Message::Result *reply = ref.result();
+	if (reply->ret != 0)
+		abort();
+	return (*reinterpret_cast<const long *>(reply->body()));
+}
+
+long
+PSSL_get_options(PSSL *ssl)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::GET_OPTIONS, ssl->target);
+
+	/* No way to return errors. */
+	if (!ref)
+		abort();
+	const Message::Result *reply = ref.result();
+	if (reply->ret != 0)
+		abort();
+	return (*reinterpret_cast<const long *>(reply->body()));
+}
+
+long
 PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 {
 	CommandSocket *cs = currentCommandSocket();
