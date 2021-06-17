@@ -639,7 +639,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		X509_STORE_CTX_set_error_depth(x509_ctx, msg->x509_error_depth);
 		X509_STORE_CTX_set_current_cert(x509_ctx, cert);
 
-		ret = ssl->ctx->verify_cb(msg->preverify_ok, x509_ctx);
+		ret = ssl->verify_cb(msg->preverify_ok, x509_ctx);
 
 		X509_STORE_CTX_free(x509_ctx);
 		X509_free(cert);

@@ -184,6 +184,7 @@ long PSSL_get_verify_result(const PSSL *ssl);
 void PSSL_set_verify_result(PSSL *ssl, long result);
 int PSSL_get_verify_mode(const PSSL *ssl);
 int PSSL_get_verify_depth(const PSSL *ssl);
+void PSSL_set_verify(PSSL *ssl, int mode, PSSL_verify_cb cb);
 int PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos,
     unsigned int len);
 int PSSL_set_cipher_list(PSSL *ssl, const char *s);

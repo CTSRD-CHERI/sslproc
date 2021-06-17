@@ -241,6 +241,7 @@ struct _PSSL {
 	struct _PSSL_CIPHER pending_cipher;
 	void (*msg_cb)(int, int, int, const void *, size_t, struct _PSSL *, void *);
 	void *msg_cb_arg;
+	int (*verify_cb)(int, X509_STORE_CTX *);
 	pem_password_cb *default_passwd_cb;
 	void *default_passwd_cb_userdata;
 	std::atomic_int refs;

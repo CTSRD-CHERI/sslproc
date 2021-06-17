@@ -1716,6 +1716,26 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		ret = SSL_get_verify_depth(ssl);
 		writeReplyMessage(hdr->type, ret);
 		break;
+	case Message::SET_VERIFY:
+	{
+		if (hdr->length != sizeof(Message::SetVerify)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		const Message::SetVerify *msg =
+		    reinterpret_cast<const Message::SetVerify *>(hdr);
+		SSL_set_verify(ssl, msg->mode, msg->cb_set ? verify_cb :
+		    nullptr);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	case Message::SET_ALPN_PROTOS:
 	{
 		const unsigned char *protos;

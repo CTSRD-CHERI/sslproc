@@ -281,6 +281,7 @@ PSSL_new(PSSL_CTX *ctx)
 	memset(&ssl->pending_cipher, 0, sizeof(ssl->pending_cipher));
 	ssl->msg_cb = nullptr;
 	ssl->msg_cb_arg = nullptr;
+	ssl->verify_cb = ctx->verify_cb;
 	ssl->default_passwd_cb = PEM_def_callback;
 	ssl->default_passwd_cb_userdata = nullptr;
 	ssl->refs = 1;
@@ -741,6 +742,26 @@ PSSL_get_verify_depth(const PSSL *ssl)
 	if (!ref || ref.result()->error != SSL_ERROR_NONE)
 		abort();
 	return (ref.result()->ret);
+}
+
+void
+PSSL_set_verify(PSSL *ssl, int mode, PSSL_verify_cb cb)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	if (cb != nullptr)
+		ssl->verify_cb = cb;
+
+	struct {
+		int mode;
+		int cb_set;
+	} body;
+
+	body.mode = mode;
+	body.cb_set = cb != nullptr;
+	cs->waitForReply(Message::SET_VERIFY, ssl->target, &body, sizeof(body));
 }
 
 int
