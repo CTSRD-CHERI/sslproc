@@ -522,54 +522,100 @@ establish_sessions(SSL *cssl, SSL *sssl)
 }
 
 static bool
-send_message(SSL *source, SSL *dest, const char *source_name,
-    const char *dest_name, const void *message, size_t len)
+send_message(SSL *ssl, const char *name, const void *message, size_t len)
 {
-	char buf[len];
-	int error, ret;
+	int ret;
 
-	ret = SSL_write(source, message, len);
+	ret = SSL_write(ssl, message, len);
 	if (ret <= 0) {
 		dprintf("unexpected error %d from %s write\n",
-		    SSL_get_error(source, ret), source_name);
+		    SSL_get_error(ssl, ret), name);
 		return (false);
 	}
 	if (ret != len) {
-		dprintf("short write to %s\n", dest_name);
-		return (false);
-	}
-
-	memset(buf, 0xa5, len);
-	for (;;) {
-		ret = SSL_read(dest, buf, len);
-		if (ret <= 0) {
-			error = SSL_get_error(dest, ret);
-			if (error == SSL_ERROR_WANT_READ)
-				continue;
-			dprintf("unexpected error %d from %s read\n", error,
-			    dest_name);
-			return (false);
-		}
-		if (ret != len) {
-			dprintf("short read from %s\n", source_name);
-			return (false);
-		}
-		break;
-	}
-	if (memcmp(buf, message, len) != 0) {
-		dprintf("%s received incorrect data\n", dest_name);
+		dprintf("short write on %s\n", name);
 		return (false);
 	}
 	return (true);
 }
 
 static bool
+read_message(SSL *ssl, const char *name, const void *message, size_t len)
+{
+	char buf[len];
+	int error, ret;
+
+	memset(buf, 0xa5, len);
+	for (;;) {
+		ret = SSL_read(ssl, buf, len);
+		if (ret <= 0) {
+			error = SSL_get_error(ssl, ret);
+			if (error == SSL_ERROR_WANT_READ)
+				continue;
+			dprintf("unexpected error %d from %s read\n", error,
+			    name);
+			return (false);
+		}
+		if (ret != len) {
+			dprintf("short read on %s\n", name);
+			return (false);
+		}
+		break;
+	}
+	if (memcmp(buf, message, len) != 0) {
+		dprintf("%s received incorrect data\n", name);
+		return (false);
+	}
+	return (true);
+}
+
+static bool
+peek_message(SSL *ssl, const char *name, const void *message, size_t len)
+{
+	char buf[len];
+	int error, ret;
+
+	memset(buf, 0xa5, len);
+	for (;;) {
+		ret = SSL_peek(ssl, buf, len);
+		if (ret <= 0) {
+			error = SSL_get_error(ssl, ret);
+			if (error == SSL_ERROR_WANT_READ)
+				continue;
+			dprintf("unexpected error %d from %s read\n", error,
+			    name);
+			return (false);
+		}
+		if (ret != len) {
+			dprintf("short read on %s\n", name);
+			return (false);
+		}
+		break;
+	}
+	if (memcmp(buf, message, len) != 0) {
+		dprintf("%s received incorrect data\n", name);
+		return (false);
+	}
+	return (true);
+}
+
+
+static bool
+bounce_message(SSL *source, SSL *dest, const char *source_name,
+    const char *dest_name, const void *message, size_t len)
+{
+	if (!send_message(source, source_name, message, len))
+		return (false);
+	return (read_message(dest, dest_name, message, len));
+}
+
+static bool
 ping_pong_message(SSL *cssl, SSL *sssl, const void *message, size_t len)
 {
 
-	if (!send_message(cssl, sssl, "client", "server", message, len))
+	if (!bounce_message(cssl, sssl, "client", "server", message, len))
 		return (false);
-	return (send_message(sssl, cssl, "server", "client", message, len));
+	return (bounce_message(sssl, cssl, "server", "client", message, len));
 }
 
 static void
@@ -612,6 +658,70 @@ test_ssl_memory_ping_pong(void)
 		SSL_free(cssl);
 		SSL_free(sssl);
 		FAIL("failed to pass messages");
+	}
+
+	SSL_free(cssl);
+	SSL_free(sssl);
+
+	PASS();
+}
+
+static void
+test_ssl_peek(void)
+{
+	SSL_CTX *cctx, *sctx;
+	SSL *cssl, *sssl;
+
+	if (!create_ssl_contexts(&cctx, &sctx)) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create contexts");
+	}
+
+	if (!create_ssl_memory_sessions(cctx, sctx, &cssl, &sssl)) {
+		ERR_print_errors_fp(stdout);
+		SSL_CTX_free(cctx);
+		SSL_CTX_free(sctx);
+		FAIL("failed to create sessions");
+	}
+	SSL_CTX_free(cctx);
+	SSL_CTX_free(sctx);
+
+	if (show_messages) {
+		SSL_set_msg_callback(cssl, msg_cb);
+		SSL_set_msg_callback_arg(cssl, "C");
+		SSL_set_msg_callback(sssl, msg_cb);
+		SSL_set_msg_callback_arg(sssl, "S");
+	}
+
+	if (!establish_sessions(cssl, sssl)) {
+		ERR_print_errors_fp(stdout);
+		SSL_free(cssl);
+		SSL_free(sssl);
+		FAIL("failed to establish sessions");
+	}
+
+	if (!send_message(cssl, "client", short_message,
+		strlen(short_message))) {
+		ERR_print_errors_fp(stdout);
+		SSL_free(cssl);
+		SSL_free(sssl);
+		FAIL("failed to send message");
+	}
+
+	if (!peek_message(sssl, "server", short_message,
+		strlen(short_message))) {
+		ERR_print_errors_fp(stdout);
+		SSL_free(cssl);
+		SSL_free(sssl);
+		FAIL("failed to peek message");
+	}
+
+	if (!read_message(sssl, "server", short_message,
+		strlen(short_message))) {
+		ERR_print_errors_fp(stdout);
+		SSL_free(cssl);
+		SSL_free(sssl);
+		FAIL("failed to read message");
 	}
 
 	SSL_free(cssl);
@@ -721,6 +831,7 @@ main(int ac, char **av)
 	test_ssl_app_data();
 	test_ssl_handshake_states();
 	test_ssl_memory_ping_pong();
+	test_ssl_peek();
 	test_conf();
 
 	return (0);

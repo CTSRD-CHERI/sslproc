@@ -162,6 +162,7 @@
 #define	SSL_get_servername	PSSL_get_servername
 #define	SSL_get_servername_type	PSSL_get_servername_type
 #define	SSL_read		PSSL_read
+#define	SSL_peek		PSSL_peek
 #define	SSL_write		PSSL_write
 #define	SSL_set_shutdown	PSSL_set_shutdown
 #define	SSL_get_shutdown	PSSL_get_shutdown

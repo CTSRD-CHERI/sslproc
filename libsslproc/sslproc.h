@@ -212,6 +212,7 @@ int PSSL_version(const PSSL *ssl);
 const char *PSSL_get_servername(const PSSL *ssl, const int type);
 int PSSL_get_servername_type(const PSSL *ssl);
 int PSSL_read(PSSL *ssl, void *buf, int len);
+int PSSL_peek(PSSL *ssl, void *buf, int len);
 int PSSL_write(PSSL *ssl, const void *buf, int len);
 void PSSL_set_shutdown(PSSL *ssl, int mode);
 int PSSL_get_shutdown(const PSSL *ssl);

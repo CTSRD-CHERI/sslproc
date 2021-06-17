@@ -1326,6 +1326,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			    SSL_get_error(ssl, ret));
 		break;
 	case Message::READ:
+	case Message::PEEK:
 	{
 		if (hdr->length != sizeof(Message::Read)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
@@ -1353,7 +1354,10 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 				break;
 			}
 		}
-		ret = SSL_read(ssl, readBuffer.data(), msg->resid);
+		if (hdr->type == Message::READ)
+			ret = SSL_read(ssl, readBuffer.data(), msg->resid);
+		else
+			ret = SSL_peek(ssl, readBuffer.data(), msg->resid);
 		if (ret > 0)
 			writeReplyMessage(hdr->type, ret, readBuffer.data(),
 			    ret);

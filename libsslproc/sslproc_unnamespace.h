@@ -163,6 +163,7 @@
 #undef SSL_get_servername
 #undef SSL_get_servername_type
 #undef SSL_read
+#undef SSL_peek
 #undef SSL_write
 #undef SSL_set_shutdown
 #undef SSL_get_shutdown

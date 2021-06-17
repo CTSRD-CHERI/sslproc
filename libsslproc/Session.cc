@@ -1204,8 +1204,8 @@ PSSL_get_servername_type(const PSSL *ssl)
 	return (msg->ret);
 }
 
-int
-PSSL_read(PSSL *ssl, void *buf, int len)
+static int
+PSSL_do_read(PSSL *ssl, enum Message::Type type, void *buf, int len)
 {
 	CommandSocket *cs = currentCommandSocket();
 	if (cs == nullptr) {
@@ -1215,7 +1215,7 @@ PSSL_read(PSSL *ssl, void *buf, int len)
 	}
 
 	int resid = len;
-	MessageRef ref = cs->waitForReply(Message::READ, ssl->target, &resid,
+	MessageRef ref = cs->waitForReply(type, ssl->target, &resid,
 	    sizeof(resid));
 	if (!ref) {
 		ssl->last_error = SSL_ERROR_SYSCALL;
@@ -1247,6 +1247,18 @@ PSSL_read(PSSL *ssl, void *buf, int len)
 	}
 	ssl->last_error = msg->error;
 	return (msg->ret);
+}
+
+int
+PSSL_read(PSSL *ssl, void *buf, int len)
+{
+	return (PSSL_do_read(ssl, Message::READ, buf, len));
+}
+
+int
+PSSL_peek(PSSL *ssl, void *buf, int len)
+{
+	return (PSSL_do_read(ssl, Message::PEEK, buf, len));
 }
 
 int

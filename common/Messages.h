@@ -111,6 +111,7 @@ namespace Message {
 		ACCEPT,
 		SHUTDOWN,
 		READ,
+		PEEK,
 
 		/*
 		 * The payload of this message is the data to write.
