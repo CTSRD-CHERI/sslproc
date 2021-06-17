@@ -108,6 +108,8 @@ static ERR_STRING_DATA PROC_strings[] = {
 	 "PSSL_use_certificate_file"},
 	{ERR_PACK(0, PROC_F_SSL_SET_CIPHER_LIST, 0), "PSSL_set_cipher_list"},
 	{ERR_PACK(0, PROC_F_SSL_SET_CIPHERSUITES, 0), "PSSL_set_ciphersuites"},
+	{ERR_PACK(0, PROC_F_SSL_VERIFY_CLIENT_POST_HANDSHAKE, 0),
+	 "PSSL_verify_client_post_handshake"},
 	{ERR_PACK(0, 0, ERR_R_IO_ERROR), "I/O error"},
 	{ERR_PACK(0, 0, ERR_R_BAD_MESSAGE), "invalid message"},
 	{ERR_PACK(0, 0, ERR_R_UNEXPECTED_EOF), "unexpected EOF"},

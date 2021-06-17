@@ -765,6 +765,23 @@ PSSL_set_verify(PSSL *ssl, int mode, PSSL_verify_cb cb)
 }
 
 int
+PSSL_verify_client_post_handshake(PSSL *ssl)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_VERIFY_CLIENT_POST_HANDSHAKE,
+		    ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::VERIFY_CLIENT_POST_HANDSHAKE,
+	    ssl->target);
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
+}
+
+int
 PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos, unsigned int len)
 {
 	CommandSocket *cs = currentCommandSocket();
