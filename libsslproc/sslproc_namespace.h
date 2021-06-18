@@ -59,6 +59,11 @@
 
 #define	SSL_CIPHER_get_name	PSSL_CIPHER_get_name
 #define	SSL_CIPHER_get_bits	PSSL_CIPHER_get_bits
+#define	sk_SSL_CIPHER_dup	sk_PSSL_CIPHER_dup
+#define	sk_SSL_CIPHER_find	sk_PSSL_CIPHER_find
+#define	sk_SSL_CIPHER_free	sk_PSSL_CIPHER_free
+#define	sk_SSL_CIPHER_num	sk_PSSL_CIPHER_num
+#define	sk_SSL_CIPHER_value	sk_PSSL_CIPHER_value
 
 /* SSL_SESSION */
 
@@ -178,3 +183,4 @@
 #define	SSL_set_default_passwd_cb	PSSL_set_default_passwd_cb
 #define	SSL_set_default_passwd_cb_userdata	PSSL_set_default_passwd_cb_userdata
 #define	SSL_use_certificate_chain_file	PSSL_use_certificate_chain_file
+#define	SSL_get_ciphers		PSSL_get_ciphers

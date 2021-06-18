@@ -117,6 +117,7 @@ __END_DECLS
 #define	PROC_F_SSL_SET_CIPHERSUITES	48
 #define	PROC_F_SSL_VERIFY_CLIENT_POST_HANDSHAKE	49
 #define	PROC_F_CIPHER_FIND		50
+#define	PROC_F_SSL_GET_CIPHERS		51
 
 #define	ERR_R_IO_ERROR		(128|ERR_R_FATAL)
 #define	ERR_R_BAD_MESSAGE	(129|ERR_R_FATAL)
@@ -244,6 +245,7 @@ struct _PSSL {
 	char *servername;
 	char *srp_username;
 	char *srp_userinfo;
+	STACK_OF(PSSL_CIPHER) *get_ciphers;
 	void (*msg_cb)(int, int, int, const void *, size_t, struct _PSSL *, void *);
 	void *msg_cb_arg;
 	int (*verify_cb)(int, X509_STORE_CTX *);

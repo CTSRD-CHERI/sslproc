@@ -81,6 +81,7 @@ const PSSL_METHOD *PTLS_client_method(void);
 
 const char *PSSL_CIPHER_get_name(const PSSL_CIPHER *c);
 int PSSL_CIPHER_get_bits(const PSSL_CIPHER *c, int *alg_bits);
+DEFINE_STACK_OF_CONST(PSSL_CIPHER)
 
 /* SSL_SESSION */
 
@@ -228,6 +229,7 @@ int PSSL_get_ex_data_X509_STORE_CTX_idx(void);
 void PSSL_set_default_passwd_cb(PSSL *ssl, pem_password_cb *cb);
 void PSSL_set_default_passwd_cb_userdata(PSSL *ssl, void *data);
 int PSSL_use_certificate_chain_file(PSSL *ssl, const char *file);
+STACK_OF(PSSL_CIPHER) *PSSL_get_ciphers(PSSL *ssl);
 
 #define	PSSL_set0_chain(ssl, sk)					\
 	PSSL_ctrl(ssl, SSL_CTRL_CHAIN, 0, (char *)(sk))

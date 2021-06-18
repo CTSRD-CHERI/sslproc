@@ -277,6 +277,7 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->servername = nullptr;
 	ssl->srp_username = nullptr;
 	ssl->srp_userinfo = nullptr;
+	ssl->get_ciphers = nullptr;
 	ssl->msg_cb = nullptr;
 	ssl->msg_cb_arg = nullptr;
 	ssl->verify_cb = ctx->verify_cb;
@@ -316,6 +317,7 @@ PSSL_free(PSSL *ssl)
 	targets.remove(ssl->target);
 
 	PSSL_CTX *ctx = ssl->ctx;
+	sk_PSSL_CIPHER_free(ssl->get_ciphers);
 	free(ssl->srp_userinfo);
 	free(ssl->srp_username);
 	free(ssl->servername);
@@ -1456,6 +1458,46 @@ void
 PSSL_set_default_passwd_cb_userdata(PSSL *ssl, void *data)
 {
 	ssl->default_passwd_cb_userdata = data;
+}
+
+STACK_OF(PSSL_CIPHER) *
+PSSL_get_ciphers(PSSL *ssl)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_GET_CIPHERS, ERR_R_NO_COMMAND_SOCKET);
+		return (nullptr);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::GET_CIPHERS, ssl->target);
+	if (!ref)
+		return (nullptr);
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		return (nullptr);
+	if (msg->bodyLength() % 4 != 0) {
+		PROCerr(PROC_F_SSL_GET_CIPHERS, ERR_R_BAD_MESSAGE);
+		ERR_add_error_data(1,
+		    "message body is not an array of targets");
+		return (nullptr);
+	}
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+
+	const int *targets = reinterpret_cast<const int *>(msg->body());
+	int count = msg->bodyLength() / 4;
+	STACK_OF(PSSL_CIPHER) *sk = sk_PSSL_CIPHER_new_reserve(nullptr, count);
+	for (int i = 0; i < count; i++) {
+		const PSSL_CIPHER *cipher = PSSL_CIPHER_find(cs, targets[i]);
+		if (cipher == nullptr) {
+			sk_PSSL_CIPHER_free(sk);
+			return (nullptr);
+		}
+		sk_PSSL_CIPHER_push(sk, cipher);
+	}
+	sk_PSSL_CIPHER_free(ssl->get_ciphers);
+	ssl->get_ciphers = sk;
+	return (sk);
 }
 
 void

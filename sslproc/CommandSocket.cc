@@ -1958,6 +1958,37 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		}
 		break;
 	}
+	case Message::GET_CIPHERS:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		STACK_OF(SSL_CIPHER) *sk = SSL_get_ciphers(ssl);
+		if (sk == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		int count = sk_SSL_CIPHER_num(sk);
+		if (count < 0) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		} else if (count == 0) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		int ciphers[count];
+		for (int i = 0; i < count; i++) {
+			const SSL_CIPHER *cipher = sk_SSL_CIPHER_value(sk, i);
+			ciphers[i] = SSL_CIPHER_target(cipher);
+		}
+		writeReplyMessage(hdr->type, 0, ciphers, sizeof(ciphers));
+		break;
+	}
 	case Message::CREATE_CONF_CONTEXT:
 	{
 		cctx = SSL_CONF_CTX_new();

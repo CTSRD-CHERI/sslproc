@@ -59,6 +59,11 @@
 
 #undef SSL_CIPHER_get_name
 #undef SSL_CIPHER_get_bits
+#undef sk_SSL_CIPHER_dup
+#undef sk_SSL_CIPHER_find
+#undef sk_SSL_CIPHER_free
+#undef sk_SSL_CIPHER_num
+#undef sk_SSL_CIPHER_value
 
 /* SSL_SESSION */
 
@@ -179,3 +184,4 @@
 #undef SSL_set_default_passwd_cb
 #undef SSL_set_default_passwd_cb_userdata
 #undef SSL_use_certificate_chain_file
+#undef SSL_get_ciphers
