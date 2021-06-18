@@ -51,6 +51,8 @@ static TargetStore targets;
 static thread_local CommandSocket *currentSocket;
 static BIO_METHOD *readBioMethod, *writeBioMethod;
 
+static std::unordered_map<const SSL_CIPHER *, int> cipherTargets;
+
 static void
 msg_cb(int write_p, int version, int content_type, const void *buf,
     size_t len, SSL *ssl, void *arg)
@@ -582,6 +584,26 @@ findSSL_CONF_CTX(const Message::Targeted *thdr)
 	if (thdr == nullptr)
 		return (nullptr);
 	return (targets.lookup<SSL_CONF_CTX>(thdr->target));
+}
+
+static SSL_CIPHER *
+findSSL_CIPHER(const Message::Targeted *thdr)
+{
+	if (thdr == nullptr)
+		return (nullptr);
+	return (targets.lookup<SSL_CIPHER>(thdr->target));
+}
+
+static int
+SSL_CIPHER_target(const SSL_CIPHER *cipher)
+{
+	if (cipher == nullptr)
+		return (NULL_TARGET);
+
+	auto it = cipherTargets.find(cipher);
+	if (it == cipherTargets.end())
+		return (targets.allocate(cipher));
+	return (it->second);
 }
 
 bool
@@ -1852,21 +1874,9 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			cipher = SSL_get_current_cipher(ssl);
 		else
 			cipher = SSL_get_pending_cipher(ssl);
-		if (cipher == nullptr) {
-			writeReplyMessage(hdr->type, 0);
-			break;
-		}
 
-		Message::CipherResultBody body;
-		body.bits = SSL_CIPHER_get_bits(cipher, &body.alg_bits);
-		const char *name = SSL_CIPHER_get_name(cipher);
-
-		struct iovec iov[2];
-		iov[0].iov_base = &body;
-		iov[0].iov_len = sizeof(body);
-		iov[1].iov_base = const_cast<char *>(name);
-		iov[1].iov_len = name == nullptr ? 0 : strlen(name);
-		writeReplyMessage(hdr->type, 0, iov, 2);
+		int target = SSL_CIPHER_target(cipher);
+		writeReplyMessage(hdr->type, 0, &target, sizeof(target));
 		break;
 	}
 	case Message::SET_SESSION_ID_CONTEXT:
@@ -2122,6 +2132,28 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 
 		long options = SSL_get_options(ssl);
 		writeReplyMessage(hdr->type, 0, &options, sizeof(options));
+		break;
+	}
+	case Message::CIPHER_FETCH_INFO:
+	{
+		const SSL_CIPHER *cipher;
+
+		cipher = findSSL_CIPHER(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		Message::CipherResultBody body;
+		body.bits = SSL_CIPHER_get_bits(cipher, &body.alg_bits);
+		const char *name = SSL_CIPHER_get_name(cipher);
+
+		struct iovec iov[2];
+		iov[0].iov_base = &body;
+		iov[0].iov_len = sizeof(body);
+		iov[1].iov_base = const_cast<char *>(name);
+		iov[1].iov_len = name == nullptr ? 0 : strlen(name);
+		writeReplyMessage(hdr->type, 0, iov, 2);
 		break;
 	}
 	default:

@@ -209,6 +209,9 @@ namespace Message {
 		CONF_CMD,
 		CONF_CMD_VALUE_TYPE,
 		CONF_CTX_SET_SSL_CTX,
+
+		/* Operations on an SSL_CIPHER. */
+		CIPHER_FETCH_INFO = 0x600,
 	};
 
 	struct Header {
@@ -428,7 +431,7 @@ namespace Message {
 		}
 	};
 
-	/* Returned by GET_*_CIPHER. */
+	/* Returned by CIPHER_FETCH_INFO. */
 	struct CipherResultBody {
 		int	bits;
 		int	alg_bits;

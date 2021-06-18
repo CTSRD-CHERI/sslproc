@@ -30,8 +30,12 @@
  * SUCH DAMAGE.
  */
 
+#include <string.h>
+
 #include "sslproc.h"
 #include "sslproc_internal.h"
+#include "CommandSocket.h"
+#include "TargetStore.h"
 
 const char *
 PSSL_CIPHER_get_name(const PSSL_CIPHER *c)
@@ -50,4 +54,46 @@ PSSL_CIPHER_get_bits(const PSSL_CIPHER *c, int *alg_bits)
 	if (alg_bits != nullptr)
 		*alg_bits = c->alg_bits;
 	return (c->bits);
+}
+
+const PSSL_CIPHER *
+PSSL_CIPHER_find(CommandSocket *cs, int target)
+{
+	PSSL_CIPHER *cipher = targets.lookup<PSSL_CIPHER>(target);
+	if (cipher != nullptr)
+		return (cipher);
+
+	cipher = new PSSL_CIPHER();
+	cipher->target = target;
+	MessageRef ref = cs->waitForReply(Message::CIPHER_FETCH_INFO, target);
+	if (!ref || ref.result()->error) {
+		PROCerr(PROC_F_CIPHER_FIND, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "failed to fetch cipher details");
+		delete cipher;
+		return (nullptr);
+	}
+	const Message::Result *msg = ref.result();
+	if (msg->length < sizeof(Message::CipherResult)) {
+		PROCerr(PROC_F_CIPHER_FIND, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "reply too short");
+		delete cipher;
+		return (nullptr);
+	}
+	const Message::CipherResult *cipherMsg =
+	    reinterpret_cast<const Message::CipherResult *>(msg);
+	cipher->bits = cipherMsg->bits;
+	cipher->alg_bits = cipherMsg->alg_bits;
+	if (cipherMsg->nameLength() == 0)
+		cipher->name = nullptr;
+	else
+		cipher->name = strndup(cipherMsg->name(),
+		    cipherMsg->nameLength());
+	if (!targets.insert(target, cipher)) {
+		PROCerr(PROC_F_CIPHER_FIND, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "failed to add cipher to TargetStore");
+		free(cipher->name);
+		delete cipher;
+		return (nullptr);
+	}
+	return (cipher);
 }

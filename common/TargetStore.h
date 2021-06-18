@@ -68,6 +68,10 @@ private:
 		    : type(t), pointer(p)
 		{}
 
+		TargetValue(const std::type_info &t, const void *p)
+		    : type(t), pointer(const_cast<void *>(p))
+		{}
+
 		const std::type_info &type;
 		void *pointer;
 	};

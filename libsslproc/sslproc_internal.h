@@ -116,6 +116,7 @@ __END_DECLS
 #define	PROC_F_SSL_SET_CIPHER_LIST	47
 #define	PROC_F_SSL_SET_CIPHERSUITES	48
 #define	PROC_F_SSL_VERIFY_CLIENT_POST_HANDSHAKE	49
+#define	PROC_F_CIPHER_FIND		50
 
 #define	ERR_R_IO_ERROR		(128|ERR_R_FATAL)
 #define	ERR_R_BAD_MESSAGE	(129|ERR_R_FATAL)
@@ -147,7 +148,12 @@ struct _PSSL_CIPHER {
 	char *name;
 	int alg_bits;
 	int bits;
+	int target;
 };
+
+typedef struct _PSSL_CIPHER PSSL_CIPHER;
+
+const PSSL_CIPHER *PSSL_CIPHER_find(CommandSocket *cs, int target);
 
 /* SSL_SESSION */
 
@@ -238,8 +244,6 @@ struct _PSSL {
 	char *servername;
 	char *srp_username;
 	char *srp_userinfo;
-	struct _PSSL_CIPHER current_cipher;
-	struct _PSSL_CIPHER pending_cipher;
 	void (*msg_cb)(int, int, int, const void *, size_t, struct _PSSL *, void *);
 	void *msg_cb_arg;
 	int (*verify_cb)(int, X509_STORE_CTX *);

@@ -277,8 +277,6 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->servername = nullptr;
 	ssl->srp_username = nullptr;
 	ssl->srp_userinfo = nullptr;
-	memset(&ssl->current_cipher, 0, sizeof(ssl->current_cipher));
-	memset(&ssl->pending_cipher, 0, sizeof(ssl->pending_cipher));
 	ssl->msg_cb = nullptr;
 	ssl->msg_cb_arg = nullptr;
 	ssl->verify_cb = ctx->verify_cb;
@@ -318,8 +316,6 @@ PSSL_free(PSSL *ssl)
 	targets.remove(ssl->target);
 
 	PSSL_CTX *ctx = ssl->ctx;
-	free(ssl->pending_cipher.name);
-	free(ssl->current_cipher.name);
 	free(ssl->srp_userinfo);
 	free(ssl->srp_username);
 	free(ssl->servername);
@@ -910,7 +906,7 @@ PSSL_get_srp_userinfo(PSSL *ssl)
 }
 
 static const PSSL_CIPHER *
-PSSL_fetch_cipher(PSSL *ssl, enum Message::Type request, PSSL_CIPHER *cipher)
+PSSL_fetch_cipher(const PSSL *ssl, enum Message::Type request)
 {
 	CommandSocket *cs = currentCommandSocket();
 	if (cs == nullptr) {
@@ -922,38 +918,30 @@ PSSL_fetch_cipher(PSSL *ssl, enum Message::Type request, PSSL_CIPHER *cipher)
 	if (!ref)
 		return (nullptr);
 	const Message::Result *msg = ref.result();
-	if (msg->length < sizeof(Message::CipherResult)) {
-		PROCerr(PROC_F_SSL_FETCH_CIPHER, ERR_R_INTERNAL_ERROR);
+	if (msg->error != SSL_ERROR_NONE)
+		return (nullptr);
+	if (msg->bodyLength() != sizeof(int)) {
+		PROCerr(PROC_F_SSL_FETCH_CIPHER, ERR_R_BAD_MESSAGE);
 		ERR_add_error_data(1, "reply too short");
 		return (nullptr);
 	}
-	const Message::CipherResult *cipherMsg =
-	    reinterpret_cast<const Message::CipherResult *>(msg);
-	cipher->bits = cipherMsg->bits;
-	cipher->alg_bits = cipherMsg->alg_bits;
-	free(cipher->name);
-	if (cipherMsg->nameLength() == 0)
-		cipher->name = nullptr;
-	else
-		cipher->name = strndup(cipherMsg->name(),
-		    cipherMsg->nameLength());
-	return (cipher);
+
+	int target = *reinterpret_cast<const int *>(msg->body());
+	if (target == NULL_TARGET)
+		return (nullptr);
+	return (PSSL_CIPHER_find(cs, target));
 }
 
 const PSSL_CIPHER *
-PSSL_get_current_cipher(const PSSL *sslc)
+PSSL_get_current_cipher(const PSSL *ssl)
 {
-	PSSL *ssl = const_cast<PSSL *>(sslc);
-	return (PSSL_fetch_cipher(ssl, Message::GET_CURRENT_CIPHER,
-	    &ssl->current_cipher));
+	return (PSSL_fetch_cipher(ssl, Message::GET_CURRENT_CIPHER));
 }
 
 const PSSL_CIPHER *
-PSSL_get_pending_cipher(const PSSL *sslc)
+PSSL_get_pending_cipher(const PSSL *ssl)
 {
-	PSSL *ssl = const_cast<PSSL *>(sslc);
-	return (PSSL_fetch_cipher(ssl, Message::GET_PENDING_CIPHER,
-	    &ssl->pending_cipher));
+	return (PSSL_fetch_cipher(ssl, Message::GET_PENDING_CIPHER));
 }
 
 int
