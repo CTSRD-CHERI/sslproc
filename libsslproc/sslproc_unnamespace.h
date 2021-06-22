@@ -185,3 +185,4 @@
 #undef SSL_set_default_passwd_cb_userdata
 #undef SSL_use_certificate_chain_file
 #undef SSL_get_ciphers
+#undef SSL_get_peer_cert_chain

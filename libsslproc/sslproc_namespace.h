@@ -184,3 +184,4 @@
 #define	SSL_set_default_passwd_cb_userdata	PSSL_set_default_passwd_cb_userdata
 #define	SSL_use_certificate_chain_file	PSSL_use_certificate_chain_file
 #define	SSL_get_ciphers		PSSL_get_ciphers
+#define	SSL_get_peer_cert_chain	PSSL_get_peer_cert_chain

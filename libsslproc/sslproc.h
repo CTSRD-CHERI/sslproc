@@ -230,6 +230,7 @@ void PSSL_set_default_passwd_cb(PSSL *ssl, pem_password_cb *cb);
 void PSSL_set_default_passwd_cb_userdata(PSSL *ssl, void *data);
 int PSSL_use_certificate_chain_file(PSSL *ssl, const char *file);
 STACK_OF(PSSL_CIPHER) *PSSL_get_ciphers(PSSL *ssl);
+STACK_OF(X509) *PSSL_get_peer_cert_chain(PSSL *ssl);
 
 #define	PSSL_set0_chain(ssl, sk)					\
 	PSSL_ctrl(ssl, SSL_CTRL_CHAIN, 0, (char *)(sk))

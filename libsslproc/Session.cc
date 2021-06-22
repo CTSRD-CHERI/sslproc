@@ -278,6 +278,7 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->srp_username = nullptr;
 	ssl->srp_userinfo = nullptr;
 	ssl->get_ciphers = nullptr;
+	ssl->get_peer_cert_chain = nullptr;
 	ssl->msg_cb = nullptr;
 	ssl->msg_cb_arg = nullptr;
 	ssl->verify_cb = ctx->verify_cb;
@@ -317,6 +318,7 @@ PSSL_free(PSSL *ssl)
 	targets.remove(ssl->target);
 
 	PSSL_CTX *ctx = ssl->ctx;
+	sk_X509_pop_free(ssl->get_peer_cert_chain, X509_free);
 	sk_PSSL_CIPHER_free(ssl->get_ciphers);
 	free(ssl->srp_userinfo);
 	free(ssl->srp_username);
@@ -1497,6 +1499,34 @@ PSSL_get_ciphers(PSSL *ssl)
 	}
 	sk_PSSL_CIPHER_free(ssl->get_ciphers);
 	ssl->get_ciphers = sk;
+	return (sk);
+}
+
+STACK_OF(X509) *
+PSSL_get_peer_cert_chain(PSSL *ssl)
+{
+	/* XXX: Need a way to invalidate this if a session is reused. */
+	if (ssl->get_peer_cert_chain != nullptr)
+		return (ssl->get_peer_cert_chain);
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::GET_PEER_CERT_CHAIN,
+	    ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		abort();
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+
+	STACK_OF(X509) *sk = sk_X509_parse(msg->body(), msg->bodyLength());
+	if (sk == nullptr)
+		abort();
+	ssl->get_peer_cert_chain = sk;
 	return (sk);
 }
 

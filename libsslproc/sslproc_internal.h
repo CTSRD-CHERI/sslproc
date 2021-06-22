@@ -246,6 +246,7 @@ struct _PSSL {
 	char *srp_username;
 	char *srp_userinfo;
 	STACK_OF(PSSL_CIPHER) *get_ciphers;
+	STACK_OF(X509) *get_peer_cert_chain;
 	void (*msg_cb)(int, int, int, const void *, size_t, struct _PSSL *, void *);
 	void *msg_cb_arg;
 	int (*verify_cb)(int, X509_STORE_CTX *);

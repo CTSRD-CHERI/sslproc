@@ -157,6 +157,7 @@ namespace Message {
 		VERSION,
 		SET_SSL_CTX,
 		GET_CIPHERS,
+		GET_PEER_CERT_CHAIN,
 
 		/* These three return 'long options' on success. */
 		SET_OPTIONS,

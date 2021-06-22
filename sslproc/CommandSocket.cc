@@ -1989,6 +1989,32 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0, ciphers, sizeof(ciphers));
 		break;
 	}
+	case Message::GET_PEER_CERT_CHAIN:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		STACK_OF(X509) *sk = SSL_get_peer_cert_chain(ssl);
+		if (sk == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		std::vector<struct iovec> vector = sk_X509_serialize(sk);
+		if (vector.empty()) {
+			syslog(LOG_WARNING,
+	    "failed to serialize X509 chain for Message::GET_PEER_CERT_CHAIN");
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+		writeReplyMessage(hdr->type, 0, vector.data(),
+		    static_cast<int>(vector.size()));
+		freeIOVector(vector);
+		break;
+	}
 	case Message::CREATE_CONF_CONTEXT:
 	{
 		cctx = SSL_CONF_CTX_new();
