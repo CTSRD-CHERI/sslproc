@@ -186,3 +186,4 @@
 #undef SSL_use_certificate_chain_file
 #undef SSL_get_ciphers
 #undef SSL_get_peer_cert_chain
+#undef SSL_renegotiate

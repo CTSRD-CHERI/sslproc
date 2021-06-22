@@ -1529,6 +1529,24 @@ PSSL_get_peer_cert_chain(PSSL *ssl)
 	return (sk);
 }
 
+int
+PSSL_renegotiate(PSSL *ssl)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_RENEGOTIATE, ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::RENEGOTIATE, ssl->target);
+	if (!ref)
+		return (0);
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		return (0);
+	return (msg->ret);
+}
+
 void
 SSL_init(void)
 {

@@ -185,3 +185,4 @@
 #define	SSL_use_certificate_chain_file	PSSL_use_certificate_chain_file
 #define	SSL_get_ciphers		PSSL_get_ciphers
 #define	SSL_get_peer_cert_chain	PSSL_get_peer_cert_chain
+#define	SSL_renegotiate		PSSL_renegotiate

@@ -112,6 +112,7 @@ static ERR_STRING_DATA PROC_strings[] = {
 	 "PSSL_verify_client_post_handshake"},
 	{ERR_PACK(0, PROC_F_CIPHER_FIND, 0), "PSSL_CIPHER_find"},
 	{ERR_PACK(0, PROC_F_SSL_GET_CIPHERS, 0), "PSSL_get_ciphers"},
+	{ERR_PACK(0, PROC_F_SSL_RENEGOTIATE, 0), "PSSL_renegotiate"},
 	{ERR_PACK(0, 0, ERR_R_IO_ERROR), "I/O error"},
 	{ERR_PACK(0, 0, ERR_R_BAD_MESSAGE), "invalid message"},
 	{ERR_PACK(0, 0, ERR_R_UNEXPECTED_EOF), "unexpected EOF"},
