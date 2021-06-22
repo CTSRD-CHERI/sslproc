@@ -113,6 +113,7 @@
 #undef SSL_CTX_set_client_cert_cb
 #undef SSL_verify_cb
 #undef SSL_CTX_set_verify
+#undef SSL_CTX_get_verify_callback
 #undef SSL_CTX_load_verify_locations
 #undef SSL_CTX_get_cert_store
 #undef SSL_CTX_set_client_CA_list

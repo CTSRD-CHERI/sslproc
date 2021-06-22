@@ -113,6 +113,7 @@
 #define	SSL_CTX_set_client_cert_cb	PSSL_CTX_set_client_cert_cb
 #define	SSL_verify_cb		PSSL_verify_cb
 #define	SSL_CTX_set_verify	PSSL_CTX_set_verify
+#define	SSL_CTX_get_verify_callback	PSSL_CTX_get_verify_callback
 #define	SSL_CTX_load_verify_locations	PSSL_CTX_load_verify_locations
 #define	SSL_CTX_get_cert_store	PSSL_CTX_get_cert_store
 #define	SSL_CTX_set_client_CA_list	PSSL_CTX_set_client_CA_list
