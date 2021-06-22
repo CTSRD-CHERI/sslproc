@@ -576,7 +576,7 @@ PSSL_CTX_use_PrivateKey_file(PSSL_CTX *ctx, const char *file, int type)
 }
 
 int
-PSSL_CTX_check_private_key(PSSL_CTX *ctx)
+PSSL_CTX_check_private_key(const PSSL_CTX *ctx)
 {
 	CommandSocket *cs = currentCommandSocket();
 	if (cs == nullptr) {

@@ -137,6 +137,9 @@ namespace Message {
 		/* Message body is a ASN1-serialized X509 object. */
 		USE_CERTIFICATE_ASN1,
 
+		USE_PRIVATEKEY_ASN1,
+
+		CHECK_PRIVATE_KEY,
 		SET_SHUTDOWN,
 		GET_SHUTDOWN,
 		GET_PEER_CERTIFICATE,

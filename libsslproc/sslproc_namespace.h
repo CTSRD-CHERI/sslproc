@@ -137,6 +137,11 @@
 #define	SSL_get_ex_data		PSSL_get_ex_data
 #define	SSL_use_certificate	PSSL_use_certificate
 #define	SSL_use_certificate_ASN1	PSSL_use_certificate_ASN1
+#define	SSL_use_certificate_file	PSSL_use_certificate_file
+#define	SSL_use_PrivateKey	PSSL_use_PrivateKey
+#define	SSL_use_PrivateKey_ASN1	PSSL_use_PrivateKey_ASN1
+#define	SSL_use_PrivateKey_file	PSSL_use_PrivateKey_file
+#define	SSL_check_private_key	PSSL_check_private_key
 #define	SSL_get_SSL_CTX		PSSL_get_SSL_CTX
 #define	SSL_set_SSL_CTX		PSSL_set_SSL_CTX
 #define	SSL_get_peer_certificate	PSSL_get_peer_certificate

@@ -115,7 +115,7 @@ int PSSL_CTX_use_PrivateKey(PSSL_CTX *ctx, EVP_PKEY *pkey);
 int PSSL_CTX_use_PrivateKey_ASN1(int type, PSSL_CTX *ctx,
     const unsigned char *d, int len);
 int PSSL_CTX_use_PrivateKey_file(PSSL_CTX *ctx, const char *file, int type);
-int PSSL_CTX_check_private_key(PSSL_CTX *ctx);
+int PSSL_CTX_check_private_key(const PSSL_CTX *ctx);
 typedef int (*PSSL_client_hello_cb_fn)(PSSL *s, int *al, void *arg);
 void PSSL_CTX_set_client_hello_cb(PSSL_CTX *ctx, PSSL_client_hello_cb_fn cb,
     void *arg);
@@ -180,6 +180,11 @@ void *PSSL_get_ex_data(const PSSL *ssl, int idx);
 int PSSL_use_certificate(PSSL *ssl, X509 *x);
 int PSSL_use_certificate_ASN1(PSSL *ssl, const unsigned char *d, int len);
 int PSSL_use_certificate_file(PSSL *ssl, const char *file, int type);
+int PSSL_use_PrivateKey(PSSL *ssl, EVP_PKEY *pkey);
+int PSSL_use_PrivateKey_ASN1(int type, PSSL *ssl,
+    const unsigned char *d, int len);
+int PSSL_use_PrivateKey_file(PSSL *ssl, const char *file, int type);
+int PSSL_check_private_key(PSSL *ssl);
 PSSL_CTX *PSSL_get_SSL_CTX(const PSSL *ssl);
 PSSL_CTX *PSSL_set_SSL_CTX(PSSL *ssl, PSSL_CTX *ctx);
 X509 *PSSL_get_peer_certificate(const PSSL *ssl);

@@ -613,6 +613,115 @@ PSSL_use_certificate_file(PSSL *ssl, const char *file, int type)
 	return (ret);
 }
 
+int
+PSSL_use_PrivateKey(PSSL *ssl, EVP_PKEY *pkey)
+{
+	unsigned char *buf;
+	int len, ret;
+
+	buf = NULL;
+	len = i2d_PrivateKey(pkey, &buf);
+	if (len < 0) {
+		PROCerr(PROC_F_SSL_USE_PRIVATEKEY, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(1, "failed to encode private key");
+		return (0);
+	}
+
+	ret = PSSL_use_PrivateKey_ASN1(EVP_PKEY_base_id(pkey), ssl, buf, len);
+	OPENSSL_free(buf);
+	return (ret);
+}
+
+int
+PSSL_use_PrivateKey_ASN1(int type, PSSL *ssl, const unsigned char *d, int len)
+{
+	struct iovec iov[2];
+
+	if (d == NULL) {
+		PROCerr(PROC_F_SSL_USE_PRIVATEKEY_ASN1,
+		    ERR_R_PASSED_NULL_PARAMETER);
+		return (0);
+	}
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_USE_PRIVATEKEY_ASN1,
+		    ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	iov[0].iov_base = &type;
+	iov[0].iov_len = sizeof(type);
+	iov[1].iov_base = const_cast<unsigned char *>(d);
+	iov[1].iov_len = len;
+	MessageRef ref = cs->waitForReply(Message::USE_PRIVATEKEY_ASN1,
+	    ssl->target, iov, 2);
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
+}
+
+int
+PSSL_use_PrivateKey_file(PSSL *ssl, const char *file, int type)
+{
+	BIO *bio;
+	EVP_PKEY *pkey;
+	char tmp[16];
+	int ret;
+
+	bio = BIO_new_file(file, "r");
+	if (bio == NULL) {
+		PROCerr(PROC_F_SSL_USE_PRIVATEKEY_FILE,
+		    ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "failed to open file ", file);
+		return (0);
+	}
+
+	switch (type) {
+	case SSL_FILETYPE_PEM:
+		pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+		if (pkey == NULL)
+			PROCerr(PROC_F_SSL_USE_PRIVATEKEY_FILE,
+			    ERR_R_PEM_LIB);
+		break;
+	case SSL_FILETYPE_ASN1:
+		pkey = d2i_PrivateKey_bio(bio, NULL);
+		if (pkey == NULL)
+			PROCerr(PROC_F_SSL_USE_PRIVATEKEY_FILE,
+			    ERR_R_ASN1_LIB);
+		break;
+	default:
+		pkey = NULL;
+		PROCerr(PROC_F_SSL_USE_PRIVATEKEY_FILE,
+		    ERR_R_PASSED_INVALID_ARGUMENT);
+		snprintf(tmp, sizeof(tmp), "%d", type);
+		ERR_add_error_data(2, "type=", tmp);
+		break;
+	}
+	BIO_free_all(bio);
+	if (pkey == NULL)
+		return (0);
+	ret = PSSL_use_PrivateKey(ssl, pkey);
+	EVP_PKEY_free(pkey);
+	return (ret);
+}
+
+int
+PSSL_check_private_key(const PSSL *ssl)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_SSL_CHECK_PRIVATE_KEY, ERR_R_NO_COMMAND_SOCKET);
+		return (0);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::CHECK_PRIVATE_KEY,
+	    ssl->target);
+	if (!ref)
+		return (0);
+	return (ref.result()->ret);
+}
+
 PSSL_CTX *
 PSSL_get_SSL_CTX(const PSSL *ssl)
 {

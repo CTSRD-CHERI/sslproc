@@ -1637,6 +1637,42 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		else
 			writeReplyMessage(hdr->type, 1);
 		break;
+	case Message::USE_PRIVATEKEY_ASN1:
+	{
+		if (hdr->length <= sizeof(Message::PKey)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		const Message::PKey *msg =
+		    reinterpret_cast<const Message::PKey *>(hdr);
+		ret = SSL_use_PrivateKey_ASN1(msg->pktype, ssl,
+		    reinterpret_cast<const unsigned char *>(msg->key()),
+		    msg->keyLength());
+		if (ret != 1)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, 1);
+		break;
+	}
+	case Message::CHECK_PRIVATE_KEY:
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		ret = SSL_check_private_key(ssl);
+		if (ret != 1)
+			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
+		else
+			writeReplyMessage(hdr->type, 1);
+		break;
 	case Message::SET_SHUTDOWN:
 	{
 		int mode;

@@ -138,6 +138,10 @@
 #undef SSL_use_certificate
 #undef SSL_use_certificate_ASN1
 #undef SSL_use_certificate_file
+#undef SSL_use_PrivateKey
+#undef SSL_use_PrivateKey_ASN1
+#undef SSL_use_PrivateKey_file
+#undef SSL_check_private_key
 #undef SSL_get_SSL_CTX
 #undef SSL_set_SSL_CTX
 #undef SSL_get_peer_certificate
