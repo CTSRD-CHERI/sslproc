@@ -159,6 +159,7 @@ namespace Message {
 		GET_CIPHERS,
 		GET_PEER_CERT_CHAIN,
 		RENEGOTIATE,
+		GET_PRIVATEKEY,
 
 		/* These three return 'long options' on success. */
 		SET_OPTIONS,
@@ -475,5 +476,20 @@ namespace Message {
 	/* Response from VERIFY_CB */
 	struct VerifyCbResult : public Result {
 		int	x509_error;
+	};
+
+	/* Response from GET_PRIVATEKEY */
+	struct PKeyResult : public Result {
+		int	pktype;
+
+		size_t keyLength() const
+		{
+			return (length - sizeof(PKeyResult));
+		}
+
+		const void *key() const
+		{
+			return (this + 1);
+		}
 	};
 }

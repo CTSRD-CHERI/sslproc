@@ -2024,6 +2024,37 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		else
 			writeReplyMessage(hdr->type, ret);
 		break;
+	case Message::GET_PRIVATEKEY:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		EVP_PKEY *pkey = SSL_get_privatekey(ssl);
+		if (pkey == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		unsigned char *pkey_buf = nullptr;
+		int pk_len = i2d_PrivateKey(pkey, &pkey_buf);
+		if (pk_len < 0) {
+			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
+			break;
+		}
+		int pktype = EVP_PKEY_base_id(pkey);
+
+		struct iovec iov[2];
+		iov[0].iov_base = &pktype;
+		iov[0].iov_len = sizeof(pktype);
+		iov[1].iov_base = pkey_buf;
+		iov[1].iov_len = pk_len;
+		writeReplyMessage(hdr->type, 0, iov, 2);
+		OPENSSL_free(pkey_buf);
+		break;
+	}
 	case Message::CREATE_CONF_CONTEXT:
 	{
 		cctx = SSL_CONF_CTX_new();

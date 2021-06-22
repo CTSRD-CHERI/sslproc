@@ -279,6 +279,7 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->srp_userinfo = nullptr;
 	ssl->get_ciphers = nullptr;
 	ssl->get_peer_cert_chain = nullptr;
+	ssl->get_privatekey = nullptr;
 	ssl->msg_cb = nullptr;
 	ssl->msg_cb_arg = nullptr;
 	ssl->verify_cb = ctx->verify_cb;
@@ -318,6 +319,7 @@ PSSL_free(PSSL *ssl)
 	targets.remove(ssl->target);
 
 	PSSL_CTX *ctx = ssl->ctx;
+	EVP_PKEY_free(ssl->get_privatekey);
 	sk_X509_pop_free(ssl->get_peer_cert_chain, X509_free);
 	sk_PSSL_CIPHER_free(ssl->get_ciphers);
 	free(ssl->srp_userinfo);
@@ -1545,6 +1547,38 @@ PSSL_renegotiate(PSSL *ssl)
 	if (msg->error != SSL_ERROR_NONE)
 		return (0);
 	return (msg->ret);
+}
+
+EVP_PKEY *
+PSSL_get_privatekey(PSSL *ssl)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::GET_PRIVATEKEY, ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *hdr = ref.result();
+	if (hdr->error != SSL_ERROR_NONE)
+		abort();
+	if (hdr->bodyLength() == 0)
+		return (nullptr);
+
+	if (hdr->length < sizeof(Message::PKeyResult))
+		abort();
+	const Message::PKeyResult *msg =
+	    reinterpret_cast<const Message::PKeyResult *>(hdr);
+	const unsigned char *pp =
+	    reinterpret_cast<const unsigned char *>(msg->key());
+	EVP_PKEY *pkey = d2i_PrivateKey(msg->pktype, nullptr, &pp,
+	    msg->keyLength());
+	if (pkey == nullptr)
+		abort();
+
+	EVP_PKEY_free(ssl->get_privatekey);
+	ssl->get_privatekey = pkey;
+	return (pkey);
 }
 
 void
