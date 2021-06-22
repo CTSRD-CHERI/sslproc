@@ -281,10 +281,10 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 			return (0);
 		}
 
-		std::vector<struct iovec> vector;
+		SerializedStack stack;
 		if (sk != nullptr) {
-			vector = sk_X509_serialize(sk);
-			if (vector.empty()) {
+			stack = sk_X509_serialize(sk);
+			if (stack.empty()) {
 				PROCerr(PROC_F_SSL_CTX_CTRL,
 				    ERR_R_INTERNAL_ERROR);
 				ERR_add_error_data(1,
@@ -293,14 +293,13 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 			}
 		}
 
-		struct iovec iov[vector.size() + 1];
+		struct iovec iov[stack.cnt() + 1];
 
 		iov[0].iov_base = &body;
 		iov[0].iov_len = sizeof(body);
-		memcpy(&iov[1], vector.data(), vector.size() * sizeof(iov[0]));
+		memcpy(&iov[1], stack.iov(), stack.cnt() * sizeof(iov[0]));
 		MessageRef ref = cs->waitForReply(Message::CTX_CTRL,
-		    ctx->target, iov, static_cast<int>(vector.size()) + 1);
-		freeIOVector(vector);
+		    ctx->target, iov, stack.cnt() + 1);
 		if (!ref)
 			return (0);
 		if (ref.result()->error != SSL_ERROR_NONE ||
@@ -908,12 +907,11 @@ PSSL_CTX_set_client_CA_list(PSSL_CTX *ctx, STACK_OF(X509_NAME) *list)
 		return;
 	}
 
-	std::vector<struct iovec> vector = sk_X509_NAME_serialize(list);
-	if (vector.empty())
+	const SerializedStack stack = sk_X509_NAME_serialize(list);
+	if (stack.empty())
 		abort();
 	MessageRef ref = cs->waitForReply(Message::CTX_SET_CLIENT_CA_LIST,
-	    ctx->target, vector.data(), static_cast<int>(vector.size()));
-	freeIOVector(vector);
+	    ctx->target, stack.iov(), stack.cnt());
 	if (!ref || ref.result()->error != SSL_ERROR_NONE)
 		abort();
 }

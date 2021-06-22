@@ -1203,17 +1203,15 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			break;
 		}
 
-		std::vector<struct iovec> vector = sk_X509_NAME_serialize(sk);
-		if (vector.empty()) {
+		const SerializedStack stack = sk_X509_NAME_serialize(sk);
+		if (stack.empty()) {
 			syslog(LOG_WARNING,
 	    "failed to serialize CA list for Message::CTX_GET_CLIENT_CA_LIST");
 			writeErrnoReply(hdr->type, -1, EINVAL);
 			break;
 		}
 
-		writeReplyMessage(hdr->type, 0, vector.data(),
-		    static_cast<int>(vector.size()));
-		freeIOVector(vector);
+		writeReplyMessage(hdr->type, 0, stack.iov(), stack.cnt());
 		break;
 	}
 	case Message::CTX_SET_POST_HANDSHAKE_AUTH:
@@ -2003,16 +2001,14 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			break;
 		}
 
-		std::vector<struct iovec> vector = sk_X509_serialize(sk);
-		if (vector.empty()) {
+		const SerializedStack stack = sk_X509_serialize(sk);
+		if (stack.empty()) {
 			syslog(LOG_WARNING,
 	    "failed to serialize X509 chain for Message::GET_PEER_CERT_CHAIN");
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
 		}
-		writeReplyMessage(hdr->type, 0, vector.data(),
-		    static_cast<int>(vector.size()));
-		freeIOVector(vector);
+		writeReplyMessage(hdr->type, 0, stack.iov(), stack.cnt());
 		break;
 	}
 	case Message::CREATE_CONF_CONTEXT:

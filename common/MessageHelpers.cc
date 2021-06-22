@@ -49,57 +49,46 @@ parseStrings(const void *buf, size_t len)
 	return (strings);
 }
 
-void
-freeIOVector(std::vector<struct iovec> &vector)
+SerializedStack::~SerializedStack()
 {
-	for (const struct iovec &vec : vector)
+	for (const struct iovec &vec : iovecs)
 		OPENSSL_free(vec.iov_base);
 }
 
 #define SERIALIZE_STACK_DEFINE(T)					\
-std::vector<struct iovec>						\
+SerializedStack								\
 sk_##T##_serialize(STACK_OF(T) *sk)					\
 {									\
 	int count = sk_##T##_num(sk);					\
 	if (count <= 0)							\
 		return {};						\
 									\
-	std::vector <struct iovec> vectors;				\
-	struct iovec iov;						\
+	SerializedStack vectors;					\
 									\
 	/* First, a count of items. */					\
 	int *p = reinterpret_cast<int *>(OPENSSL_malloc(sizeof(int)));	\
 	*p = count;							\
-	iov.iov_base = p;						\
-	iov.iov_len = sizeof(int);					\
-	vectors.emplace_back(iov);					\
+	vectors.push_back(p, sizeof(int));				\
 									\
 	for (int i = 0; i < count; i++) {				\
 		unsigned char *pp = nullptr;				\
 		int len = i2d_##T(sk_##T##_value(sk, i), &pp);		\
-		if (len < 0) {						\
-			freeIOVector(vectors);				\
+		if (len < 0)						\
 			return {};					\
-		}							\
 									\
 		/* Each object is preceded by its length. */		\
 		p = reinterpret_cast<int *>(OPENSSL_malloc(sizeof(int))); \
 		*p = len;						\
-		iov.iov_base = p;					\
-		iov.iov_len = sizeof(int);				\
-		vectors.emplace_back(iov);				\
+		vectors.push_back(p, sizeof(int));			\
 									\
-		iov.iov_base = pp;					\
-		iov.iov_len = len;					\
-		vectors.emplace_back(iov);				\
+		vectors.push_back(pp, len);				\
 									\
 		if (len % 4 == 0 || i == count - 1)			\
 			continue;					\
 									\
 		/* Pad serialization to a 4 byte boundary. */		\
-		iov.iov_len = 4 - (len % 4);				\
-		iov.iov_base = OPENSSL_zalloc(iov.iov_len);		\
-		vectors.emplace_back(iov);				\
+		len = 4 - (len % 4);					\
+		vectors.push_back(OPENSSL_zalloc(len), len);		\
 	}								\
 	return vectors;							\
 }									\

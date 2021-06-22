@@ -46,18 +46,40 @@
  */
 std::vector<const char *> parseStrings(const void *buf, size_t len);
 
-/*
- * Free a dynamically allocated vector of iovecs.  Assumes each buffer
- * in the iovec is allocated by OPENSSL_malloc().
- */
-void freeIOVector(std::vector<struct iovec> &vector);
+class SerializedStack {
+public:
+	SerializedStack() = default;
+	SerializedStack(SerializedStack &&stack)
+	    : iovecs(std::move(stack.iovecs)) {}
+	~SerializedStack();
+
+	SerializedStack &operator=(SerializedStack &&stack)
+	{
+		iovecs = std::move(stack.iovecs);
+		return (*this);
+	}
+
+	bool empty() const { return (iovecs.empty()); }
+
+	const struct iovec *iov() const { return (iovecs.data()); }
+
+	int cnt() const { return (static_cast<int>(iovecs.size())); }
+
+	void push_back(void *p, size_t len)
+	{
+		struct iovec v = { p, len };
+		iovecs.emplace_back(v);
+	}
+private:
+	std::vector<struct iovec> iovecs;
+};
 
 /*
  * Routines to serialize and then de-serialize (parse) an OpenSSL
  * stack of objects (STACK_OF(T)).
  */
 #define	SERIALIZE_STACK_DECLARE(T)					\
-std::vector<struct iovec> sk_##T##_serialize(STACK_OF(T) *);		\
+SerializedStack sk_##T##_serialize(STACK_OF(T) *);			\
 STACK_OF(T) *sk_##T##_parse(const void *buf, size_t len)
 
 SERIALIZE_STACK_DECLARE(X509);

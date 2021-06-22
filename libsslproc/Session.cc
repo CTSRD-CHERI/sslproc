@@ -432,10 +432,10 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 			return (0);
 		}
 
-		std::vector<struct iovec> vector;
+		SerializedStack stack;
 		if (sk != nullptr) {
-			vector = sk_X509_serialize(sk);
-			if (vector.empty()) {
+			stack = sk_X509_serialize(sk);
+			if (stack.empty()) {
 				PROCerr(PROC_F_SSL_CTRL, ERR_R_INTERNAL_ERROR);
 				ERR_add_error_data(1,
 				    "failed to serialize certificate chain");
@@ -443,14 +443,13 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 			}
 		}
 
-		struct iovec iov[vector.size() + 1];
+		struct iovec iov[stack.cnt() + 1];
 
 		iov[0].iov_base = &body;
 		iov[0].iov_len = sizeof(body);
-		memcpy(&iov[1], vector.data(), vector.size() * sizeof(iov[0]));
+		memcpy(&iov[1], stack.iov(), stack.cnt() * sizeof(iov[0]));
 		MessageRef ref = cs->waitForReply(Message::CTRL, ssl->target,
-		    iov, static_cast<int>(vector.size()) + 1);
-		freeIOVector(vector);
+		    iov, stack.cnt() + 1);
 		if (!ref)
 			return (0);
 		if (ref.result()->error != SSL_ERROR_NONE ||
