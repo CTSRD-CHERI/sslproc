@@ -280,6 +280,7 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->get_ciphers = nullptr;
 	ssl->get_peer_cert_chain = nullptr;
 	ssl->get_privatekey = nullptr;
+	ssl->client_CA_list = nullptr;
 	ssl->msg_cb = nullptr;
 	ssl->msg_cb_arg = nullptr;
 	ssl->verify_cb = ctx->verify_cb;
@@ -319,6 +320,7 @@ PSSL_free(PSSL *ssl)
 	targets.remove(ssl->target);
 
 	PSSL_CTX *ctx = ssl->ctx;
+	sk_X509_NAME_pop_free(ssl->client_CA_list, X509_NAME_free);
 	EVP_PKEY_free(ssl->get_privatekey);
 	sk_X509_pop_free(ssl->get_peer_cert_chain, X509_free);
 	sk_PSSL_CIPHER_free(ssl->get_ciphers);
@@ -1579,6 +1581,39 @@ PSSL_get_privatekey(PSSL *ssl)
 	EVP_PKEY_free(ssl->get_privatekey);
 	ssl->get_privatekey = pkey;
 	return (pkey);
+}
+
+STACK_OF(X509_NAME) *
+PSSL_get_client_CA_list(const PSSL *sslc)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::GET_CLIENT_CA_LIST,
+	    ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		abort();
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+	STACK_OF(X509_NAME) *sk = sk_X509_NAME_parse(msg->body(),
+	    msg->bodyLength());
+	if (sk == nullptr)
+		abort();
+
+	/*
+	 * Cache the returned result since the caller doesn't
+	 * explicitly free the returned list.
+	 */
+	if (ssl->client_CA_list != nullptr)
+		sk_X509_NAME_pop_free(ssl->client_CA_list, X509_NAME_free);
+	ssl->client_CA_list = sk;
+	return (sk);
 }
 
 void

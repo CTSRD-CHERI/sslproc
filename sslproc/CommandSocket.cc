@@ -2055,6 +2055,31 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		OPENSSL_free(pkey_buf);
 		break;
 	}
+	case Message::GET_CLIENT_CA_LIST:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		STACK_OF(X509_NAME) *sk = SSL_get_client_CA_list(ssl);
+		if (sk == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		const SerializedStack stack = sk_X509_NAME_serialize(sk);
+		if (stack.empty()) {
+			syslog(LOG_WARNING,
+	    "failed to serialize CA list for Message::GET_CLIENT_CA_LIST");
+			writeErrnoReply(hdr->type, -1, EINVAL);
+			break;
+		}
+
+		writeReplyMessage(hdr->type, 0, stack.iov(), stack.cnt());
+		break;
+	}
 	case Message::CREATE_CONF_CONTEXT:
 	{
 		cctx = SSL_CONF_CTX_new();

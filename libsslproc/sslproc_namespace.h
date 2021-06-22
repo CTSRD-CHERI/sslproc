@@ -187,3 +187,4 @@
 #define	SSL_get_peer_cert_chain	PSSL_get_peer_cert_chain
 #define	SSL_renegotiate		PSSL_renegotiate
 #define	SSL_get_privatekey	PSSL_get_privatekey
+#define	SSL_get_client_CA_list	PSSL_get_client_CA_list

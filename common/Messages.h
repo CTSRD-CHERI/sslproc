@@ -160,6 +160,7 @@ namespace Message {
 		GET_PEER_CERT_CHAIN,
 		RENEGOTIATE,
 		GET_PRIVATEKEY,
+		GET_CLIENT_CA_LIST,
 
 		/* These three return 'long options' on success. */
 		SET_OPTIONS,

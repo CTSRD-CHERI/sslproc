@@ -188,3 +188,4 @@
 #undef SSL_get_peer_cert_chain
 #undef SSL_renegotiate
 #undef SSL_get_privatekey
+#undef SSL_get_client_CA_list
