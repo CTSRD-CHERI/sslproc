@@ -1129,6 +1129,16 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
+	case Message::CTX_GET_VERIFY_MODE:
+		ctx = findSSL_CTX(thdr);
+		if (ctx == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		ret = SSL_CTX_get_verify_mode(ctx);
+		writeReplyMessage(hdr->type, ret);
+		break;
 	case Message::CTX_LOAD_VERIFY_LOCATIONS:
 	{
 		ctx = findSSL_CTX(thdr);

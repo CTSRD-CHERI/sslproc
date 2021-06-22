@@ -864,6 +864,20 @@ PSSL_CTX_get_verify_callback(const PSSL_CTX *ctx)
 }
 
 int
+PSSL_CTX_get_verify_mode(const PSSL_CTX *ctx)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::CTX_GET_VERIFY_MODE,
+	    ctx->target);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		abort();
+	return (ref.result()->ret);
+}
+
+int
 PSSL_CTX_load_verify_locations(PSSL_CTX *ctx, const char *CAfile,
     const char *CApath)
 {
