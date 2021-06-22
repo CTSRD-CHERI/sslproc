@@ -188,3 +188,4 @@
 #define	SSL_renegotiate		PSSL_renegotiate
 #define	SSL_get_privatekey	PSSL_get_privatekey
 #define	SSL_get_client_CA_list	PSSL_get_client_CA_list
+#define	SSL_state_string_long	PSSL_state_string_long

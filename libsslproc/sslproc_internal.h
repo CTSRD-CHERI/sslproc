@@ -250,6 +250,7 @@ struct _PSSL {
 	STACK_OF(X509) *get_peer_cert_chain;
 	EVP_PKEY *get_privatekey;
 	STACK_OF(X509_NAME) *client_CA_list;
+	char *state_string_long;
 	void (*msg_cb)(int, int, int, const void *, size_t, struct _PSSL *, void *);
 	void *msg_cb_arg;
 	int (*verify_cb)(int, X509_STORE_CTX *);

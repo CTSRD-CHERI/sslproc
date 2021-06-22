@@ -2080,6 +2080,22 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0, stack.iov(), stack.cnt());
 		break;
 	}
+	case Message::STATE_STRING_LONG:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		const char *s = SSL_state_string_long(ssl);
+		if (s == nullptr) {
+			writeErrnoReply(hdr->type, -1, EINVAL);
+			break;
+		}
+		writeReplyMessage(hdr->type, 0, s, strlen(s));
+		break;
+	}
 	case Message::CREATE_CONF_CONTEXT:
 	{
 		cctx = SSL_CONF_CTX_new();

@@ -161,6 +161,7 @@ namespace Message {
 		RENEGOTIATE,
 		GET_PRIVATEKEY,
 		GET_CLIENT_CA_LIST,
+		STATE_STRING_LONG,
 
 		/* These three return 'long options' on success. */
 		SET_OPTIONS,

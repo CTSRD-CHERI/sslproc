@@ -281,6 +281,7 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->get_peer_cert_chain = nullptr;
 	ssl->get_privatekey = nullptr;
 	ssl->client_CA_list = nullptr;
+	ssl->state_string_long = nullptr;
 	ssl->msg_cb = nullptr;
 	ssl->msg_cb_arg = nullptr;
 	ssl->verify_cb = ctx->verify_cb;
@@ -320,6 +321,7 @@ PSSL_free(PSSL *ssl)
 	targets.remove(ssl->target);
 
 	PSSL_CTX *ctx = ssl->ctx;
+	free(ssl->state_string_long);
 	sk_X509_NAME_pop_free(ssl->client_CA_list, X509_NAME_free);
 	EVP_PKEY_free(ssl->get_privatekey);
 	sk_X509_pop_free(ssl->get_peer_cert_chain, X509_free);
@@ -1614,6 +1616,30 @@ PSSL_get_client_CA_list(const PSSL *sslc)
 		sk_X509_NAME_pop_free(ssl->client_CA_list, X509_NAME_free);
 	ssl->client_CA_list = sk;
 	return (sk);
+}
+
+const char *
+PSSL_state_string_long(const PSSL *sslc)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::STATE_STRING_LONG,
+	    ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		abort();
+
+	char *s = strndup(reinterpret_cast<const char *>(msg->body()),
+	    msg->bodyLength());
+	free(ssl->state_string_long);
+	ssl->state_string_long = s;
+	return (s);
 }
 
 void

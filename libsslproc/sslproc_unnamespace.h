@@ -189,3 +189,4 @@
 #undef SSL_renegotiate
 #undef SSL_get_privatekey
 #undef SSL_get_client_CA_list
+#undef SSL_state_string_long
