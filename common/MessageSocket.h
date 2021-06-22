@@ -124,6 +124,13 @@ public:
 			ms->freeMessage(b);
 	}
 
+	MessageRef &operator=(MessageRef &&ref)
+	{
+		reset(ref.ms, ref.b);
+		ref.b = nullptr;
+		return (*this);
+	}
+
 	void reset(MessageSocket *_ms, MessageBuffer *_b)
 	{
 		if (b != nullptr)
