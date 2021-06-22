@@ -52,8 +52,7 @@ PSSL_SESSION_new(void)
 	PSSL_SESSION *s;
 
 	s = new PSSL_SESSION();
-	s->time = time(nullptr);
-	s->compress_id = 0;
+	s->target = NULL_TARGET;
 	s->id = nullptr;
 	s->id_len = 0;
 	s->internal_repr = nullptr;
@@ -99,29 +98,50 @@ PSSL_SESSION_get_id(const PSSL_SESSION *s, unsigned int *len)
 unsigned int
 PSSL_SESSION_get_compress_id(const PSSL_SESSION *s)
 {
-	return (s->compress_id);
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::SESSION_GET_COMPRESS_ID,
+	    s->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		abort();
+	if (msg->bodyLength() != sizeof(unsigned int))
+		abort();
+	return (*reinterpret_cast<const unsigned int *>(msg->body()));
 }
 
 long
 PSSL_SESSION_get_time(const PSSL_SESSION *s)
 {
-	return (s->time);
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::SESSION_GET_TIME, s->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		abort();
+	if (msg->bodyLength() != sizeof(long))
+		abort();
+	return (*reinterpret_cast<const long *>(msg->body()));
 }
 
 #define	PSSL_SESSION_ASN1_VERSION	1
 
 typedef struct {
 	uint32_t version;
-	int32_t compress_id;
-	int64_t time;
 	ASN1_OCTET_STRING *id;
 	ASN1_OCTET_STRING *internal;
 } PSSL_SESSION_ASN1;
 
 ASN1_SEQUENCE(PSSL_SESSION_ASN1) = {
 	ASN1_EMBED(PSSL_SESSION_ASN1, version, UINT32),
-	ASN1_EMBED(PSSL_SESSION_ASN1, compress_id, INT32),
-	ASN1_EMBED(PSSL_SESSION_ASN1, time, ZINT64),
 	ASN1_SIMPLE(PSSL_SESSION_ASN1, id, ASN1_OCTET_STRING),
 	ASN1_SIMPLE(PSSL_SESSION_ASN1, internal, ASN1_OCTET_STRING)
 } static_ASN1_SEQUENCE_END(PSSL_SESSION_ASN1)
@@ -150,12 +170,9 @@ d2i_PSSL_SESSION(PSSL_SESSION **a, const unsigned char **pp,
 		goto error;
 	}
 
-	if (as->time != 0)
-		s->time = as->time;
-	else
-		s->time = time(nullptr);
+	free(s->id);
+	free(s->internal_repr);
 
-	s->compress_id = as->compress_id;
 	s->id_len = as->id->length;
 	s->id = reinterpret_cast<unsigned char *>(malloc(s->id_len));
 	memcpy(s->id, as->id->data, s->id_len);
@@ -187,18 +204,33 @@ i2d_PSSL_SESSION(PSSL_SESSION *in, unsigned char **pp)
 	if (in == nullptr)
 		return (0);
 
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr) {
+		PROCerr(PROC_F_I2D_SSL_SESSION, ERR_R_NO_COMMAND_SOCKET);
+		return (-1);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::SESSION_GET_ASN1,
+	    in->target);
+	if (!ref)
+		return (-1);
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		return (-1);
+	if (msg->bodyLength() == 0)
+		return (0);
+
 	memset(&as, 0, sizeof(as));
 
 	as.version = PSSL_SESSION_ASN1_VERSION;
-	as.compress_id = in->compress_id;
-	as.time = in->time;
 	as.id = &id;
 	id.data = in->id;
 	id.length = in->id_len;
 	id.flags = 0;
 	as.internal = &internal;
-	internal.data = in->internal_repr;
-	internal.length = in->internal_length;
+	internal.data = reinterpret_cast<unsigned char *>
+	    (const_cast<void *>(msg->body()));
+	internal.length = msg->bodyLength();
 	internal.flags = 0;
 
 	return (i2d_PSSL_SESSION_ASN1(&as, pp));

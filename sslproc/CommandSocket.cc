@@ -151,14 +151,6 @@ srp_username_cb(SSL *ssl, int *ad, void *arg)
 static int
 sess_new_cb(SSL *ssl, SSL_SESSION *s)
 {
-	struct {
-		long	time;
-		int	compress_id;
-		unsigned int id_len;
-		long	internal_length;
-	} body;
-	struct iovec iov[3];
-
 	CommandSocket *cs = currentSocket;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
@@ -166,27 +158,21 @@ sess_new_cb(SSL *ssl, SSL_SESSION *s)
 		return (0);
 	}
 
-	iov[0].iov_base = &body;
-	iov[0].iov_len = sizeof(body);
-	body.time = SSL_SESSION_get_time(s);
-	body.compress_id = SSL_SESSION_get_compress_id(s);
-
-	iov[1].iov_base = const_cast<unsigned char *>(SSL_SESSION_get_id(s,
-	    &body.id_len));
-	if (iov[1].iov_base == nullptr)
+	unsigned int id_len;
+	const unsigned char *id = SSL_SESSION_get_id(s, &id_len);
+	if (id == nullptr || id_len == 0)
 		return (0);
-	iov[1].iov_len = body.id_len;
 
-	unsigned char *asn1 = nullptr;
-	iov[2].iov_len = i2d_SSL_SESSION(s, &asn1);
-	if (iov[2].iov_len == 0)
-		return (0);
-	iov[2].iov_base = asn1;
-	body.internal_length = iov[2].iov_len;
+	int target = targets.allocate(s);
+	struct iovec iov[2];
+	iov[0].iov_base = &target;
+	iov[0].iov_len = sizeof(target);
+	iov[1].iov_base = const_cast<unsigned char *>(id);
+	iov[1].iov_len = id_len;
 
-	cs->sendRequest(Message::SESS_NEW_CB, ssl, iov, 3);
+	cs->sendRequest(Message::SESS_NEW_CB, ssl, iov, 2);
 
-	OPENSSL_free(asn1);
+	targets.remove(target);
 
 	return (0);
 }
@@ -206,7 +192,16 @@ sess_remove_cb(SSL_CTX *ctx, SSL_SESSION *s)
 	if (id == nullptr || id_len == 0)
 		return;
 
-	cs->sendRequest(Message::SESS_REMOVE_CB, ctx, id, id_len);
+	int target = targets.allocate(s);
+	struct iovec iov[2];
+	iov[0].iov_base = &target;
+	iov[0].iov_len = sizeof(target);
+	iov[1].iov_base = const_cast<unsigned char *>(id);
+	iov[1].iov_len = id_len;
+
+	cs->sendRequest(Message::SESS_REMOVE_CB, ctx, iov, 2);
+
+	targets.remove(target);
 }
 
 SSL_SESSION *
@@ -604,6 +599,14 @@ SSL_CIPHER_target(const SSL_CIPHER *cipher)
 	if (it == cipherTargets.end())
 		return (targets.allocate(cipher));
 	return (it->second);
+}
+
+static SSL_SESSION *
+findSSL_SESSION(const Message::Targeted *thdr)
+{
+	if (thdr == nullptr)
+		return (nullptr);
+	return (targets.lookup<SSL_SESSION>(thdr->target));
 }
 
 bool
@@ -2338,6 +2341,49 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		iov[1].iov_base = const_cast<char *>(name);
 		iov[1].iov_len = name == nullptr ? 0 : strlen(name);
 		writeReplyMessage(hdr->type, 0, iov, 2);
+		break;
+	}
+	case Message::SESSION_GET_COMPRESS_ID:
+	{
+		SSL_SESSION *s = findSSL_SESSION(thdr);
+		if (s == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		int compress_id = SSL_SESSION_get_compress_id(s);
+		writeReplyMessage(hdr->type, 0, &compress_id,
+		    sizeof(compress_id));
+		break;
+	}
+	case Message::SESSION_GET_TIME:
+	{
+		SSL_SESSION *s = findSSL_SESSION(thdr);
+		if (s == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		long time = SSL_SESSION_get_time(s);
+		writeReplyMessage(hdr->type, 0, &time, sizeof(time));
+		break;
+	}
+	case Message::SESSION_GET_ASN1:
+	{
+		SSL_SESSION *s = findSSL_SESSION(thdr);
+		if (s == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		unsigned char *asn1 = nullptr;
+		int len = i2d_SSL_SESSION(s, &asn1);
+		if (len < 0) {
+			writeSSLErrorReply(hdr->type, -1, SSL_ERROR_SSL);
+			break;
+		}
+		writeReplyMessage(hdr->type, 0, asn1, len);
+		OPENSSL_free(asn1);
 		break;
 	}
 	default:

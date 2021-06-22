@@ -123,6 +123,7 @@ __END_DECLS
 #define	PROC_F_SSL_USE_PRIVATEKEY_ASN1	54
 #define	PROC_F_SSL_USE_PRIVATEKEY_FILE	55
 #define	PROC_F_SSL_CHECK_PRIVATE_KEY	56
+#define	PROC_F_I2D_SSL_SESSION		57
 
 #define	ERR_R_IO_ERROR		(128|ERR_R_FATAL)
 #define	ERR_R_BAD_MESSAGE	(129|ERR_R_FATAL)
@@ -164,8 +165,7 @@ const PSSL_CIPHER *PSSL_CIPHER_find(CommandSocket *cs, int target);
 /* SSL_SESSION */
 
 struct _PSSL_SESSION {
-	long time;
-	int compress_id;
+	int target;
 	unsigned char *id;
 	unsigned int id_len;
 	unsigned char *internal_repr;

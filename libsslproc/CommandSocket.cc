@@ -300,23 +300,13 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 	}
 	case Message::SESS_NEW_CB:
 	{
-		if (hdr->length < sizeof(Message::SessNewCb)) {
+		if (hdr->length < sizeof(Message::SessCb)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
 
-		const Message::SessNewCb *msg =
-		    reinterpret_cast<const Message::SessNewCb *>(hdr);
-
-		if (msg->id_len <= 0 || msg->internal_length <= 0) {
-			writeErrnoReply(hdr->type, -1, EBADMSG);
-			break;
-		}
-		if (msg->length != sizeof(Message::SessNewCb) + msg->id_len +
-		    msg->internal_length) {
-			writeErrnoReply(hdr->type, -1, EMSGSIZE);
-			break;
-		}
+		const Message::SessCb *msg =
+		    reinterpret_cast<const Message::SessCb *>(hdr);
 
 		ssl = findSSL(thdr);
 		if (ssl == nullptr) {
@@ -330,20 +320,15 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			break;
 		}
 
-		s->time = msg->time;
-		s->compress_id = msg->compress_id;
-		s->id_len = msg->id_len;
-		s->internal_length = msg->internal_length;
+		s->target = msg->session;
+		s->id_len = msg->idLength();
 		s->id = reinterpret_cast<unsigned char *>(malloc(s->id_len));
-		s->internal_repr = reinterpret_cast<unsigned char *>
-		    (malloc(s->internal_length));
-		if (s->id == nullptr || s->internal_repr == nullptr) {
+		if (s->id == nullptr) {
 			PSSL_SESSION_free(s);
 			writeErrnoReply(hdr->type, -1, ENOMEM);
 			break;
 		}
 		memcpy(s->id, msg->id(), s->id_len);
-		memcpy(s->internal_repr, msg->internal(), s->internal_length);
 
 		/*
 		 * Locally created PSSL_SESSION objects are stored in
@@ -364,15 +349,19 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			if (ssl->ctx->sess_new_cb(ssl, s) == 0)
 				PSSL_SESSION_free(s);
 		}
+		s->target = NULL_TARGET;
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
 	case Message::SESS_REMOVE_CB:
 	{
-		if (thdr == nullptr || thdr->bodyLength() == 0) {
+		if (hdr->length < sizeof(Message::SessCb)) {
 			writeErrnoReply(hdr->type, -1, EMSGSIZE);
 			break;
 		}
+
+		const Message::SessCb *msg =
+		    reinterpret_cast<const Message::SessCb *>(hdr);
 
 		ctx = findSSL_CTX(thdr);
 		if (ctx == nullptr) {
@@ -381,8 +370,8 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		}
 
 		auto it = ctx->sessions.find(session_map_key(
-		    reinterpret_cast<const unsigned char *>(thdr->body()),
-		    thdr->bodyLength()));
+		    reinterpret_cast<const unsigned char *>(msg->id()),
+		    msg->idLength()));
 		if (it == ctx->sessions.end()) {
 			writeErrnoReply(hdr->type, -1, ENOENT);
 			break;
@@ -390,6 +379,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 
 		PSSL_SESSION *s = it->second;
 		ctx->sessions.erase(it);
+		s->target = msg->session;
 		if (ctx->sess_remove_cb != nullptr)
 			ctx->sess_remove_cb(ctx, s);
 		PSSL_SESSION_free(s);
@@ -433,7 +423,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 
 		/*
 		 * XXX: Is it correct to assume that newly created
-		 * sessions via the get callback should be assume to
+		 * sessions via the get callback should be assumed to
 		 * already be cached and subject to a future remove
 		 * callback?
 		 */

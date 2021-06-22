@@ -120,6 +120,7 @@ static ERR_STRING_DATA PROC_strings[] = {
 	 "PSSL_use_PrivateKey_file"},
 	{ERR_PACK(0, PROC_F_SSL_CHECK_PRIVATE_KEY, 0),
 	 "PSSL_check_private_key"},
+	{ERR_PACK(0, PROC_F_I2D_SSL_SESSION, 0), "i2d_PSSL_SESSION"},
 	{ERR_PACK(0, 0, ERR_R_IO_ERROR), "I/O error"},
 	{ERR_PACK(0, 0, ERR_R_BAD_MESSAGE), "invalid message"},
 	{ERR_PACK(0, 0, ERR_R_UNEXPECTED_EOF), "unexpected EOF"},

@@ -222,6 +222,11 @@ namespace Message {
 
 		/* Operations on an SSL_CIPHER. */
 		CIPHER_FETCH_INFO = 0x600,
+
+		/* Operations on an SSL_SESSION. */
+		SESSION_GET_COMPRESS_ID = 0x700,
+		SESSION_GET_TIME,
+		SESSION_GET_ASN1,
 	};
 
 	struct Header {
@@ -353,21 +358,18 @@ namespace Message {
 		}
 	};
 
-	/* Body for SESS_NEW_CB. */
-	struct SessNewCb : public Targeted {
-		long	time;
-		int	compress_id;
-		unsigned int id_len;
-		long	internal_length;
+	/* Body for SESS_NEW_CB and SESS_REMOVE_CB. */
+	struct SessCb : public Targeted {
+		int	session;
+
+		size_t idLength() const
+		{
+			return (length - sizeof(SessCb));
+		}
 
 		const void *id() const
 		{
 			return (this + 1);
-		}
-
-		const void *internal() const
-		{
-			return (reinterpret_cast<const char *>(id()) + id_len);
 		}
 	};
 
