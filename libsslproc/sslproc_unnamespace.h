@@ -155,6 +155,7 @@
 #undef SSL_set_alpn_protos
 #undef SSL_set_cipher_list
 #undef SSL_set_ciphersuites
+#undef SSL_set_srp_server_param
 #undef SSL_get_srp_username
 #undef SSL_get_srp_userinfo
 #undef SSL_get_current_cipher

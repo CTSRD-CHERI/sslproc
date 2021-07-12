@@ -152,6 +152,7 @@ namespace Message {
 		SET_ALPN_PROTOS,
 		SET_CIPHER_LIST,
 		SET_CIPHERSUITES,
+		SET_SRP_SERVER_PARAM,
 		GET_SRP_USERNAME,
 		GET_SRP_USERINFO,
 		GET_CURRENT_CIPHER,
@@ -338,6 +339,34 @@ namespace Message {
 	 */
 	struct Read : public Targeted {
 		int	resid;		/* Max amount of data requested. */
+	};
+
+	/*
+	 * Body for SET_SRP_SERVER_PARAM.
+	 */
+	struct SrpServerParamBody {
+		int	N_len;
+		int	g_len;
+		int	sa_len;
+		int	v_len;
+	};
+
+	struct SrpServerParam : public Targeted, SrpServerParamBody {
+		/* N padded to 4 bytes */
+		/* g padded to 4 bytes */
+		/* sa padded to 4 bytes */
+		/* v padded to 4 bytes */
+		/* info */
+
+		size_t bodyLength() const
+		{
+			return (length - sizeof(SrpServerParam));
+		}
+
+		const void *body() const
+		{
+			return (this + 1);
+		}
 	};
 
 	/*

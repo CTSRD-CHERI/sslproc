@@ -155,6 +155,7 @@
 #define	SSL_set_alpn_protos	PSSL_set_alpn_protos
 #define	SSL_set_cipher_list	PSSL_set_cipher_list
 #define	SSL_set_ciphersuites	PSSL_set_ciphersuites
+#define	SSL_set_srp_server_param	PSSL_set_srp_server_param
 #define	SSL_get_srp_username	PSSL_get_srp_username
 #define	SSL_get_srp_userinfo	PSSL_get_srp_userinfo
 #define	SSL_get_current_cipher	PSSL_get_current_cipher

@@ -199,6 +199,8 @@ int PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos,
     unsigned int len);
 int PSSL_set_cipher_list(PSSL *ssl, const char *s);
 int PSSL_set_ciphersuites(PSSL *ssl, const char *s);
+int PSSL_set_srp_server_param(PSSL *ssl, const BIGNUM *N, const BIGNUM *g,
+    BIGNUM *sa, BIGNUM *v, char *info);
 char *PSSL_get_srp_username(PSSL *ssl);
 char *PSSL_get_srp_userinfo(PSSL *ssl);
 const PSSL_CIPHER *PSSL_get_current_cipher(const PSSL *ssl);

@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/param.h>
 #include <sys/event.h>
 #include <errno.h>
 #include <pthread.h>
@@ -1874,6 +1875,92 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			writeSSLErrorReply(hdr->type, 0, SSL_ERROR_SSL);
 		else
 			writeReplyMessage(hdr->type, ret);
+		break;
+	}
+	case Message::SET_SRP_SERVER_PARAM:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (hdr->length < sizeof(Message::SrpServerParam)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		const Message::SrpServerParam *msg =
+		    reinterpret_cast<const Message::SrpServerParam *>(hdr);
+		if (msg->N_len < 0 || msg->g_len < 0 || msg->sa_len < 0 ||
+		    msg->v_len < 0) {
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+		int bnPayload = roundup2(msg->N_len, 4) +
+		    roundup2(msg->g_len, 4) + roundup2(msg->sa_len, 4) +
+		    roundup2(msg->v_len, 4);
+		if (bnPayload > msg->bodyLength()) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+
+		const unsigned char *p =
+		    reinterpret_cast<const unsigned char *>(msg->body());
+
+		BIGNUM *N = nullptr;
+		if (msg->N_len != 0) {
+			N = BN_bin2bn(p, msg->N_len, nullptr);
+			if (N == nullptr) {
+				writeErrnoReply(hdr->type, -1, EBADMSG);
+				break;
+			}
+			p += roundup2(msg->N_len, 4);
+		}
+		BIGNUM *g = nullptr;
+		if (msg->g_len != 0) {
+			g = BN_bin2bn(p, msg->g_len, nullptr);
+			if (g == nullptr) {
+				BN_free(N);
+				writeErrnoReply(hdr->type, -1, EBADMSG);
+				break;
+			}
+			p += roundup2(msg->g_len, 4);
+		}
+		BIGNUM *sa = nullptr;
+		if (msg->sa_len != 0) {
+			sa = BN_bin2bn(p, msg->sa_len, nullptr);
+			if (sa == nullptr) {
+				BN_free(g);
+				BN_free(N);
+				writeErrnoReply(hdr->type, -1, EBADMSG);
+				break;
+			}
+			p += roundup2(msg->sa_len, 4);
+		}
+		BIGNUM *v = nullptr;
+		if (msg->v_len != 0) {
+			v = BN_bin2bn(p, msg->v_len, nullptr);
+			if (v == nullptr) {
+				BN_free(sa);
+				BN_free(g);
+				BN_free(N);
+				writeErrnoReply(hdr->type, -1, EBADMSG);
+				break;
+			}
+			p += roundup2(msg->v_len, 4);
+		}
+		char *info = nullptr;
+		if (msg->bodyLength() > bnPayload)
+			info = strndup(reinterpret_cast<const char *>(p),
+			    msg->bodyLength() - bnPayload);
+
+		ret = SSL_set_srp_server_param(ssl, N, g, sa, v, info);
+		BN_free(N);
+		BN_free(g);
+		BN_free(sa);
+		BN_free(v);
+		free(info);
+		writeReplyMessage(hdr->type, ret);
 		break;
 	}
 	case Message::GET_SRP_USERNAME:

@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/param.h>
 #include <unistd.h>
 
 #include <openssl/ssl.h>
@@ -1003,6 +1004,68 @@ PSSL_set_ciphersuites(PSSL *ssl, const char *s)
 	    ssl->target, s, strlen(s));
 	if (!ref)
 		return (0);
+	return (ref.result()->ret);
+}
+
+static void
+serialize_BIGNUM(struct iovec *iov, const BIGNUM *bn, int len)
+{
+	len = roundup2(len, 4);
+	iov->iov_base = malloc(len);
+	iov->iov_len = len;
+	int ret = BN_bn2binpad(bn,
+	    reinterpret_cast<unsigned char *>(iov->iov_base), len);
+	if (ret != len)
+		abort();
+}
+
+int
+PSSL_set_srp_server_param(PSSL *ssl, const BIGNUM *N, const BIGNUM *g,
+    BIGNUM *sa, BIGNUM *v, char *info)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		return (-1);
+
+	struct Message::SrpServerParamBody body;
+	struct iovec iov[5];
+
+	memset(&body, 0, sizeof(body));
+	memset(iov, 0, sizeof(iov));
+
+	if (N != nullptr) {
+		body.N_len = BN_num_bytes(N);
+		serialize_BIGNUM(&iov[0], N, body.N_len);
+	}
+	if (g != nullptr) {
+		body.g_len = BN_num_bytes(g);
+		serialize_BIGNUM(&iov[1], g, body.g_len);
+	}
+	if (sa != nullptr) {
+		body.sa_len = BN_num_bytes(sa);
+		serialize_BIGNUM(&iov[2], sa, body.sa_len);
+	}
+	if (v != nullptr) {
+		body.v_len = BN_num_bytes(v);
+		serialize_BIGNUM(&iov[3], v, body.v_len);
+	}
+	if (info != nullptr) {
+		iov[4].iov_base = info;
+		iov[4].iov_len = strlen(info);
+	}
+
+	MessageRef ref = cs->waitForReply(Message::SET_SRP_SERVER_PARAM,
+	    ssl->target, iov, 5);
+
+	free(iov[0].iov_base);
+	free(iov[1].iov_base);
+	free(iov[2].iov_base);
+	free(iov[3].iov_base);
+
+	if (!ref)
+		return (-1);
+	if (ref.result()->error != SSL_ERROR_NONE)
+		return (-1);
 	return (ref.result()->ret);
 }
 
