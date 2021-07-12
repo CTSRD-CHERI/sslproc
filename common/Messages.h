@@ -227,6 +227,7 @@ namespace Message {
 		SESSION_GET_COMPRESS_ID = 0x700,
 		SESSION_GET_TIME,
 		SESSION_GET_ASN1,
+		SESSION_SET_TIMEOUT,
 	};
 
 	struct Header {

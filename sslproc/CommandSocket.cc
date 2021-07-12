@@ -2386,6 +2386,23 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		OPENSSL_free(asn1);
 		break;
 	}
+	case Message::SESSION_SET_TIMEOUT:
+	{
+		SSL_SESSION *s = findSSL_SESSION(thdr);
+		if (s == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (thdr->bodyLength() != sizeof(long)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		SSL_SESSION_set_timeout(s,
+		    *reinterpret_cast<const long *>(thdr->body()));
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
 	default:
 		syslog(LOG_WARNING, "unknown session request %d", hdr->type);
 		return (false);

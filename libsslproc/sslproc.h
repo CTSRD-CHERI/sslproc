@@ -92,6 +92,7 @@ const unsigned char *PSSL_SESSION_get_id(const PSSL_SESSION *s,
     unsigned int *len);
 unsigned int PSSL_SESSION_get_compress_id(const PSSL_SESSION *s);
 long PSSL_SESSION_get_time(const PSSL_SESSION *s);
+int PSSL_SESSION_set_timeout(PSSL_SESSION *s, long tm);
 PSSL_SESSION *d2i_PSSL_SESSION(PSSL_SESSION **a, const unsigned char **pp,
     long length);
 int i2d_PSSL_SESSION(PSSL_SESSION *in, unsigned char **pp);

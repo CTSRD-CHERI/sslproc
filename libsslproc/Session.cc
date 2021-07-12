@@ -132,6 +132,23 @@ PSSL_SESSION_get_time(const PSSL_SESSION *s)
 	return (*reinterpret_cast<const long *>(msg->body()));
 }
 
+int
+PSSL_SESSION_set_timeout(PSSL_SESSION *s, long tm)
+{
+	if (s == nullptr)
+		return (0);
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::SESSION_SET_TIMEOUT,
+	    s->target, &tm, sizeof(tm));
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		abort();
+	return (1);
+}
+
 #define	PSSL_SESSION_ASN1_VERSION	1
 
 typedef struct {

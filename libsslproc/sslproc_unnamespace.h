@@ -73,6 +73,7 @@
 #undef SSL_SESSION_get_id
 #undef SSL_SESSION_get_compress_id
 #undef SSL_SESSION_get_time
+#undef SSL_SESSION_set_timeout
 #undef d2i_SSL_SESSION
 #undef i2d_SSL_SESSION
 

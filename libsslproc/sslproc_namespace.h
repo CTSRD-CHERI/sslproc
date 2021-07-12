@@ -73,6 +73,7 @@
 #define	SSL_SESSION_get_id	PSSL_SESSION_get_id
 #define	SSL_SESSION_get_compress_id	PSSL_SESSION_get_compress_id
 #define	SSL_SESSION_get_time	PSSL_SESSION_get_time
+#define	SSL_SESSION_set_timeout	PSSL_SESSION_set_timeout
 #define	d2i_SSL_SESSION		d2i_PSSL_SESSION
 #define	i2d_SSL_SESSION		i2d_PSSL_SESSION
 
