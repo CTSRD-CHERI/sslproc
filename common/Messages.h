@@ -166,6 +166,7 @@ namespace Message {
 		GET_PRIVATEKEY,
 		GET_CLIENT_CA_LIST,
 		STATE_STRING_LONG,
+		CLIENT_HELLO_GET0_EXT,
 
 		/* These three return 'long options' on success. */
 		SET_OPTIONS,

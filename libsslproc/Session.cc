@@ -370,6 +370,10 @@ PSSL_free(PSSL *ssl)
 	targets.remove(ssl->target);
 
 	PSSL_CTX *ctx = ssl->ctx;
+	while (!ssl->client_hello_exts.empty()) {
+		free(ssl->client_hello_exts.front());
+		ssl->client_hello_exts.pop_front();
+	}
 	free(ssl->state_string_long);
 	sk_X509_NAME_pop_free(ssl->client_CA_list, X509_NAME_free);
 	EVP_PKEY_free(ssl->get_privatekey);
@@ -1798,6 +1802,34 @@ PSSL_state_string_long(const PSSL *sslc)
 	free(ssl->state_string_long);
 	ssl->state_string_long = s;
 	return (s);
+}
+
+int
+PSSL_client_hello_get0_ext(PSSL *ssl, int type, const unsigned char **out,
+    size_t *outlen)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::CLIENT_HELLO_GET0_EXT,
+	    ssl->target, &type, sizeof(type));
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		abort();
+
+	if (msg->ret != 1)
+		return (msg->ret);
+
+	void *buf = malloc(msg->bodyLength());
+	memcpy(buf, msg->body(), msg->bodyLength());
+	ssl->client_hello_exts.push_back(buf);
+
+	*out = reinterpret_cast<const unsigned char *>(buf);
+	*outlen = msg->bodyLength();
+	return (1);
 }
 
 void

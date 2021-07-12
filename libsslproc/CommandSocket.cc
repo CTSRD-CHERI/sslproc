@@ -268,9 +268,14 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		al = *reinterpret_cast<const int *>(thdr->body());
 		if (ssl->ctx->client_hello_cb == NULL)
 			ret = 0;
-		else
+		else {
 			ret = ssl->ctx->client_hello_cb(ssl, &al,
 			    ssl->ctx->client_hello_cb_arg);
+			while (!ssl->client_hello_exts.empty()) {
+				free(ssl->client_hello_exts.front());
+				ssl->client_hello_exts.pop_front();
+			}
+		}
 		writeReplyMessage(hdr->type, ret, &al, sizeof(al));
 		break;
 	}

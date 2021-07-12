@@ -2145,6 +2145,29 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		writeReplyMessage(hdr->type, 0, s, strlen(s));
 		break;
 	}
+	case Message::CLIENT_HELLO_GET0_EXT:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		if (thdr->bodyLength() != sizeof(int)) {
+			writeErrnoReply(hdr->type, -1, EMSGSIZE);
+			break;
+		}
+		int type = *reinterpret_cast<const int *>(thdr->body());
+
+		const unsigned char *data;
+		size_t len;
+		ret = SSL_client_hello_get0_ext(ssl, type, &data, &len);
+		if (ret == 1)
+			writeReplyMessage(hdr->type, ret, data, len);
+		else
+			writeReplyMessage(hdr->type, ret);
+		break;
+	}
 	case Message::CREATE_CONF_CONTEXT:
 	{
 		cctx = SSL_CONF_CTX_new();
