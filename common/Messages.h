@@ -168,6 +168,7 @@ namespace Message {
 		GET_CLIENT_CA_LIST,
 		STATE_STRING_LONG,
 		CLIENT_HELLO_GET0_EXT,
+		GET_SESSION,
 
 		/* These three return 'long options' on success. */
 		SET_OPTIONS,
@@ -230,6 +231,7 @@ namespace Message {
 		SESSION_GET_TIME,
 		SESSION_GET_ASN1,
 		SESSION_SET_TIMEOUT,
+		SESSION_REMOVE_TARGET,
 	};
 
 	struct Header {
@@ -527,6 +529,21 @@ namespace Message {
 		}
 
 		const void *key() const
+		{
+			return (this + 1);
+		}
+	};
+
+	/* Reponse from GET_SESSION */
+	struct GetSessionResult : public Result {
+		int	session;
+
+		size_t idLength() const
+		{
+			return (length - sizeof(GetSessionResult));
+		}
+
+		const void *id() const
 		{
 			return (this + 1);
 		}

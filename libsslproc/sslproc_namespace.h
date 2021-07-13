@@ -199,3 +199,4 @@
 #define	SSL_get_client_CA_list	PSSL_get_client_CA_list
 #define	SSL_state_string_long	PSSL_state_string_long
 #define	SSL_client_hello_get0_ext	PSSL_client_hello_get0_ext
+#define	SSL_get_session		PSSL_get_session

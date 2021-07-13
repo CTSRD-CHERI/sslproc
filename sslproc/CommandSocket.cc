@@ -2255,6 +2255,36 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 			writeReplyMessage(hdr->type, ret);
 		break;
 	}
+	case Message::GET_SESSION:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		SSL_SESSION *s = SSL_get_session(ssl);
+		if (s == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		unsigned int id_len;
+		const unsigned char *id = SSL_SESSION_get_id(s, &id_len);
+		if (id == nullptr || id_len == 0) {
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+
+		int target = targets.allocate(s);
+		struct iovec iov[2];
+		iov[0].iov_base = &target;
+		iov[0].iov_len = sizeof(target);
+		iov[1].iov_base = const_cast<unsigned char *>(id);
+		iov[1].iov_len = id_len;
+		writeReplyMessage(hdr->type, 0, iov, 2);
+		break;
+	}
 	case Message::CREATE_CONF_CONTEXT:
 	{
 		cctx = SSL_CONF_CTX_new();
@@ -2510,6 +2540,18 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		}
 		SSL_SESSION_set_timeout(s,
 		    *reinterpret_cast<const long *>(thdr->body()));
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case Message::SESSION_REMOVE_TARGET:
+	{
+		SSL_SESSION *s = findSSL_SESSION(thdr);
+		if (s == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		targets.remove(thdr->target);
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}

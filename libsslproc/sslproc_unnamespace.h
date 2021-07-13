@@ -199,3 +199,4 @@
 #undef SSL_get_client_CA_list
 #undef SSL_state_string_long
 #undef SSL_client_hello_get0_ext
+#undef SSL_get_session

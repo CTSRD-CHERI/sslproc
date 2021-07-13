@@ -332,6 +332,7 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->get_privatekey = nullptr;
 	ssl->client_CA_list = nullptr;
 	ssl->state_string_long = nullptr;
+	ssl->session = nullptr;
 	ssl->msg_cb = nullptr;
 	ssl->msg_cb_arg = nullptr;
 	ssl->verify_cb = ctx->verify_cb;
@@ -371,6 +372,11 @@ PSSL_free(PSSL *ssl)
 	targets.remove(ssl->target);
 
 	PSSL_CTX *ctx = ssl->ctx;
+	if (ssl->session != nullptr) {
+		cs->waitForReply(Message::SESSION_REMOVE_TARGET,
+		    ssl->session->target);
+		PSSL_SESSION_free(ssl->session);
+	}
 	while (!ssl->client_hello_exts.empty()) {
 		free(ssl->client_hello_exts.front());
 		ssl->client_hello_exts.pop_front();
@@ -1893,6 +1899,42 @@ PSSL_client_hello_get0_ext(PSSL *ssl, int type, const unsigned char **out,
 	*out = reinterpret_cast<const unsigned char *>(buf);
 	*outlen = msg->bodyLength();
 	return (1);
+}
+
+PSSL_SESSION *
+PSSL_get_session(const PSSL *sslc)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+
+	if (ssl->session != nullptr)
+		return (ssl->session);
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		return (nullptr);
+
+	MessageRef ref = cs->waitForReply(Message::GET_SESSION, ssl->target);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		return (nullptr);
+	if (ref.result()->length < sizeof(Message::GetSessionResult))
+		return (nullptr);
+
+	const Message::GetSessionResult *msg =
+	    reinterpret_cast<const Message::GetSessionResult *>(ref.result());
+
+	PSSL_SESSION *s = PSSL_SESSION_new();
+	if (s == nullptr)
+		return (nullptr);
+
+	s->target = msg->session;
+	s->id_len = msg->idLength();
+	s->id = reinterpret_cast<unsigned char *>(malloc(s->id_len));
+	if (s->id == nullptr) {
+		PSSL_SESSION_free(s);
+		return (nullptr);
+	}
+	ssl->session = s;
+	return (s);
 }
 
 void
