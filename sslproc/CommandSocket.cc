@@ -2160,6 +2160,30 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		else
 			writeReplyMessage(hdr->type, ret);
 		break;
+	case Message::GET_CERTIFICATE:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		X509 *x = SSL_get_certificate(ssl);
+		if (x == nullptr) {
+			writeReplyMessage(hdr->type, 0);
+			break;
+		}
+
+		unsigned char *buf = nullptr;
+		int len = i2d_X509(x, &buf);
+		if (len < 0) {
+			writeReplyMessage(hdr->type, -1);
+			break;
+		}
+		writeReplyMessage(hdr->type, 0, buf, len);
+		OPENSSL_free(buf);
+		break;
+	}
 	case Message::GET_PRIVATEKEY:
 	{
 		ssl = findSSL(thdr);
@@ -2283,6 +2307,18 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		iov[1].iov_base = const_cast<unsigned char *>(id);
 		iov[1].iov_len = id_len;
 		writeReplyMessage(hdr->type, 0, iov, 2);
+		break;
+	}
+	case Message::SESSION_REUSED:
+	{
+		ssl = findSSL(thdr);
+		if (ssl == nullptr) {
+			writeErrnoReply(hdr->type, -1, ENOENT);
+			break;
+		}
+
+		ret = SSL_session_reused(ssl);
+		writeReplyMessage(hdr->type, ret);
 		break;
 	}
 	case Message::CREATE_CONF_CONTEXT:

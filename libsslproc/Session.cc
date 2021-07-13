@@ -329,6 +329,7 @@ PSSL_new(PSSL_CTX *ctx)
 	ssl->srp_userinfo = nullptr;
 	ssl->get_ciphers = nullptr;
 	ssl->get_peer_cert_chain = nullptr;
+	ssl->get_cert = nullptr;
 	ssl->get_privatekey = nullptr;
 	ssl->client_CA_list = nullptr;
 	ssl->state_string_long = nullptr;
@@ -384,6 +385,7 @@ PSSL_free(PSSL *ssl)
 	free(ssl->state_string_long);
 	sk_X509_NAME_pop_free(ssl->client_CA_list, X509_NAME_free);
 	EVP_PKEY_free(ssl->get_privatekey);
+	X509_free(ssl->get_cert);
 	sk_X509_pop_free(ssl->get_peer_cert_chain, X509_free);
 	sk_PSSL_CIPHER_free(ssl->get_ciphers);
 	free(ssl->srp_userinfo);
@@ -1784,6 +1786,35 @@ PSSL_renegotiate(PSSL *ssl)
 	return (msg->ret);
 }
 
+X509 *
+PSSL_get_certificate(const PSSL *sslc)
+{
+	PSSL *ssl = const_cast<PSSL *>(sslc);
+
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::GET_CERTIFICATE, ssl->target);
+	if (!ref)
+		abort();
+	const Message::Result *msg = ref.result();
+	if (msg->error != SSL_ERROR_NONE)
+		abort();
+	if (msg->bodyLength() == 0)
+		return (nullptr);
+
+	const unsigned char *data =
+	    reinterpret_cast<const unsigned char *>(msg->body());
+	X509 *cert = d2i_X509(NULL, &data, msg->bodyLength());
+	if (cert == nullptr)
+		abort();
+
+	X509_free(ssl->get_cert);
+	ssl->get_cert = cert;
+	return (cert);
+}
+
 EVP_PKEY *
 PSSL_get_privatekey(PSSL *ssl)
 {
@@ -1935,6 +1966,19 @@ PSSL_get_session(const PSSL *sslc)
 	}
 	ssl->session = s;
 	return (s);
+}
+
+int
+PSSL_session_reused(const PSSL *ssl)
+{
+	CommandSocket *cs = currentCommandSocket();
+	if (cs == nullptr)
+		abort();
+
+	MessageRef ref = cs->waitForReply(Message::SESSION_REUSED, ssl->target);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		abort();
+	return (ref.result()->ret);
 }
 
 void

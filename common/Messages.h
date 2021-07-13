@@ -164,11 +164,13 @@ namespace Message {
 		GET_CIPHERS,
 		GET_PEER_CERT_CHAIN,
 		RENEGOTIATE,
+		GET_CERTIFICATE,
 		GET_PRIVATEKEY,
 		GET_CLIENT_CA_LIST,
 		STATE_STRING_LONG,
 		CLIENT_HELLO_GET0_EXT,
 		GET_SESSION,
+		SESSION_REUSED,
 
 		/* These three return 'long options' on success. */
 		SET_OPTIONS,

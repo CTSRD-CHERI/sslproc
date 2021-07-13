@@ -242,12 +242,14 @@ int PSSL_use_certificate_chain_file(PSSL *ssl, const char *file);
 STACK_OF(PSSL_CIPHER) *PSSL_get_ciphers(PSSL *ssl);
 STACK_OF(X509) *PSSL_get_peer_cert_chain(PSSL *ssl);
 int PSSL_renegotiate(PSSL *ssl);
+X509 *PSSL_get_certificate(const PSSL *ssl);
 EVP_PKEY *PSSL_get_privatekey(PSSL *ssl);
 STACK_OF(X509_NAME) *PSSL_get_client_CA_list(const PSSL *ssl);
 const char *PSSL_state_string_long(const PSSL *ssl);
 int PSSL_client_hello_get0_ext(PSSL *ssl, int type, const unsigned char **out,
     size_t *outlen);
 PSSL_SESSION *PSSL_get_session(const PSSL *ssl);
+int PSSL_session_reused(const PSSL *ssl);
 
 #define	PSSL_set0_chain(ssl, sk)					\
 	PSSL_ctrl(ssl, SSL_CTRL_CHAIN, 0, (char *)(sk))

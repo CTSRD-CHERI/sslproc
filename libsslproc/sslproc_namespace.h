@@ -195,8 +195,10 @@
 #define	SSL_get_ciphers		PSSL_get_ciphers
 #define	SSL_get_peer_cert_chain	PSSL_get_peer_cert_chain
 #define	SSL_renegotiate		PSSL_renegotiate
+#define	SSL_get_certificate	PSSL_get_certificate
 #define	SSL_get_privatekey	PSSL_get_privatekey
 #define	SSL_get_client_CA_list	PSSL_get_client_CA_list
 #define	SSL_state_string_long	PSSL_state_string_long
 #define	SSL_client_hello_get0_ext	PSSL_client_hello_get0_ext
 #define	SSL_get_session		PSSL_get_session
+#define	SSL_session_reused	PSSL_session_reused

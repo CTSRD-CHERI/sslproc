@@ -253,6 +253,7 @@ struct _PSSL {
 	char *srp_userinfo;
 	STACK_OF(PSSL_CIPHER) *get_ciphers;
 	STACK_OF(X509) *get_peer_cert_chain;
+	X509 *get_cert;
 	EVP_PKEY *get_privatekey;
 	STACK_OF(X509_NAME) *client_CA_list;
 	char *state_string_long;

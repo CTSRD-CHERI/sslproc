@@ -195,8 +195,10 @@
 #undef SSL_get_ciphers
 #undef SSL_get_peer_cert_chain
 #undef SSL_renegotiate
+#undef SSL_get_certificate
 #undef SSL_get_privatekey
 #undef SSL_get_client_CA_list
 #undef SSL_state_string_long
 #undef SSL_client_hello_get0_ext
 #undef SSL_get_session
+#undef SSL_session_reused
