@@ -88,8 +88,6 @@ MessageRef
 LibMessageSocket<Base>::waitForReply(enum Message::Type type, int target,
     const struct iovec *iov, int iovCnt)
 {
-	if (ERR_peek_error() != 0)
-		return {};
 	if (!Base::writeMessage(type, target, iov, iovCnt))
 		return {};
 	return (_waitForReply(type));
@@ -100,8 +98,6 @@ MessageRef
 LibMessageSocket<Base>::waitForReply(enum Message::Type type, int target,
     const void *payload, size_t payloadLen)
 {
-	if (ERR_peek_error() != 0)
-		return {};
 	if (!Base::writeMessage(type, target, payload, payloadLen))
 		return {};
 	return (_waitForReply(type));
@@ -112,8 +108,6 @@ MessageRef
 LibMessageSocket<Base>::waitForReply(enum Message::Type type,
     const void *payload, size_t payloadLen)
 {
-	if (ERR_peek_error() != 0)
-		return {};
 	if (!Base::writeMessage(type, payload, payloadLen))
 		return {};
 	return (_waitForReply(type));
@@ -125,8 +119,6 @@ LibMessageSocket<Base>::waitForReply(enum Message::Type type,
     const void *payload, size_t payloadLen, const void *control,
     size_t controlLen)
 {
-	if (ERR_peek_error() != 0)
-		return {};
 	if (!Base::writeMessage(type, payload, payloadLen, control, controlLen))
 		return {};
 	return (_waitForReply(type));
