@@ -30,6 +30,8 @@
  * SUCH DAMAGE.
  */
 
+#include <syslog.h>
+
 #include <openssl/dh.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -355,6 +357,7 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 		return (1);
 	}
 	default:
+		syslog(LOG_WARNING, "%s: unsupported cmd %d", __func__, cmd);
 		abort();
 	}
 }

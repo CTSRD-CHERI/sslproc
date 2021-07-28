@@ -31,6 +31,7 @@
  */
 
 #include <sys/param.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #include <openssl/ssl.h>
@@ -582,6 +583,7 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 		return (1);
 	}
 	default:
+		syslog(LOG_WARNING, "%s: unsupported cmd %d", __func__, cmd);
 		abort();
 	}
 }
