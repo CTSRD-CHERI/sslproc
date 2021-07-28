@@ -105,6 +105,7 @@ PSSL_CTX_new(const PSSL_METHOD *method)
 
 	ctx->get0_cert = nullptr;
 	ctx->client_CA_list = nullptr;
+	ctx->extra_chain_certs = nullptr;
 	ctx->servername_cb = nullptr;
 	ctx->servername_cb_arg = nullptr;
 	ctx->client_hello_cb = nullptr;
@@ -160,6 +161,8 @@ PSSL_CTX_free(PSSL_CTX *ctx)
 	X509_free(ctx->get0_cert);
 	if (ctx->client_CA_list != nullptr)
 		sk_X509_NAME_pop_free(ctx->client_CA_list, X509_NAME_free);
+	if (ctx->extra_chain_certs != nullptr)
+		sk_X509_pop_free(ctx->extra_chain_certs, X509_free);
 	delete ctx;
 }
 
@@ -354,6 +357,31 @@ PSSL_CTX_ctrl(PSSL_CTX *ctx, int cmd, long larg, void *parg)
 		 */
 		if (larg == 0)
 			X509_free(x);
+		return (1);
+	}
+	case SSL_CTRL_GET_EXTRA_CHAIN_CERTS:
+	{
+		if (cs == nullptr)
+			abort();
+		MessageRef ref = cs->waitForReply(Message::CTX_CTRL,
+		    ctx->target, &body, sizeof(body));
+		if (!ref)
+			abort();
+		const Message::Result *msg = ref.result();
+		if (msg->error != SSL_ERROR_NONE)
+			abort();
+		if (msg->bodyLength() == 0) {
+			*(STACK_OF(X509) **)parg = nullptr;
+			return (1);
+		}
+		STACK_OF(X509) *sk = sk_X509_parse(msg->body(),
+		    msg->bodyLength());
+		if (sk == nullptr)
+			abort();
+		if (ctx->extra_chain_certs != nullptr)
+			sk_X509_pop_free(ctx->extra_chain_certs, X509_free);
+		ctx->extra_chain_certs = sk;
+		*(STACK_OF(X509) **)parg = sk;
 		return (1);
 	}
 	default:

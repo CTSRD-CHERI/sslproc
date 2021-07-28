@@ -809,6 +809,27 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 				writeReplyMessage(hdr->type, ret);
 			break;
 		}
+		case SSL_CTRL_GET_EXTRA_CHAIN_CERTS:
+		{
+			STACK_OF(X509) *sk;
+			ret = SSL_CTX_ctrl(ctx, msg->cmd, msg->larg, &sk);
+			if (sk == nullptr) {
+				writeReplyMessage(hdr->type, ret);
+				break;
+			}
+
+			SerializedStack stack = sk_X509_serialize(sk);
+			if (stack.empty()) {
+				syslog(LOG_WARNING, "failed to serialize "
+	    "cert chain for Message::CTX_CTRL(SSL_CTRL_GET_EXTRA_CHAIN_CERTS)");
+				writeErrnoReply(hdr->type, 0, ENXIO);
+				break;
+			}
+
+			writeReplyMessage(hdr->type, ret, stack.iov(),
+			    stack.cnt());
+			break;
+		}
 		default:
 			writeErrnoReply(hdr->type, -1, EOPNOTSUPP);
 			break;
