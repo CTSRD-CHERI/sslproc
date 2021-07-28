@@ -100,6 +100,9 @@ PSSL_CONF_CTX_finish(PSSL_CONF_CTX *cctx)
 void
 PSSL_CONF_CTX_free(PSSL_CONF_CTX *cctx)
 {
+	if (cctx == nullptr)
+		return;
+
 	CommandSocket *cs = currentCommandSocket();
 	if (cs == nullptr)
 		abort();

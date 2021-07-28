@@ -146,6 +146,9 @@ PSSL_CTX_up_ref(PSSL_CTX *ctx)
 void
 PSSL_CTX_free(PSSL_CTX *ctx)
 {
+	if (ctx == nullptr)
+		return;
+
 	if (ctx->refs.fetch_sub(1, std::memory_order_relaxed) > 1)
 		return;
 

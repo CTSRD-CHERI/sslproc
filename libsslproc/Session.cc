@@ -81,6 +81,9 @@ PSSL_SESSION_up_ref(PSSL_SESSION *s)
 void
 PSSL_SESSION_free(PSSL_SESSION *s)
 {
+	if (s == nullptr)
+		return;
+
 	if (s->refs.fetch_sub(1, std::memory_order_relaxed) > 1)
 		return;
 
@@ -362,6 +365,9 @@ PSSL_up_ref(PSSL *ssl)
 void
 PSSL_free(PSSL *ssl)
 {
+	if (ssl == nullptr)
+		return;
+
 	if (ssl->refs.fetch_sub(1, std::memory_order_relaxed) > 1)
 		return;
 
