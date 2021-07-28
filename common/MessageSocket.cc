@@ -42,6 +42,8 @@
 #include "Messages.h"
 #include "MessageSocket.h"
 
+int MessageSocket::traceFd = -1;
+
 MessageSocket::~MessageSocket()
 {
 	while (!messages.empty()) {
@@ -50,6 +52,26 @@ MessageSocket::~MessageSocket()
 		delete buffer;
 	}
 	close(fd);
+}
+
+void
+MessageSocket::enableTracing(int fd)
+{
+	traceFd = fd;
+}
+
+void
+MessageSocket::trace(const char *fmt, ...)
+{
+	if (traceFd == -1)
+		return;
+
+	int save_error = errno;
+	va_list ap;
+	va_start(ap, fmt);
+	vdprintf(traceFd, fmt, ap);
+	va_end(ap);
+	errno = save_error;
 }
 
 bool
@@ -82,6 +104,7 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 
 	buffer = messages.top();
 	if (buffer == nullptr) {
+		trace("RCV %d: out of message buffers\n", fd);
 		observeReadError(NO_BUFFER, nullptr);
 		return (-1);
 	}
@@ -103,6 +126,7 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 	if (nread == 0)
 		return (0);
 	if (nread == -1) {
+		trace("RCV %d: recvmsg failed: %m\n", fd);
 		observeReadError(READ_ERROR, nullptr);
 		return (-1);
 	}
@@ -112,6 +136,8 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 		hdr = buffer->hdr();
 		if (hdr->length >= sizeof(*hdr)) {
 			if (!buffer->grow(hdr->length)) {
+				trace("RCV %d: failed to grow buffer to %u\n",
+				    fd, hdr->length);
 				observeReadError(GROW_FAIL, hdr);
 				errno = ENOMEM;
 				return (-1);
@@ -137,27 +163,37 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 	buffer->setLength(nread);
 	buffer->setControlLength(msg.msg_controllen);
 	if (nread < sizeof(*hdr)) {
+		trace("RCV %d: nread %zd < header\n", fd, nread);
 		observeReadError(SHORT, nullptr);
 		errno = EBADMSG;
 		return (-1);
 	}
 	if ((msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) != 0) {
+		trace("RCV %d: message truncated\n", fd);
 		observeReadError(TRUNCATED, nullptr);
 		errno = EBADMSG;
 		return (-1);
 	}
 	hdr = buffer->hdr();
 	if (hdr->length < sizeof(*hdr)) {
+		trace("RCV %d: header length %u too short\n", fd, hdr->length);
 		observeReadError(BAD_MSG_LENGTH, hdr);
 		errno = EBADMSG;
 		return (-1);
 	}
 	if (nread != hdr->length) {
+		trace("RCV %d: header length %u != nread %zd\n", fd,
+		    hdr->length, nread);
 		observeReadError(LENGTH_MISMATCH, hdr);
 		errno = EMSGSIZE;
 		return (-1);
 	}
 
+	if (buffer->controlCapacity())
+		trace("RCV %d: type %u len %zd controllen %u\n", fd, hdr->type,
+		    nread, msg.msg_controllen);
+	else
+		trace("RCV %d: type %u len %zd\n", fd, hdr->type, nread);
 	buffer->setLength(nread);
 	buffer->setControlLength(msg.msg_controllen);
 	messages.pop();
@@ -199,6 +235,7 @@ MessageStreamSocket::readMessage(MessageRef &ref)
 
 	buffer = messages.top();
 	if (buffer == nullptr) {
+		trace("RCV %d: out of message buffers\n", fd);
 		observeReadError(NO_BUFFER, nullptr);
 		return (-1);
 	}
@@ -209,10 +246,12 @@ MessageStreamSocket::readMessage(MessageRef &ref)
 	if (nread == 0)
 		return (0);
 	if (nread == -1) {
+		trace("RCV %d: header read failed: %m\n", fd);
 		observeReadError(READ_ERROR, nullptr);
 		return (-1);
 	}
 	if (nread != sizeof(*hdr)) {
+		trace("RCV %d: nread %zd < header\n", fd, nread);
 		observeReadError(SHORT, nullptr);
 		return (-1);
 	}
@@ -221,12 +260,15 @@ MessageStreamSocket::readMessage(MessageRef &ref)
 	/* Validate the header. */
 	hdr = buffer->hdr();
 	if (hdr->length < sizeof(*hdr)) {
+		trace("RCV %d: header length %u too short\n", fd, hdr->length);
 		observeReadError(BAD_MSG_LENGTH, hdr);
 		errno = EBADMSG;
 		return (-1);
 	}
 	if (buffer->capacity() < hdr->length) {
 		if (!buffer->grow(hdr->length)) {
+			trace("RCV %d: failed to grow buffer to %u\n", fd,
+			    hdr->length);
 			observeReadError(GROW_FAIL, hdr);
 			errno = ENOMEM;
 			return (-1);
@@ -241,10 +283,12 @@ MessageStreamSocket::readMessage(MessageRef &ref)
 		    reinterpret_cast<char *>(buffer->data()) + sizeof(*hdr),
 		    payloadLen);
 		if (nread == -1) {
+			trace("RCV %d: payload read failed: %m\n", fd);
 			observeReadError(READ_ERROR, nullptr);
 			return (-1);
 		}
 		if (nread != payloadLen) {
+			trace("RCV %d: message truncated\n", fd);
 			observeReadError(TRUNCATED, nullptr);
 			errno = EBADMSG;
 			return (-1);
@@ -252,6 +296,7 @@ MessageStreamSocket::readMessage(MessageRef &ref)
 		buffer->setLength(sizeof(*hdr) + nread);
 	}
 
+	trace("RCV %d: type %u len %u\n", fd, hdr->type, hdr->length);
 	messages.pop();
 	ref.reset(this, buffer);
 	return (1);
@@ -304,6 +349,8 @@ MessageDatagramSocket::writeMessage(enum Message::Type type,
 	msg.msg_control = const_cast<void *>(control);
 	msg.msg_controllen = controlLen;
 	msg.msg_flags = 0;
+	trace("SND %d: type %u len %d controlLen %zu\n", fd, hdr.type,
+	    hdr.length, controlLen);
 	nwritten = sendmsg(fd, &msg, 0);
 	if (nwritten == -1) {
 		observeWriteError();
@@ -330,6 +377,7 @@ MessageSocket::writeMessage(enum Message::Type type,
 		cnt = 1;
 	else
 		cnt = 2;
+	trace("SND %d: type %u len %d\n", fd, hdr.type, hdr.length);
 	return (writeMessage(iov, cnt));
 }
 
@@ -352,6 +400,8 @@ MessageSocket::writeMessage(enum Message::Type type, int target,
 		cnt = 1;
 	else
 		cnt = 2;
+	trace("SND %d: type %u target %u, len %d\n", fd, hdr.type, hdr.target,
+	    hdr.length);
 	return (writeMessage(iov, cnt));
 }
 
@@ -371,6 +421,8 @@ MessageSocket::writeMessage(enum Message::Type type, int target,
 	iov2[0].iov_base = &hdr;
 	iov2[0].iov_len = sizeof(hdr);
 	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
+	trace("SND %d: type %u target %u, len %d\n", fd, hdr.type, hdr.target,
+	    hdr.length);
 	return (writeMessage(iov2, iovCnt + 1));
 }
 
@@ -395,6 +447,8 @@ MessageSocket::writeReplyMessage(enum Message::Type type, long ret, int error,
 		cnt = 1;
 	else
 		cnt = 2;
+	trace("SND %d: RESULT type %u error %d len %d\n", fd, result.request,
+	    result.error, result.length);
 	writeMessage(iov, cnt);
 }
 
@@ -423,6 +477,8 @@ MessageSocket::writeReplyMessage(enum Message::Type type, long ret,
 	iov2[0].iov_base = &result;
 	iov2[0].iov_len = sizeof(result);
 	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
+	trace("SND %d: RESULT type %u error %d len %d\n", fd, result.request,
+	    result.error, result.length);
 	writeMessage(iov2, iovCnt + 1);
 }
 

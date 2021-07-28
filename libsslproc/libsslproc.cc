@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <fcntl.h>
 #include <unistd.h>
 #include <atomic>
 #include <memory>
@@ -42,6 +43,20 @@
 static std::unique_ptr<ControlSocket> controlSocket;
 static thread_local std::unique_ptr<CommandSocket> commandSocket;
 TargetStore targets;
+
+static void
+MessageTracing_init(void)
+{
+	const char *tracerPath = getenv("LIBSSLPROC_TRACE_PATH");
+	if (tracerPath == nullptr)
+		return;
+
+	int fd = open(tracerPath, O_WRONLY | O_CREAT | O_APPEND, 0644);
+	if (fd == -1)
+		return;
+
+	MessageSocket::enableTracing(fd);
+}
 
 static void
 ControlSocket_init(void)
@@ -147,6 +162,7 @@ POPENSSL_init_ssl(void)
 	}
 
 	PERR_init();
+	MessageTracing_init();
 	ControlSocket_init();
 	SSL_init();
 	initted.store(1);

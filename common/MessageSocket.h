@@ -56,6 +56,7 @@ public:
 		BAD_MSG_LENGTH,
 		LENGTH_MISMATCH
 	};
+	static void enableTracing(int fd);
 protected:
 	MessageSocket(int _fd) : fd(_fd) {};
 	~MessageSocket();
@@ -88,6 +89,10 @@ private:
 
 	friend class MessageDatagramSocket;
 	friend class MessageStreamSocket;
+
+	static int traceFd;
+	static void trace(const char *fmt, ...)
+	    __attribute__((__format__ (__printf__, 1, 2)));
 };
 
 class MessageDatagramSocket : public MessageSocket {

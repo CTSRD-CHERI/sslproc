@@ -78,6 +78,19 @@ main(int ac, char **av)
 		return (false);
 	}
 
+	const char *tracerPath = getenv("SSLPROC_TRACE_PATH");
+	if (tracerPath != nullptr) {
+		int fd = open(tracerPath, O_WRONLY | O_CREAT | O_APPEND,
+		    0644);
+		if (fd != -1) {
+			cap_rights_init(&rights, CAP_WRITE);
+			if (caph_rights_limit(fd, &rights) == 0)
+				MessageSocket::enableTracing(fd);
+			else
+				close(fd);
+		}
+	}
+
 	if (caph_enter() < 0) {
 		syslog(LOG_ERR, "failed to enter capability mode: %m");
 		return (1);
