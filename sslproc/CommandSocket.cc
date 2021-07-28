@@ -741,6 +741,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		case SSL_CTRL_CLEAR_MODE:
 		case SSL_CTRL_SET_SESS_CACHE_MODE:
 		case SSL_CTRL_GET_SESS_CACHE_MODE:
+		case SSL_CTRL_SET_CURRENT_CERT:
 			ret = SSL_CTX_ctrl(ctx, msg->cmd, msg->larg, nullptr);
 			writeReplyMessage(hdr->type, ret);
 			break;
@@ -1555,6 +1556,10 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		    reinterpret_cast<const Message::Ctrl *>(hdr);
 
 		switch (msg->cmd) {
+		case SSL_CTRL_SET_CURRENT_CERT:
+			ret = SSL_ctrl(ssl, msg->cmd, msg->larg, nullptr);
+			writeReplyMessage(hdr->type, ret);
+			break;
 		case SSL_CTRL_SET_TLSEXT_HOSTNAME:
 		{
 			char *name;

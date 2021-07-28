@@ -466,6 +466,16 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 	case SSL_CTRL_SET_MSG_CALLBACK_ARG:
 		ssl->msg_cb_arg = parg;
 		return (1);
+	case SSL_CTRL_SET_CURRENT_CERT:
+	{
+		if (cs == nullptr)
+			abort();
+		MessageRef ref = cs->waitForReply(Message::CTRL, ssl->target,
+		    &body, sizeof(body));
+		if (!ref)
+			abort();
+		return (ref.result()->ret);
+	}
 	case SSL_CTRL_SET_TLSEXT_HOSTNAME:
 	{
 		struct iovec iov[2];
