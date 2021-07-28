@@ -185,7 +185,7 @@ int PSSL_use_PrivateKey(PSSL *ssl, EVP_PKEY *pkey);
 int PSSL_use_PrivateKey_ASN1(int type, PSSL *ssl,
     const unsigned char *d, int len);
 int PSSL_use_PrivateKey_file(PSSL *ssl, const char *file, int type);
-int PSSL_check_private_key(PSSL *ssl);
+int PSSL_check_private_key(const PSSL *ssl);
 PSSL_CTX *PSSL_get_SSL_CTX(const PSSL *ssl);
 PSSL_CTX *PSSL_set_SSL_CTX(PSSL *ssl, PSSL_CTX *ctx);
 X509 *PSSL_get_peer_certificate(const PSSL *ssl);
