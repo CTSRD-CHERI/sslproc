@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/wait.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -52,16 +53,25 @@
 	}					\
 } while (0)
 
-#define FAIL(...) do {					\
+#define _FAIL(...) do {					\
 	printf("%s: FAIL: ", __func__);			\
 	printf(__VA_ARGS__);				\
 	printf("\n");					\
+} while (0)
+
+#define FAIL(...) do {					\
+	_FAIL(__VA_ARGS__);				\
 	return;						\
 } while (0)
 
 #define PASS() do {					\
 	printf("%s: PASS\n", __func__);			\
 	return;						\
+} while (0)
+
+#define CHILD_FAIL(...) do {				\
+	_FAIL(__VA_ARGS__);				\
+	exit(1);					\
 } while (0)
 
 static int show_messages, verbose;
@@ -847,6 +857,86 @@ test_conf(void)
 	PASS();
 }
 
+static void
+test_fork(void)
+{
+	SSL_CTX *cctx, *sctx;
+	SSL *cssl, *sssl;
+	pid_t pid;
+	int status;
+
+	if (!create_ssl_contexts(&cctx, &sctx)) {
+		ERR_print_errors_fp(stdout);
+		FAIL("failed to create contexts");
+	}
+
+	pid = fork();
+	if (pid == -1) {
+		SSL_CTX_free(cctx);
+		SSL_CTX_free(sctx);
+		FAIL("fork failed");
+	}
+
+	if (pid == 0) {
+		/* Child */
+#ifdef USE_SSLPROC
+		POPENSSL_atfork_child();
+#endif
+
+		if (!create_ssl_memory_sessions(cctx, sctx, &cssl, &sssl)) {
+			ERR_print_errors_fp(stdout);
+			CHILD_FAIL("failed to create sessions");
+		}
+
+		if (show_messages) {
+			SSL_set_msg_callback(cssl, msg_cb);
+			SSL_set_msg_callback_arg(cssl, "C");
+			SSL_set_msg_callback(sssl, msg_cb);
+			SSL_set_msg_callback_arg(sssl, "S");
+		}
+
+		if (!establish_sessions(cssl, sssl)) {
+			ERR_print_errors_fp(stdout);
+			SSL_free(cssl);
+			SSL_free(sssl);
+			CHILD_FAIL("failed to establish sessions");
+		}
+
+		if (!ping_pong_message(cssl, sssl, short_message,
+			strlen(short_message))) {
+			ERR_print_errors_fp(stdout);
+			SSL_free(cssl);
+			SSL_free(sssl);
+			CHILD_FAIL("failed to pass messages");
+		}
+
+		SSL_free(cssl);
+		SSL_free(sssl);
+
+		exit(0);
+	}
+
+	if (waitpid(pid, &status, 0) != pid)
+		FAIL("failed to wait for child");
+
+	SSL_CTX_free(cctx);
+	SSL_CTX_free(sctx);
+
+	if (WIFEXITED(status)) {
+		switch (WEXITSTATUS(status)) {
+		case 0:
+			PASS();
+		case 1:
+			/* Failure reported via CHILD_FAIL(). */
+			return;
+		default:
+			FAIL("unexpected child exit status %d",
+			    WEXITSTATUS(status));
+		}
+	} else
+		FAIL("unexpected child wait status %#x", status);
+}
+
 int
 main(int ac, char **av)
 {
@@ -884,6 +974,7 @@ main(int ac, char **av)
 	test_ssl_memory_ping_pong();
 	test_ssl_peek();
 	test_conf();
+	test_fork();
 
 	return (0);
 }

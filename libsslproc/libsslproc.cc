@@ -31,8 +31,10 @@
  */
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <atomic>
+#include <list>
 #include <memory>
 
 #include "sslproc_internal.h"
@@ -40,6 +42,8 @@
 #include "CommandSocket.h"
 #include "TargetStore.h"
 
+static std::list<CommandSocket *> commandSockets;
+static pthread_mutex_t commandSocketsLock = { PTHREAD_MUTEX_INITIALIZER };
 static std::unique_ptr<ControlSocket> controlSocket;
 static thread_local std::unique_ptr<CommandSocket> commandSocket;
 TargetStore targets;
@@ -129,6 +133,9 @@ createCommandSocket()
 		return (nullptr);
 	}
 
+	pthread_mutex_lock(&commandSocketsLock);
+	commandSockets.push_back(cs);
+	pthread_mutex_unlock(&commandSocketsLock);
 	return (cs);
 }
 
@@ -141,6 +148,27 @@ currentCommandSocket()
 		commandSocket.reset(cs);
 	}
 	return (cs);
+}
+
+void
+POPENSSL_atfork_child(void)
+{
+	/*
+	 * Teardown any command sockets inherited from the parent
+	 * process.  No locking is needed here since the child process
+	 * is single-threaded at this point.
+	 */
+	while (!commandSockets.empty()) {
+		CommandSocket *cs = commandSockets.front();
+		delete cs;
+		commandSockets.pop_front();
+	}
+
+	/*
+	 * Clear the TLS variable so that the first method will
+	 * allocate a new command socket.
+	 */
+	commandSocket.release();
 }
 
 int
@@ -164,6 +192,7 @@ POPENSSL_init_ssl(void)
 	PERR_init();
 	MessageTracing_init();
 	ControlSocket_init();
+	pthread_atfork(nullptr, nullptr, POPENSSL_atfork_child);
 	SSL_init();
 	initted.store(1);
 	return (0);
