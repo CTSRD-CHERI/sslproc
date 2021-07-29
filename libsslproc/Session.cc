@@ -309,7 +309,7 @@ PSSL_new(PSSL_CTX *ctx)
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
 		delete ssl;
 		PSSL_CTX_free(ctx);
-		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_BAD_MESSAGE);
+		PROCerr(PROC_F_SSL_NEW, ERR_R_BAD_MESSAGE);
 		ERR_add_error_data(1, "failed to create remote session");
 		return (nullptr);
 	}
@@ -320,7 +320,7 @@ PSSL_new(PSSL_CTX *ctx)
 		CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL, ssl, &ssl->ex_data);
 		delete ssl;
 		PSSL_CTX_free(ctx);
-		PROCerr(PROC_F_SSL_CTX_NEW, ERR_R_INTERNAL_ERROR);
+		PROCerr(PROC_F_SSL_NEW, ERR_R_INTERNAL_ERROR);
 		ERR_add_error_data(1, "duplicate target");
 		return (nullptr);
 	}
