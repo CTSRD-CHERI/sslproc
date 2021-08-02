@@ -102,12 +102,12 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 	struct iovec iov[1];
 	ssize_t nread;
 
-	buffer = messages.top();
-	if (buffer == nullptr) {
+	if (messages.empty()) {
 		trace("RCV %d: out of message buffers\n", fd);
 		observeReadError(NO_BUFFER, nullptr);
 		return (-1);
 	}
+	buffer = messages.top();
 	buffer->reset();
 	iov[0].iov_base = buffer->data();
 	iov[0].iov_len = buffer->capacity();
