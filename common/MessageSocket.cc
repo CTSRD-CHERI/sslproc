@@ -331,7 +331,6 @@ MessageDatagramSocket::writeMessage(enum Message::Type type,
 	struct msghdr msg;
 	ssize_t nwritten;
 	struct iovec iov[2];
-	int cnt;
 
 	hdr.type = type;
 	hdr.length = sizeof(hdr) + payloadLen;
