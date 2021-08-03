@@ -36,7 +36,7 @@
 
 #include "MessageSocket.h"
 
-class CommandSocket : public MessageStreamSocket {
+class CommandSocket final : public MessageStreamSocket {
 public:
 	CommandSocket(int fd) : MessageStreamSocket(fd) {}
 	~CommandSocket() = default;

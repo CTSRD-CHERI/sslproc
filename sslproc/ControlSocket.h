@@ -34,7 +34,7 @@
 
 #include "MessageSocket.h"
 
-class ControlSocket : MessageDatagramSocket {
+class ControlSocket final : MessageDatagramSocket {
 public:
 	ControlSocket(int fd) : MessageDatagramSocket(fd) {}
 	~ControlSocket() = default;
