@@ -550,4 +550,6 @@ namespace Message {
 			return (this + 1);
 		}
 	};
+
+	const char *typeName(enum Type);
 }
