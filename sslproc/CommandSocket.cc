@@ -80,7 +80,9 @@ msg_cb(int write_p, int version, int content_type, const void *buf,
 	iov[0].iov_len = sizeof(args);
 	iov[1].iov_base = const_cast<void *>(buf);
 	iov[1].iov_len = len;
-	cs->sendRequest(Message::MSG_CB, ssl, iov, 2);
+	MessageRef ref = cs->sendRequest(Message::MSG_CB, ssl, iov, 2);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		syslog(LOG_WARNING, "no reply from MSG_CB");
 }
 
 static int
@@ -171,7 +173,9 @@ sess_new_cb(SSL *ssl, SSL_SESSION *s)
 	iov[1].iov_base = const_cast<unsigned char *>(id);
 	iov[1].iov_len = id_len;
 
-	cs->sendRequest(Message::SESS_NEW_CB, ssl, iov, 2);
+	MessageRef ref = cs->sendRequest(Message::SESS_NEW_CB, ssl, iov, 2);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		syslog(LOG_WARNING, "no reply from SESS_NEW_CB");
 
 	targets.remove(target);
 
@@ -200,7 +204,9 @@ sess_remove_cb(SSL_CTX *ctx, SSL_SESSION *s)
 	iov[1].iov_base = const_cast<unsigned char *>(id);
 	iov[1].iov_len = id_len;
 
-	cs->sendRequest(Message::SESS_REMOVE_CB, ctx, iov, 2);
+	MessageRef ref = cs->sendRequest(Message::SESS_REMOVE_CB, ctx, iov, 2);
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		syslog(LOG_WARNING, "no reply from SESS_REMOVE_CB");
 
 	targets.remove(target);
 }
@@ -277,7 +283,10 @@ info_cb(const SSL *ssl, int where, int ret)
 		return;
 	}
 
-	cs->sendRequest(Message::INFO_CB, ssl, &body, sizeof(body));
+	MessageRef ref = cs->sendRequest(Message::INFO_CB, ssl, &body,
+	    sizeof(body));
+	if (!ref || ref.result()->error != SSL_ERROR_NONE)
+		syslog(LOG_WARNING, "no reply from INFO_CB");
 }
 
 static int
