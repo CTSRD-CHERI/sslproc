@@ -6,6 +6,8 @@ option(BUILD_TESTS "Build tests" OFF)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+add_compile_options(-Wall -Werror)
+
 find_package(OpenSSL REQUIRED)
 
 add_subdirectory(common)
