@@ -1586,6 +1586,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		    reinterpret_cast<const Message::Ctrl *>(hdr);
 
 		switch (msg->cmd) {
+		case SSL_CTRL_GET_RI_SUPPORT:
 		case SSL_CTRL_SET_CURRENT_CERT:
 			ret = SSL_ctrl(ssl, msg->cmd, msg->larg, nullptr);
 			writeReplyMessage(hdr->type, ret);
