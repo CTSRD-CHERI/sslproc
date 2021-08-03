@@ -192,7 +192,12 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 	if (msg.msg_controllen != 0)
 		trace("RCV %d: type %s len %zd controllen %u\n", fd,
 		    Message::typeName(hdr->type), nread, msg.msg_controllen);
-	else
+	else if (hdr->type == Message::RESULT && buffer->result() != nullptr) {
+		const Message::Result *result = buffer->result();
+		trace("RCV %d: type RESULT len %d request %s error %d\n", fd,
+		    result->length, Message::typeName(result->request),
+		    result->error);
+	} else
 		trace("RCV %d: type %s len %zd\n", fd,
 		    Message::typeName(hdr->type), nread);
 	buffer->setLength(nread);
@@ -297,8 +302,14 @@ MessageStreamSocket::readMessage(MessageRef &ref)
 		buffer->setLength(sizeof(*hdr) + nread);
 	}
 
-	trace("RCV %d: type %s len %u\n", fd, Message::typeName(hdr->type),
-	    hdr->length);
+	if (hdr->type == Message::RESULT && buffer->result() != nullptr) {
+		const Message::Result *result = buffer->result();
+		trace("RCV %d: type RESULT len %d request %s error %d\n", fd,
+		    result->length, Message::typeName(result->request),
+		    result->error);
+	} else
+		trace("RCV %d: type %s len %u\n", fd,
+		    Message::typeName(hdr->type), hdr->length);
 	messages.pop();
 	ref.reset(this, buffer);
 	return (1);
