@@ -2697,7 +2697,7 @@ CommandSocket::sendRequest(enum Message::Type type, int target,
 		return {};
 	}
 
-	return (_waitForReply(type));
+	return (waitForReply(type));
 }
 
 MessageRef
@@ -2710,42 +2710,46 @@ CommandSocket::sendRequest(enum Message::Type type, int target,
 		return {};
 	}
 
-	return (_waitForReply(type));
+	return (waitForReply(type));
 }
 
 MessageRef
-CommandSocket::_waitForReply(enum Message::Type type)
+CommandSocket::waitForReply(enum Message::Type type)
 {
-	MessageRef ref;
-	const Message::Header *hdr;
-	const Message::Result *msg;
-	int rc;
+	for (;;) {
+		MessageRef ref;
+		int rc = readMessage(ref);
+		if (rc == 0) {
+			syslog(LOG_DEBUG, "%s: EOF", __func__);
+			return {};
+		}
+		if (rc == -1) {
+			syslog(LOG_DEBUG, "%s: failed to read reply: %m",
+			    __func__);
+			return {};
+		}
 
-	rc = readMessage(ref);
-	if (rc == 0) {
-		syslog(LOG_DEBUG, "%s: EOF", __func__);
-		return {};
+		const Message::Header *hdr = ref.hdr();
+		if (hdr->type == Message::RESULT) {
+			const Message::Result *result = ref.result();
+
+			if (result == nullptr) {
+				syslog(LOG_WARNING, "%s: reply too short",
+				    __func__);
+				return {};
+			}
+
+			if (result->request == type)
+				return (ref);
+
+			syslog(LOG_WARNING,
+			    "%s: reply mismatch: expected %d got %d", __func__,
+			    type, result->request);
+			return {};
+		}
+
+		handleMessage(hdr);
 	}
-	if (rc == -1) {
-		syslog(LOG_DEBUG, "%s: failed to read reply: %m", __func__);
-		return {};
-	}
-	hdr = ref.hdr();
-	if (hdr->type != Message::RESULT) {
-		syslog(LOG_DEBUG, "%s: unexpected reply message %d", __func__,
-		    hdr->type);
-		return {};
-	}
-	msg = ref.result();
-	if (msg == nullptr) {
-		syslog(LOG_DEBUG, "%s: reply too short", __func__);
-		return {};
-	}
-	if (msg->request != type) {
-		syslog(LOG_DEBUG, "%s: reply mismatch", __func__);
-		return {};
-	}
-	return (ref);
 }
 
 MessageRef

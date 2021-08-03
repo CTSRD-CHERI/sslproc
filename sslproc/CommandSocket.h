@@ -54,7 +54,7 @@ private:
 	    struct iovec *iov, int iovCnt);
 	MessageRef sendRequest(enum Message::Type type, int target,
 	    const void *payload = nullptr, size_t payloadLen = 0);
-	MessageRef _waitForReply(enum Message::Type type);
+	MessageRef waitForReply(enum Message::Type type);
 	void writeSSLErrorReply(enum Message::Type type, long ret,
 	    int errorType);
 	bool handleMessage(const Message::Header *hdr);
