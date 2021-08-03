@@ -189,7 +189,7 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 		return (-1);
 	}
 
-	if (buffer->controlCapacity())
+	if (msg.msg_controllen != 0)
 		trace("RCV %d: type %s len %zd controllen %u\n", fd,
 		    Message::typeName(hdr->type), nread, msg.msg_controllen);
 	else
