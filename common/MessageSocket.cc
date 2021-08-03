@@ -402,8 +402,8 @@ MessageSocket::writeMessage(enum Message::Type type, int target,
 		cnt = 1;
 	else
 		cnt = 2;
-	trace("SND %d: type %s target %u, len %d\n", fd,
-	    Message::typeName(hdr.type), hdr.target, hdr.length);
+	trace("SND %d: type %s len %d target %u\n", fd,
+	    Message::typeName(hdr.type), hdr.length, hdr.target);
 	return (writeMessage(iov, cnt));
 }
 
@@ -423,8 +423,8 @@ MessageSocket::writeMessage(enum Message::Type type, int target,
 	iov2[0].iov_base = &hdr;
 	iov2[0].iov_len = sizeof(hdr);
 	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
-	trace("SND %d: type %s target %u, len %d\n", fd,
-	    Message::typeName(hdr.type), hdr.target, hdr.length);
+	trace("SND %d: type %s len %d target %u\n", fd,
+	    Message::typeName(hdr.type), hdr.length, hdr.target);
 	return (writeMessage(iov2, iovCnt + 1));
 }
 
@@ -449,8 +449,8 @@ MessageSocket::writeReplyMessage(enum Message::Type type, long ret, int error,
 		cnt = 1;
 	else
 		cnt = 2;
-	trace("SND %d: RESULT type %s error %d len %d\n", fd,
-	    Message::typeName(result.request), result.error, result.length);
+	trace("SND %d: type RESULT len %d request %s error %d\n", fd,
+	    result.length, Message::typeName(result.request), result.error);
 	writeMessage(iov, cnt);
 }
 
@@ -479,8 +479,8 @@ MessageSocket::writeReplyMessage(enum Message::Type type, long ret,
 	iov2[0].iov_base = &result;
 	iov2[0].iov_len = sizeof(result);
 	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
-	trace("SND %d: RESULT type %s error %d len %d\n", fd,
-	    Message::typeName(result.request), result.error, result.length);
+	trace("SND %d: type RESULT len %d request %s error %d\n", fd,
+	    result.length, Message::typeName(result.request), result.error);
 	writeMessage(iov2, iovCnt + 1);
 }
 
