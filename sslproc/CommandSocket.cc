@@ -2537,7 +2537,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 		const SSL_CIPHER *cipher;
 
 		cipher = findSSL_CIPHER(thdr);
-		if (ssl == nullptr) {
+		if (cipher == nullptr) {
 			writeErrnoReply(hdr->type, -1, ENOENT);
 			break;
 		}
@@ -2733,7 +2733,7 @@ CommandSocket::_waitForReply(enum Message::Type type)
 	hdr = ref.hdr();
 	if (hdr->type != Message::RESULT) {
 		syslog(LOG_DEBUG, "%s: unexpected reply message %d", __func__,
-		    msg->type);
+		    hdr->type);
 		return {};
 	}
 	msg = ref.result();
