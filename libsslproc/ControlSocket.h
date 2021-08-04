@@ -40,6 +40,7 @@ public:
 	~ControlSocket() = default;
 	bool init();
 	bool createCommandSocket(int fd);
+	bool requestFork(int fd);
 private:
 	void handleMessage(const Message::Header *hdr);
 };

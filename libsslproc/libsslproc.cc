@@ -46,6 +46,7 @@ static std::list<CommandSocket *> commandSockets;
 static pthread_mutex_t commandSocketsLock = { PTHREAD_MUTEX_INITIALIZER };
 static std::unique_ptr<ControlSocket> controlSocket;
 static thread_local std::unique_ptr<CommandSocket> commandSocket;
+static thread_local std::unique_ptr<ControlSocket> childControlSocket;
 TargetStore targets;
 
 static void
@@ -150,9 +151,68 @@ currentCommandSocket()
 	return (cs);
 }
 
+/*
+ * For an application fork(), the helper needs to also fork preserving
+ * COW semantics for any state established in the helper by the
+ * application process.  Waiting to fork the helper in the atchild
+ * hook is racey as the parent might perform operations affecting the
+ * state in the helper after fork() returns but before the atchild
+ * hook runs in the parent.  To avoid this, the 'prepare' hook
+ * executed in the parent prior to the system call forks the helper
+ * and establishes a new ControlSocket.  The 'parent' hook deletes
+ * this socket in the parent after the fork.  The 'child' hook uses
+ * this socket as the ControlSocket in the child after the fork.
+ */
+void
+POPENSSL_atfork_prepare(void)
+{
+	if (childControlSocket)
+		return;
+
+	ControlSocket *ctrl = controlSocket.get();
+	if (ctrl == nullptr)
+		return;
+
+	/*
+	 * Request a fork of the helper.  Create a new socketpair to
+	 * use as the control socket in the child helper.
+	 */
+	int fds[2];
+	if (socketpair(PF_LOCAL, SOCK_SEQPACKET, 0, fds) == -1) {
+		PROCerr(PROC_F_POPENSSL_ATFORK_PREPARE, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "socketpair: ", strerror(errno));
+		return;
+	}
+
+	if (!ctrl->requestFork(fds[1])) {
+		close(fds[0]);
+		close(fds[1]);
+		return;
+	}
+
+	close(fds[1]);
+
+	ControlSocket *newCtrl = new ControlSocket(fds[0]);
+	if (!newCtrl->init()) {
+		delete newCtrl;
+		newCtrl = nullptr;
+	}
+
+	childControlSocket.reset(newCtrl);
+}
+
+void
+POPENSSL_atfork_parent(void)
+{
+	childControlSocket.reset(nullptr);
+}
+
 void
 POPENSSL_atfork_child(void)
 {
+	if (!childControlSocket)
+		return;
+
 	/*
 	 * Teardown any command sockets inherited from the parent
 	 * process.  No locking is needed here since the child process
@@ -169,6 +229,12 @@ POPENSSL_atfork_child(void)
 	 * allocate a new command socket.
 	 */
 	commandSocket.release();
+
+	/*
+	 * Switch to the new ControlSocket allocated in the prepare
+	 * hook.
+	 */
+	controlSocket = std::move(childControlSocket);
 }
 
 int
@@ -192,7 +258,8 @@ POPENSSL_init_ssl(void)
 	PERR_init();
 	MessageTracing_init();
 	ControlSocket_init();
-	pthread_atfork(nullptr, nullptr, POPENSSL_atfork_child);
+	pthread_atfork(POPENSSL_atfork_prepare, POPENSSL_atfork_parent,
+	    POPENSSL_atfork_child);
 	SSL_init();
 	initted.store(1);
 	return (0);

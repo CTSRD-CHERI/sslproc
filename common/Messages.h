@@ -48,6 +48,14 @@ namespace Message {
 		 */
 		CREATE_COMMAND_SOCKET,
 
+		/*
+		 * Special message sent only on the control socket to
+		 * request a fork of the helper.  This message passes
+		 * an fd to use as the control socket in the new
+		 * helper.
+		 */
+		FORK,
+
 		/* Returns a target for the created context. */
 		CREATE_CONTEXT,
 

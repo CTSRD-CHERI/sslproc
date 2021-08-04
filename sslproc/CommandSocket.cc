@@ -46,6 +46,7 @@
 #include "MessageHelpers.h"
 #include "TargetStore.h"
 #include "CommandSocket.h"
+#include "ControlSocket.h"
 
 static pthread_attr_t attr;
 static TargetStore targets;
@@ -514,6 +515,7 @@ commandSocketRun(void *arg)
 
 	currentSocket = cs;
 	cs->run();
+	ControlSocket::deleteCommandSocket(cs);
 	delete cs;
 	return (nullptr);
 }

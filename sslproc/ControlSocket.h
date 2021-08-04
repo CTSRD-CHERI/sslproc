@@ -34,12 +34,16 @@
 
 #include "MessageSocket.h"
 
+class CommandSocket;
+
 class ControlSocket final : MessageDatagramSocket {
 public:
 	ControlSocket(int fd) : MessageDatagramSocket(fd) {}
 	~ControlSocket() = default;
 	bool init();
 	void run();
+
+	static void deleteCommandSocket(CommandSocket *cs);
 private:
 	virtual void observeReadError(enum ReadError,
 	    const Message::Header *hdr);

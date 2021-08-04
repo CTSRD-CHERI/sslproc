@@ -60,14 +60,15 @@ struct _PSSL;
 typedef struct _PSSL PSSL;
 
 /*
- * Programs linked against libpthread will invoke this automatically
- * in new child processes via pthread_atfork(3).  Single-threaded
- * programs may need to call this manually after fork(2) in the child
- * process.
+ * Programs linked against libpthread will invoke these automatically
+ * during fork via pthread_atfork(3).  Single-threaded should these
+ * manually after around fork(2).
  *
- * Calling this after fork(2) in a new child process is safe even if
- * the handler was already invoked by pthread_atfork(3).
+ * Calling these explicitly is safe even if the handlers are invoked
+ * by pthread_atfork(3).
  */
+void POPENSSL_atfork_prepare(void);
+void POPENSSL_atfork_parent(void);
 void POPENSSL_atfork_child(void);
 
 /* OPENSSL_init? */

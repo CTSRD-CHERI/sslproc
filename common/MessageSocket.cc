@@ -74,6 +74,14 @@ MessageSocket::trace(const char *fmt, ...)
 	errno = save_error;
 }
 
+void
+MessageSocket::updateFd(int newFd)
+{
+	assert(fd != newFd);
+	close(fd);
+	fd = newFd;
+}
+
 bool
 MessageSocket::allocateMessages(int count, size_t size, size_t controlSize)
 {

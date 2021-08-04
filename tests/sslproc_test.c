@@ -870,6 +870,9 @@ test_fork(void)
 		FAIL("failed to create contexts");
 	}
 
+#ifdef USE_SSLPROC
+	POPENSSL_atfork_prepare();
+#endif
 	pid = fork();
 	if (pid == -1) {
 		SSL_CTX_free(cctx);
@@ -916,11 +919,14 @@ test_fork(void)
 		exit(0);
 	}
 
-	if (waitpid(pid, &status, 0) != pid)
-		FAIL("failed to wait for child");
-
+#ifdef USE_SSLPROC
+	POPENSSL_atfork_parent();
+#endif
 	SSL_CTX_free(cctx);
 	SSL_CTX_free(sctx);
+
+	if (waitpid(pid, &status, 0) != pid)
+		FAIL("failed to wait for child");
 
 	if (WIFEXITED(status)) {
 		switch (WEXITSTATUS(status)) {

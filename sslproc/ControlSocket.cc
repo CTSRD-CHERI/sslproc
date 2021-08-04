@@ -33,8 +33,10 @@
 #include <assert.h>
 #include <capsicum_helpers.h>
 #include <errno.h>
+#include <pthread.h>
 #include <string.h>
 #include <syslog.h>
+#include <list>
 
 #include <openssl/ssl.h>
 
@@ -44,6 +46,9 @@
 #include "ControlSocket.h"
 #include "CommandSocket.h"
 
+static std::list<CommandSocket *> commandSockets;
+static pthread_mutex_t commandSocketsLock = { PTHREAD_MUTEX_INITIALIZER };
+
 bool
 ControlSocket::init()
 {
@@ -51,6 +56,14 @@ ControlSocket::init()
 	if (!allocateMessages(1, 64, CMSG_SPACE(sizeof(int))))
 		return (false);
 	return (true);
+}
+
+void
+ControlSocket::deleteCommandSocket(CommandSocket *cs)
+{
+	pthread_mutex_lock(&commandSocketsLock);
+	commandSockets.remove(cs);
+	pthread_mutex_unlock(&commandSocketsLock);
 }
 
 void
@@ -94,6 +107,69 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
 		}
+		pthread_mutex_lock(&commandSocketsLock);
+		commandSockets.push_back(cs);
+		pthread_mutex_unlock(&commandSocketsLock);
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+	case Message::FORK:
+	{
+		if (cmsg->cmsg_level != SOL_SOCKET ||
+		    cmsg->cmsg_type != SCM_RIGHTS ||
+		    cmsg->cmsg_len != CMSG_LEN(sizeof(int))) {
+			syslog(LOG_WARNING,
+			    "invalid control message for Message::FORK");
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+
+		fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
+
+		cap_rights_t rights;
+		cap_rights_init(&rights, CAP_EVENT, CAP_READ, CAP_WRITE);
+		if (caph_rights_limit(fds[0], &rights) < 0) {
+			int error = errno;
+			close(fds[0]);
+			syslog(LOG_WARNING,
+			    "failed to restrict new control socket: %m");
+			writeErrnoReply(hdr->type, -1, error);
+			break;
+		}
+
+		pid_t pid = fork();
+		if (pid == -1) {
+			int error = errno;
+			close(fds[0]);
+			syslog(LOG_WARNING, "failed to fork: %m");
+			writeErrnoReply(hdr->type, -1, error);
+			break;
+		}
+
+		if (pid == 0) {
+			/*
+			 * Teardown any command sockets inherited from
+			 * the parent process.  No locking is needed
+			 * here since the child process is
+			 * single-threaded at this point.
+			 */
+			while (!commandSockets.empty()) {
+				CommandSocket *cs = commandSockets.front();
+				delete cs;
+				commandSockets.pop_front();
+			}
+
+			/* Switch fd of child control socket. */
+			updateFd(fds[0]);
+
+			/*
+			 * Return to await the first message on the
+			 * new socket.
+			 */
+			break;
+		}
+
+		close(fds[0]);
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
