@@ -42,10 +42,14 @@
 #include "CommandSocket.h"
 #include "TargetStore.h"
 
+static void commandSocketDeleter(CommandSocket *cs);
+
 static std::list<CommandSocket *> commandSockets;
 static pthread_mutex_t commandSocketsLock = { PTHREAD_MUTEX_INITIALIZER };
 static std::unique_ptr<ControlSocket> controlSocket;
-static thread_local std::unique_ptr<CommandSocket> commandSocket;
+static thread_local std::unique_ptr<CommandSocket,
+    decltype(&commandSocketDeleter)> commandSocket(nullptr,
+    &commandSocketDeleter);
 static thread_local std::unique_ptr<ControlSocket> childControlSocket;
 TargetStore targets;
 
@@ -149,6 +153,15 @@ currentCommandSocket()
 		commandSocket.reset(cs);
 	}
 	return (cs);
+}
+
+static void
+commandSocketDeleter(CommandSocket *cs)
+{
+	pthread_mutex_lock(&commandSocketsLock);
+	commandSockets.remove(cs);
+	pthread_mutex_unlock(&commandSocketsLock);
+	delete cs;
 }
 
 /*
