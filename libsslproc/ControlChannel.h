@@ -32,14 +32,14 @@
 
 #pragma once
 
-#include "LibMessageSocket.h"
+#include "LibMessageChannel.h"
 
-class ControlSocket final : public LibMessageSocket<MessageDatagramSocket> {
+class ControlChannel final : public LibMessageChannel<MessageDatagramSocket> {
 public:
-	ControlSocket(int fd) : LibMessageSocket(fd) {}
-	~ControlSocket() = default;
+	ControlChannel(int fd) : LibMessageChannel(fd) {}
+	~ControlChannel() = default;
 	bool init();
-	bool createCommandSocket(int fd);
+	bool createCommandChannel(int fd);
 	bool requestFork(int fd);
 private:
 	void handleMessage(const Message::Header *hdr);

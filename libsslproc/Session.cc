@@ -40,7 +40,7 @@
 #include "sslproc.h"
 #include "sslproc_internal.h"
 #include "MessageHelpers.h"
-#include "CommandSocket.h"
+#include "CommandChannel.h"
 #include "TargetStore.h"
 
 /* XXX: The normal version of this does not work with C++. */
@@ -103,7 +103,7 @@ PSSL_SESSION_get_id(const PSSL_SESSION *s, unsigned int *len)
 unsigned int
 PSSL_SESSION_get_compress_id(const PSSL_SESSION *s)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -122,7 +122,7 @@ PSSL_SESSION_get_compress_id(const PSSL_SESSION *s)
 long
 PSSL_SESSION_get_time(const PSSL_SESSION *s)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -143,7 +143,7 @@ PSSL_SESSION_set_timeout(PSSL_SESSION *s, long tm)
 	if (s == nullptr)
 		return (0);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -226,9 +226,9 @@ i2d_PSSL_SESSION(PSSL_SESSION *in, unsigned char **pp)
 	if (in == nullptr)
 		return (0);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_I2D_SSL_SESSION, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_I2D_SSL_SESSION, ERR_R_NO_COMMAND_CHANNEL);
 		return (-1);
 	}
 
@@ -269,9 +269,9 @@ PSSL_new(PSSL_CTX *ctx)
 		return (nullptr);
 	}
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_NEW, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_NEW, ERR_R_NO_COMMAND_CHANNEL);
 		return (nullptr);
 	}
 
@@ -371,7 +371,7 @@ PSSL_free(PSSL *ssl)
 	if (ssl->refs.fetch_sub(1, std::memory_order_relaxed) > 1)
 		return;
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 	MessageRef ref = cs->waitForReply(Message::FREE_SESSION, ssl->target);
@@ -408,7 +408,7 @@ PSSL_free(PSSL *ssl)
 long
 PSSL_set_options(PSSL *ssl, long options)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -427,7 +427,7 @@ PSSL_set_options(PSSL *ssl, long options)
 long
 PSSL_clear_options(PSSL *ssl, long options)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -446,7 +446,7 @@ PSSL_clear_options(PSSL *ssl, long options)
 long
 PSSL_get_options(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -464,7 +464,7 @@ PSSL_get_options(PSSL *ssl)
 long
 PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	Message::CtrlBody body;
 
 	body.cmd = cmd;
@@ -490,7 +490,7 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 		int cnt;
 
 		if (cs == nullptr) {
-			PROCerr(PROC_F_SSL_CTRL, ERR_R_NO_COMMAND_SOCKET);
+			PROCerr(PROC_F_SSL_CTRL, ERR_R_NO_COMMAND_CHANNEL);
 			return (0);
 		}
 
@@ -514,7 +514,7 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 		STACK_OF(X509) *sk = reinterpret_cast<STACK_OF(X509) *>(parg);
 
 		if (cs == nullptr) {
-			PROCerr(PROC_F_SSL_CTRL, ERR_R_NO_COMMAND_SOCKET);
+			PROCerr(PROC_F_SSL_CTRL, ERR_R_NO_COMMAND_CHANNEL);
 			return (0);
 		}
 
@@ -561,7 +561,7 @@ PSSL_ctrl(PSSL *ssl, int cmd, long larg, void *parg)
 			return (0);
 
 		if (cs == nullptr) {
-			PROCerr(PROC_F_SSL_CTRL, ERR_R_NO_COMMAND_SOCKET);
+			PROCerr(PROC_F_SSL_CTRL, ERR_R_NO_COMMAND_CHANNEL);
 			return (0);
 		}
 
@@ -635,10 +635,10 @@ PSSL_use_certificate_ASN1(PSSL *ssl, const unsigned char *d, int len)
 		return (0);
 	}
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
 		PROCerr(PROC_F_SSL_USE_CERTIFICATE_ASN1,
-		    ERR_R_NO_COMMAND_SOCKET);
+		    ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -724,10 +724,10 @@ PSSL_use_PrivateKey_ASN1(int type, PSSL *ssl, const unsigned char *d, int len)
 		return (0);
 	}
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
 		PROCerr(PROC_F_SSL_USE_PRIVATEKEY_ASN1,
-		    ERR_R_NO_COMMAND_SOCKET);
+		    ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -790,9 +790,9 @@ PSSL_use_PrivateKey_file(PSSL *ssl, const char *file, int type)
 int
 PSSL_check_private_key(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_CHECK_PRIVATE_KEY, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_CHECK_PRIVATE_KEY, ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -817,9 +817,9 @@ PSSL_set_SSL_CTX(PSSL *ssl, PSSL_CTX *ctx)
 	if (ssl->ctx == ctx)
 		return (ctx);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_SET_SSL_CTX, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_SET_SSL_CTX, ERR_R_NO_COMMAND_CHANNEL);
 		return (nullptr);
 	}
 
@@ -856,10 +856,10 @@ PSSL_set_SSL_CTX(PSSL *ssl, PSSL_CTX *ctx)
 X509 *
 PSSL_get_peer_certificate(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
 		PROCerr(PROC_F_SSL_GET_PEER_CERTIFICATE,
-		    ERR_R_NO_COMMAND_SOCKET);
+		    ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -884,9 +884,9 @@ PSSL_get_peer_certificate(const PSSL *ssl)
 long
 PSSL_get_verify_result(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_GET_VERIFY_RESULT, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_GET_VERIFY_RESULT, ERR_R_NO_COMMAND_CHANNEL);
 		return (X509_V_ERR_UNSPECIFIED);
 	}
 
@@ -903,7 +903,7 @@ PSSL_get_verify_result(const PSSL *ssl)
 void
 PSSL_set_verify_result(PSSL *ssl, long result)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -914,7 +914,7 @@ PSSL_set_verify_result(PSSL *ssl, long result)
 int
 PSSL_get_verify_mode(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -928,7 +928,7 @@ PSSL_get_verify_mode(const PSSL *ssl)
 int
 PSSL_get_verify_depth(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -942,7 +942,7 @@ PSSL_get_verify_depth(const PSSL *ssl)
 void
 PSSL_set_verify(PSSL *ssl, int mode, PSSL_verify_cb cb)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -962,10 +962,10 @@ PSSL_set_verify(PSSL *ssl, int mode, PSSL_verify_cb cb)
 int
 PSSL_verify_client_post_handshake(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
 		PROCerr(PROC_F_SSL_VERIFY_CLIENT_POST_HANDSHAKE,
-		    ERR_R_NO_COMMAND_SOCKET);
+		    ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -979,7 +979,7 @@ PSSL_verify_client_post_handshake(PSSL *ssl)
 int
 PSSL_set_alpn_protos(PSSL *ssl, const unsigned char *protos, unsigned int len)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -999,9 +999,9 @@ PSSL_set_cipher_list(PSSL *ssl, const char *s)
 		return (0);
 	}
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_SET_CIPHER_LIST, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_SET_CIPHER_LIST, ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -1021,9 +1021,9 @@ PSSL_set_ciphersuites(PSSL *ssl, const char *s)
 		return (0);
 	}
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_SET_CIPHERSUITES, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_SET_CIPHERSUITES, ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -1050,7 +1050,7 @@ int
 PSSL_set_srp_server_param(PSSL *ssl, const BIGNUM *N, const BIGNUM *g,
     BIGNUM *sa, BIGNUM *v, char *info)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		return (-1);
 
@@ -1108,9 +1108,9 @@ PSSL_get_srp_username(PSSL *ssl)
 	if (ssl->srp_username != nullptr)
 		return (ssl->srp_username);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_GET_SRP_USERNAME, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_GET_SRP_USERNAME, ERR_R_NO_COMMAND_CHANNEL);
 		return (nullptr);
 	}
 
@@ -1143,9 +1143,9 @@ PSSL_get_srp_userinfo(PSSL *ssl)
 	if (ssl->srp_userinfo != nullptr)
 		return (ssl->srp_userinfo);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_GET_SRP_USERINFO, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_GET_SRP_USERINFO, ERR_R_NO_COMMAND_CHANNEL);
 		return (nullptr);
 	}
 
@@ -1169,9 +1169,9 @@ PSSL_get_srp_userinfo(PSSL *ssl)
 static const PSSL_CIPHER *
 PSSL_fetch_cipher(const PSSL *ssl, enum Message::Type request)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_FETCH_CIPHER, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_FETCH_CIPHER, ERR_R_NO_COMMAND_CHANNEL);
 		return (nullptr);
 	}
 
@@ -1209,10 +1209,10 @@ int
 PSSL_set_session_id_context(PSSL *ssl, const unsigned char *ctx,
     unsigned int len)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
 		PROCerr(PROC_F_SSL_SET_SESSION_ID_CONTEXT,
-		    ERR_R_NO_COMMAND_SOCKET);
+		    ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -1227,7 +1227,7 @@ void
 PSSL_set_msg_callback(PSSL *ssl, void (*cb)(int, int, int, const void *,
     size_t, PSSL *, void *))
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1320,7 +1320,7 @@ PSSL_get_error(const PSSL *ssl, int i)
 void
 PSSL_set_connect_state(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1333,7 +1333,7 @@ PSSL_set_connect_state(PSSL *ssl)
 void
 PSSL_set_accept_state(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1346,7 +1346,7 @@ PSSL_set_accept_state(PSSL *ssl)
 int
 PSSL_is_server(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1362,9 +1362,9 @@ PSSL_is_server(PSSL *ssl)
 int
 PSSL_do_handshake(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_DO_HANDSHAKE, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_DO_HANDSHAKE, ERR_R_NO_COMMAND_CHANNEL);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
@@ -1382,9 +1382,9 @@ PSSL_do_handshake(PSSL *ssl)
 int
 PSSL_accept(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_ACCEPT, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_ACCEPT, ERR_R_NO_COMMAND_CHANNEL);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
@@ -1402,9 +1402,9 @@ PSSL_accept(PSSL *ssl)
 int
 PSSL_connect(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_CONNECT, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_CONNECT, ERR_R_NO_COMMAND_CHANNEL);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
@@ -1422,7 +1422,7 @@ PSSL_connect(PSSL *ssl)
 int
 PSSL_in_init(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1438,7 +1438,7 @@ PSSL_in_init(const PSSL *ssl)
 int
 PSSL_in_before(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1454,7 +1454,7 @@ PSSL_in_before(const PSSL *ssl)
 int
 PSSL_is_init_finished(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1471,7 +1471,7 @@ PSSL_is_init_finished(const PSSL *ssl)
 int
 PSSL_client_version(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1512,7 +1512,7 @@ PSSL_get_version(const PSSL *ssl)
 int
 PSSL_version(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1530,9 +1530,9 @@ PSSL_get_servername(const PSSL *sslc, const int type)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_GET_SERVERNAME, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_GET_SERVERNAME, ERR_R_NO_COMMAND_CHANNEL);
 		return (nullptr);
 	}
 
@@ -1561,7 +1561,7 @@ PSSL_get_servername(const PSSL *sslc, const int type)
 int
 PSSL_get_servername_type(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1578,9 +1578,9 @@ PSSL_get_servername_type(const PSSL *ssl)
 static int
 PSSL_do_read(PSSL *ssl, enum Message::Type type, void *buf, int len)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_READ, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_READ, ERR_R_NO_COMMAND_CHANNEL);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
@@ -1635,9 +1635,9 @@ PSSL_peek(PSSL *ssl, void *buf, int len)
 int
 PSSL_write(PSSL *ssl, const void *buf, int len)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_WRITE, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_WRITE, ERR_R_NO_COMMAND_CHANNEL);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
@@ -1656,7 +1656,7 @@ PSSL_write(PSSL *ssl, const void *buf, int len)
 void
 PSSL_set_shutdown(PSSL *ssl, int mode)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1669,7 +1669,7 @@ PSSL_set_shutdown(PSSL *ssl, int mode)
 int
 PSSL_get_shutdown(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1682,9 +1682,9 @@ PSSL_get_shutdown(const PSSL *ssl)
 int
 PSSL_shutdown(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_SHUTDOWN, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_SHUTDOWN, ERR_R_NO_COMMAND_CHANNEL);
 		ssl->last_error = SSL_ERROR_SYSCALL;
 		return (-1);
 	}
@@ -1722,9 +1722,9 @@ PSSL_set_default_passwd_cb_userdata(PSSL *ssl, void *data)
 STACK_OF(PSSL_CIPHER) *
 PSSL_get_ciphers(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_GET_CIPHERS, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_GET_CIPHERS, ERR_R_NO_COMMAND_CHANNEL);
 		return (nullptr);
 	}
 
@@ -1766,7 +1766,7 @@ PSSL_get_peer_cert_chain(PSSL *ssl)
 	if (ssl->get_peer_cert_chain != nullptr)
 		return (ssl->get_peer_cert_chain);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1790,9 +1790,9 @@ PSSL_get_peer_cert_chain(PSSL *ssl)
 int
 PSSL_renegotiate(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_RENEGOTIATE, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_RENEGOTIATE, ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -1810,7 +1810,7 @@ PSSL_get_certificate(const PSSL *sslc)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1837,7 +1837,7 @@ PSSL_get_certificate(const PSSL *sslc)
 EVP_PKEY *
 PSSL_get_privatekey(PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1871,7 +1871,7 @@ PSSL_get_client_CA_list(const PSSL *sslc)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1904,7 +1904,7 @@ PSSL_state_string_long(const PSSL *sslc)
 {
 	PSSL *ssl = const_cast<PSSL *>(sslc);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1927,7 +1927,7 @@ int
 PSSL_client_hello_get0_ext(PSSL *ssl, int type, const unsigned char **out,
     size_t *outlen)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 
@@ -1959,7 +1959,7 @@ PSSL_get_session(const PSSL *sslc)
 	if (ssl->session != nullptr)
 		return (ssl->session);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		return (nullptr);
 
@@ -1990,7 +1990,7 @@ PSSL_get_session(const PSSL *sslc)
 int
 PSSL_session_reused(const PSSL *ssl)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 

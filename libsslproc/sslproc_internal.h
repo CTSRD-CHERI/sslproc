@@ -56,9 +56,9 @@ void	PERR_init(void);
 
 void	SSL_init(void);
 
-class CommandSocket;
+class CommandChannel;
 
-CommandSocket *currentCommandSocket();
+CommandChannel *currentCommandChannel();
 
 class TargetStore;
 
@@ -86,8 +86,8 @@ __END_DECLS
 #define	PROC_F_D2I_SSL_SESSION		16
 #define	PROC_F_SSL_CTX_SET_CIPHER_LIST	17
 #define	PROC_F_SSL_CTX_SET_CIPHERSUITES	18
-#define	PROC_F_CONTROLSOCKET_INIT	19
-#define	PROC_F_CREATECOMMANDSOCKET	20
+#define	PROC_F_CONTROLCHANNEL_INIT	19
+#define	PROC_F_CREATECOMMANDCHANNEL	20
 #define	PROC_F_SSL_CTX_CTRL		21
 #define	PROC_F_SSL_CTX_CHECK_PRIVATE_KEY	22
 #define	PROC_F_SSL_CTX_SET_SRP_USERNAME_CALLBACK	23
@@ -135,7 +135,7 @@ __END_DECLS
 #define	ERR_R_BAD_VERSION	(133|ERR_R_FATAL)
 #define	ERR_R_NO_BUFFER		(134|ERR_R_FATAL)
 #define	ERR_R_MISSING_TARGET	(135|ERR_R_FATAL)
-#define	ERR_R_NO_COMMAND_SOCKET	(136|ERR_R_FATAL)
+#define	ERR_R_NO_COMMAND_CHANNEL	(136|ERR_R_FATAL)
 
 /* SSL_CONF_CTX */
 
@@ -162,7 +162,7 @@ struct _PSSL_CIPHER {
 
 typedef struct _PSSL_CIPHER PSSL_CIPHER;
 
-const PSSL_CIPHER *PSSL_CIPHER_find(CommandSocket *cs, int target);
+const PSSL_CIPHER *PSSL_CIPHER_find(CommandChannel *cs, int target);
 
 /* SSL_SESSION */
 

@@ -30,19 +30,73 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
+#include <stdlib.h>
 
-#include "LibMessageSocket.h"
-#include "sslproc.h"
+#include <Messages.h>
+#include "ControlChannel.h"
+#include "sslproc_internal.h"
 
-class CommandSocket final : public LibMessageSocket<MessageStreamSocket> {
-public:
-	CommandSocket(int fd) : LibMessageSocket(fd) {}
-	~CommandSocket() = default;
-	bool init();
+bool
+ControlChannel::init()
+{
+	/* Control socket messages don't recurse. */
+	if (!allocateMessages(1, 64))
+		return (false);
 
-private:
-	void handleMessage(const Message::Header *hdr);
+	MessageRef ref = waitForReply(Message::NOP);
+	if (!ref)
+		return (false);
 
-	DataBuffer readBuffer;
-};
+	return (true);
+}
+
+bool
+ControlChannel::createCommandChannel(int fd)
+{
+	union {
+		struct cmsghdr hdr;
+		char buf[CMSG_SPACE(sizeof(int))];
+	} cmsgbuf;
+	struct cmsghdr *cmsg;
+	int *fds;
+
+	cmsg = &cmsgbuf.hdr;
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_RIGHTS;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+	fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
+	fds[0] = fd;
+	MessageRef ref = waitForReply(Message::CREATE_COMMAND_SOCKET,
+	    nullptr, 0, &cmsgbuf, sizeof(cmsgbuf));
+	if (!ref)
+		return (false);
+	return (ref.result()->ret == 0);
+}
+
+bool
+ControlChannel::requestFork(int fd)
+{
+	union {
+		struct cmsghdr hdr;
+		char buf[CMSG_SPACE(sizeof(int))];
+	} cmsgbuf;
+	struct cmsghdr *cmsg;
+	int *fds;
+
+	cmsg = &cmsgbuf.hdr;
+	cmsg->cmsg_level = SOL_SOCKET;
+	cmsg->cmsg_type = SCM_RIGHTS;
+	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+	fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
+	fds[0] = fd;
+	MessageRef ref = waitForReply(Message::FORK, nullptr, 0, &cmsgbuf,
+	    sizeof(cmsgbuf));
+	if (!ref)
+		return (false);
+	return (ref.result()->ret == 0);
+}
+
+void
+ControlChannel::handleMessage(const Message::Header *hdr)
+{
+}

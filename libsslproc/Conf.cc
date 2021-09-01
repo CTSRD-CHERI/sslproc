@@ -32,7 +32,7 @@
 
 #include "sslproc.h"
 #include "sslproc_internal.h"
-#include "CommandSocket.h"
+#include "CommandChannel.h"
 #include "TargetStore.h"
 
 PSSL_CONF_CTX *
@@ -41,9 +41,9 @@ PSSL_CONF_CTX_new(void)
 	if (POPENSSL_init_ssl() != 0)
 		return (nullptr);
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_CONF_CTX_NEW, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_CONF_CTX_NEW, ERR_R_NO_COMMAND_CHANNEL);
 		return (nullptr);
 	}
 
@@ -84,9 +84,9 @@ PSSL_CONF_CTX_new(void)
 int
 PSSL_CONF_CTX_finish(PSSL_CONF_CTX *cctx)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_CONF_CTX_FINISH, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_CONF_CTX_FINISH, ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -103,7 +103,7 @@ PSSL_CONF_CTX_free(PSSL_CONF_CTX *cctx)
 	if (cctx == nullptr)
 		return;
 
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 	MessageRef ref = cs->waitForReply(Message::FREE_CONF_CONTEXT,
@@ -118,7 +118,7 @@ PSSL_CONF_CTX_free(PSSL_CONF_CTX *cctx)
 unsigned int
 PSSL_CONF_CTX_set_flags(PSSL_CONF_CTX *cctx, unsigned int flags)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 	MessageRef ref = cs->waitForReply(Message::CONF_CTX_SET_FLAGS,
@@ -131,9 +131,9 @@ PSSL_CONF_CTX_set_flags(PSSL_CONF_CTX *cctx, unsigned int flags)
 int
 PSSL_CONF_cmd(PSSL_CONF_CTX *cctx, const char *cmd, const char *value)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr) {
-		PROCerr(PROC_F_SSL_CONF_CMD, ERR_R_NO_COMMAND_SOCKET);
+		PROCerr(PROC_F_SSL_CONF_CMD, ERR_R_NO_COMMAND_CHANNEL);
 		return (0);
 	}
 
@@ -152,7 +152,7 @@ PSSL_CONF_cmd(PSSL_CONF_CTX *cctx, const char *cmd, const char *value)
 int
 PSSL_CONF_cmd_value_type(PSSL_CONF_CTX *cctx, const char *cmd)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 	MessageRef ref = cs->waitForReply(Message::CONF_CMD_VALUE_TYPE,
@@ -165,7 +165,7 @@ PSSL_CONF_cmd_value_type(PSSL_CONF_CTX *cctx, const char *cmd)
 void
 PSSL_CONF_CTX_set_ssl_ctx(PSSL_CONF_CTX *cctx, PSSL_CTX *ctx)
 {
-	CommandSocket *cs = currentCommandSocket();
+	CommandChannel *cs = currentCommandChannel();
 	if (cs == nullptr)
 		abort();
 	MessageRef ref = cs->waitForReply(Message::CONF_CTX_SET_SSL_CTX,

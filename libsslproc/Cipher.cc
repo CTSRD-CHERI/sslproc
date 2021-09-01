@@ -34,7 +34,7 @@
 
 #include "sslproc.h"
 #include "sslproc_internal.h"
-#include "CommandSocket.h"
+#include "CommandChannel.h"
 #include "TargetStore.h"
 
 const char *
@@ -57,7 +57,7 @@ PSSL_CIPHER_get_bits(const PSSL_CIPHER *c, int *alg_bits)
 }
 
 const PSSL_CIPHER *
-PSSL_CIPHER_find(CommandSocket *cs, int target)
+PSSL_CIPHER_find(CommandChannel *cs, int target)
 {
 	PSSL_CIPHER *cipher = targets.lookup<PSSL_CIPHER>(target);
 	if (cipher != nullptr)

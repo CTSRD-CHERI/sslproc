@@ -33,12 +33,12 @@
 #include <openssl/ssl.h>
 
 #include <Messages.h>
-#include "CommandSocket.h"
+#include "CommandChannel.h"
 #include "TargetStore.h"
 #include "sslproc_internal.h"
 
 bool
-CommandSocket::init()
+CommandChannel::init()
 {
 	if (!allocateMessages(4, 64))
 		return (false);
@@ -58,7 +58,7 @@ findSSL_CTX(const Message::Targeted *thdr)
 }
 
 void
-CommandSocket::handleMessage(const Message::Header *hdr)
+CommandChannel::handleMessage(const Message::Header *hdr)
 {
 	const Message::Targeted *thdr;
 	PSSL_CTX *ctx;

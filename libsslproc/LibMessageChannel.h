@@ -39,18 +39,18 @@
 #include <MessageSocket.h>
 #include "sslproc_internal.h"
 
-namespace LibMessageSocketHelpers {
-	void observeReadError(enum MessageSocket::ReadError error,
+namespace LibMessageChannelHelpers {
+	void observeReadError(enum MessageChannel::ReadError error,
 	    const Message::Header *hdr);
 	void observeWriteError();
 	void setMessageError(const Message::Result *msg);
 };
 
 template<class Base>
-class LibMessageSocket : public Base {
+class LibMessageChannel : public Base {
 public:
-	LibMessageSocket(int fd) : Base(fd) {}
-	~LibMessageSocket() = default;
+	LibMessageChannel(int fd) : Base(fd) {}
+	~LibMessageChannel() = default;
 	MessageRef waitForReply(enum Message::Type type, int target,
 	    const struct iovec *iov, int iovCnt);
 	MessageRef waitForReply(enum Message::Type type, int target,
@@ -70,22 +70,22 @@ private:
 
 template<class Base>
 void
-LibMessageSocket<Base>::observeReadError(enum Base::ReadError error,
+LibMessageChannel<Base>::observeReadError(enum Base::ReadError error,
     const Message::Header *hdr)
 {
-	LibMessageSocketHelpers::observeReadError(error, hdr);
+	LibMessageChannelHelpers::observeReadError(error, hdr);
 }
 
 template<class Base>
 void
-LibMessageSocket<Base>::observeWriteError()
+LibMessageChannel<Base>::observeWriteError()
 {
-	LibMessageSocketHelpers::observeWriteError();
+	LibMessageChannelHelpers::observeWriteError();
 }
 
 template<class Base>
 MessageRef
-LibMessageSocket<Base>::waitForReply(enum Message::Type type, int target,
+LibMessageChannel<Base>::waitForReply(enum Message::Type type, int target,
     const struct iovec *iov, int iovCnt)
 {
 	if (!Base::writeMessage(type, target, iov, iovCnt))
@@ -95,7 +95,7 @@ LibMessageSocket<Base>::waitForReply(enum Message::Type type, int target,
 
 template<class Base>
 MessageRef
-LibMessageSocket<Base>::waitForReply(enum Message::Type type, int target,
+LibMessageChannel<Base>::waitForReply(enum Message::Type type, int target,
     const void *payload, size_t payloadLen)
 {
 	if (!Base::writeMessage(type, target, payload, payloadLen))
@@ -105,7 +105,7 @@ LibMessageSocket<Base>::waitForReply(enum Message::Type type, int target,
 
 template<class Base>
 MessageRef
-LibMessageSocket<Base>::waitForReply(enum Message::Type type,
+LibMessageChannel<Base>::waitForReply(enum Message::Type type,
     const void *payload, size_t payloadLen)
 {
 	if (!Base::writeMessage(type, payload, payloadLen))
@@ -115,7 +115,7 @@ LibMessageSocket<Base>::waitForReply(enum Message::Type type,
 
 template<class Base>
 MessageRef
-LibMessageSocket<Base>::waitForReply(enum Message::Type type,
+LibMessageChannel<Base>::waitForReply(enum Message::Type type,
     const void *payload, size_t payloadLen, const void *control,
     size_t controlLen)
 {
@@ -126,7 +126,7 @@ LibMessageSocket<Base>::waitForReply(enum Message::Type type,
 
 template<class Base>
 MessageRef
-LibMessageSocket<Base>::_waitForReply(enum Message::Type type)
+LibMessageChannel<Base>::_waitForReply(enum Message::Type type)
 {
 	for (;;) {
 		MessageRef ref;
@@ -151,7 +151,7 @@ LibMessageSocket<Base>::_waitForReply(enum Message::Type type)
 			}
 
 			if (result->error != SSL_ERROR_NONE)
-				LibMessageSocketHelpers::setMessageError(
+				LibMessageChannelHelpers::setMessageError(
 				    result);
 
 			if (result->request == type)

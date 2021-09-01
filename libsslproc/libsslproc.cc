@@ -38,19 +38,19 @@
 #include <memory>
 
 #include "sslproc_internal.h"
-#include "ControlSocket.h"
-#include "CommandSocket.h"
+#include "ControlChannel.h"
+#include "CommandChannel.h"
 #include "TargetStore.h"
 
-static void commandSocketDeleter(CommandSocket *cs);
+static void commandChannelDeleter(CommandChannel *cs);
 
-static std::list<CommandSocket *> commandSockets;
-static pthread_mutex_t commandSocketsLock = { PTHREAD_MUTEX_INITIALIZER };
-static std::unique_ptr<ControlSocket> controlSocket;
-static thread_local std::unique_ptr<CommandSocket,
-    decltype(&commandSocketDeleter)> commandSocket(nullptr,
-    &commandSocketDeleter);
-static thread_local std::unique_ptr<ControlSocket> childControlSocket;
+static std::list<CommandChannel *> commandChannels;
+static pthread_mutex_t commandChannelsLock = { PTHREAD_MUTEX_INITIALIZER };
+static std::unique_ptr<ControlChannel> controlChannel;
+static thread_local std::unique_ptr<CommandChannel,
+    decltype(&commandChannelDeleter)> commandChannel(nullptr,
+    &commandChannelDeleter);
+static thread_local std::unique_ptr<ControlChannel> childControlChannel;
 TargetStore targets;
 
 static void
@@ -64,15 +64,15 @@ MessageTracing_init(void)
 	if (fd == -1)
 		return;
 
-	MessageSocket::enableTracing(fd);
+	MessageChannel::enableTracing(fd);
 }
 
 static void
-ControlSocket_init(void)
+ControlChannel_init(void)
 {
 	int fds[2];
 	if (socketpair(PF_LOCAL, SOCK_SEQPACKET, 0, fds) == -1) {
-		PROCerr(PROC_F_CONTROLSOCKET_INIT, ERR_R_INTERNAL_ERROR);
+		PROCerr(PROC_F_CONTROLCHANNEL_INIT, ERR_R_INTERNAL_ERROR);
 		ERR_add_error_data(2, "socketpair: ", strerror(errno));
 		return;
 	}
@@ -99,7 +99,7 @@ ControlSocket_init(void)
 
 	close(fds[1]);
 
-	ControlSocket *cs = new ControlSocket(fds[0]);
+	ControlChannel *cs = new ControlChannel(fds[0]);
 	if (!cs->init()) {
 		delete cs;
 
@@ -107,24 +107,24 @@ ControlSocket_init(void)
 		return;
 	}
 
-	controlSocket.reset(cs);
+	controlChannel.reset(cs);
 }
 
-static CommandSocket *
-createCommandSocket()
+static CommandChannel *
+createCommandChannel()
 {
-	ControlSocket *ctrl = controlSocket.get();
+	ControlChannel *ctrl = controlChannel.get();
 	if (ctrl == nullptr)
 		return (nullptr);
 
 	int fds[2];
 	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, fds) == -1) {
-		PROCerr(PROC_F_CONTROLSOCKET_INIT, ERR_R_INTERNAL_ERROR);
+		PROCerr(PROC_F_CONTROLCHANNEL_INIT, ERR_R_INTERNAL_ERROR);
 		ERR_add_error_data(2, "socketpair: ", strerror(errno));
 		return (nullptr);
 	}
 
-	if (!ctrl->createCommandSocket(fds[1])) {
+	if (!ctrl->createCommandChannel(fds[1])) {
 		close(fds[0]);
 		close(fds[1]);
 		return (nullptr);
@@ -132,35 +132,35 @@ createCommandSocket()
 
 	close(fds[1]);
 
-	CommandSocket *cs = new CommandSocket(fds[0]);
+	CommandChannel *cs = new CommandChannel(fds[0]);
 	if (!cs->init()) {
 		delete cs;
 		return (nullptr);
 	}
 
-	pthread_mutex_lock(&commandSocketsLock);
-	commandSockets.push_back(cs);
-	pthread_mutex_unlock(&commandSocketsLock);
+	pthread_mutex_lock(&commandChannelsLock);
+	commandChannels.push_back(cs);
+	pthread_mutex_unlock(&commandChannelsLock);
 	return (cs);
 }
 
-CommandSocket *
-currentCommandSocket()
+CommandChannel *
+currentCommandChannel()
 {
-	CommandSocket *cs = commandSocket.get();
+	CommandChannel *cs = commandChannel.get();
 	if (cs == nullptr) {
-		cs = createCommandSocket();
-		commandSocket.reset(cs);
+		cs = createCommandChannel();
+		commandChannel.reset(cs);
 	}
 	return (cs);
 }
 
 static void
-commandSocketDeleter(CommandSocket *cs)
+commandChannelDeleter(CommandChannel *cs)
 {
-	pthread_mutex_lock(&commandSocketsLock);
-	commandSockets.remove(cs);
-	pthread_mutex_unlock(&commandSocketsLock);
+	pthread_mutex_lock(&commandChannelsLock);
+	commandChannels.remove(cs);
+	pthread_mutex_unlock(&commandChannelsLock);
 	delete cs;
 }
 
@@ -172,17 +172,17 @@ commandSocketDeleter(CommandSocket *cs)
  * state in the helper after fork() returns but before the atchild
  * hook runs in the parent.  To avoid this, the 'prepare' hook
  * executed in the parent prior to the system call forks the helper
- * and establishes a new ControlSocket.  The 'parent' hook deletes
+ * and establishes a new ControlChannel.  The 'parent' hook deletes
  * this socket in the parent after the fork.  The 'child' hook uses
- * this socket as the ControlSocket in the child after the fork.
+ * this socket as the ControlChannel in the child after the fork.
  */
 void
 POPENSSL_atfork_prepare(void)
 {
-	if (childControlSocket)
+	if (childControlChannel)
 		return;
 
-	ControlSocket *ctrl = controlSocket.get();
+	ControlChannel *ctrl = controlChannel.get();
 	if (ctrl == nullptr)
 		return;
 
@@ -205,25 +205,25 @@ POPENSSL_atfork_prepare(void)
 
 	close(fds[1]);
 
-	ControlSocket *newCtrl = new ControlSocket(fds[0]);
+	ControlChannel *newCtrl = new ControlChannel(fds[0]);
 	if (!newCtrl->init()) {
 		delete newCtrl;
 		newCtrl = nullptr;
 	}
 
-	childControlSocket.reset(newCtrl);
+	childControlChannel.reset(newCtrl);
 }
 
 void
 POPENSSL_atfork_parent(void)
 {
-	childControlSocket.reset(nullptr);
+	childControlChannel.reset(nullptr);
 }
 
 void
 POPENSSL_atfork_child(void)
 {
-	if (!childControlSocket)
+	if (!childControlChannel)
 		return;
 
 	/*
@@ -231,23 +231,23 @@ POPENSSL_atfork_child(void)
 	 * process.  No locking is needed here since the child process
 	 * is single-threaded at this point.
 	 */
-	while (!commandSockets.empty()) {
-		CommandSocket *cs = commandSockets.front();
+	while (!commandChannels.empty()) {
+		CommandChannel *cs = commandChannels.front();
 		delete cs;
-		commandSockets.pop_front();
+		commandChannels.pop_front();
 	}
 
 	/*
 	 * Clear the TLS variable so that the first method will
 	 * allocate a new command socket.
 	 */
-	commandSocket.release();
+	commandChannel.release();
 
 	/*
-	 * Switch to the new ControlSocket allocated in the prepare
+	 * Switch to the new ControlChannel allocated in the prepare
 	 * hook.
 	 */
-	controlSocket = std::move(childControlSocket);
+	controlChannel = std::move(childControlChannel);
 }
 
 int
@@ -270,7 +270,7 @@ POPENSSL_init_ssl(void)
 
 	PERR_init();
 	MessageTracing_init();
-	ControlSocket_init();
+	ControlChannel_init();
 	pthread_atfork(POPENSSL_atfork_prepare, POPENSSL_atfork_parent,
 	    POPENSSL_atfork_child);
 	SSL_init();

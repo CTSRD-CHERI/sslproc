@@ -35,41 +35,41 @@
 #include <openssl/ssl.h>
 
 #include <Messages.h>
-#include "LibMessageSocket.h"
+#include "LibMessageChannel.h"
 #include "sslproc_internal.h"
 
 void
-LibMessageSocketHelpers::observeReadError(enum MessageSocket::ReadError error,
+LibMessageChannelHelpers::observeReadError(enum MessageChannel::ReadError error,
     const Message::Header *hdr)
 {
 	char tmp[16];
 
 	switch (error) {
-	case MessageSocket::NO_BUFFER:
+	case MessageChannel::NO_BUFFER:
 		PROCerr(PROC_F_READ_MESSAGE, ERR_R_NO_BUFFER);
 		break;
-	case MessageSocket::READ_ERROR:
+	case MessageChannel::READ_ERROR:
 		PROCerr(PROC_F_RECVMSG, ERR_R_IO_ERROR);
 		ERR_add_error_data(1, strerror(errno));
 		break;
-	case MessageSocket::GROW_FAIL:
+	case MessageChannel::GROW_FAIL:
 		PROCerr(PROC_F_READ_MESSAGE, ERR_R_MALLOC_FAILURE);
 		ERR_add_error_data(1, "failed to grow message buffer");
 		break;
-	case MessageSocket::SHORT:
+	case MessageChannel::SHORT:
 		PROCerr(PROC_F_READ_MESSAGE, ERR_R_BAD_MESSAGE);
 		ERR_add_error_data(1, "too short");
 		break;
-	case MessageSocket::TRUNCATED:
+	case MessageChannel::TRUNCATED:
 		PROCerr(PROC_F_READ_MESSAGE, ERR_R_BAD_MESSAGE);
 		ERR_add_error_data(1, "truncated");
 		break;
-	case MessageSocket::BAD_MSG_LENGTH:
+	case MessageChannel::BAD_MSG_LENGTH:
 		PROCerr(PROC_F_READ_MESSAGE, ERR_R_BAD_MESSAGE);
 		snprintf(tmp, sizeof(tmp), "%d", hdr->length);
 		ERR_add_error_data(2, "invalid length ", tmp);
 		break;
-	case MessageSocket::LENGTH_MISMATCH:
+	case MessageChannel::LENGTH_MISMATCH:
 		PROCerr(PROC_F_READ_MESSAGE, ERR_R_BAD_MESSAGE);
 		ERR_add_error_data(1, "length mismatch");
 		break;
@@ -77,14 +77,14 @@ LibMessageSocketHelpers::observeReadError(enum MessageSocket::ReadError error,
 }
 
 void
-LibMessageSocketHelpers::observeWriteError()
+LibMessageChannelHelpers::observeWriteError()
 {
 	PROCerr(PROC_F_WRITE_MESSAGE, ERR_R_IO_ERROR);
 	ERR_add_error_data(1, strerror(errno));
 }
 
 void
-LibMessageSocketHelpers::setMessageError(const Message::Result *msg)
+LibMessageChannelHelpers::setMessageError(const Message::Result *msg)
 {
 	long error;
 	char tmp[16], tmp2[16];
