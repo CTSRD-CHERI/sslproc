@@ -45,12 +45,12 @@
 #include "Messages.h"
 #include "MessageHelpers.h"
 #include "TargetStore.h"
-#include "CommandSocket.h"
-#include "ControlSocket.h"
+#include "CommandChannel.h"
+#include "ControlChannel.h"
 
 static pthread_attr_t attr;
 static TargetStore targets;
-static thread_local CommandSocket *currentSocket;
+static thread_local CommandChannel *currentChannel;
 static BIO_METHOD *readBioMethod, *writeBioMethod;
 
 static std::unordered_map<const SSL_CIPHER *, int> cipherTargets;
@@ -59,7 +59,7 @@ static void
 msg_cb(int write_p, int version, int content_type, const void *buf,
     size_t len, SSL *ssl, void *arg)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -89,7 +89,7 @@ msg_cb(int write_p, int version, int content_type, const void *buf,
 static int
 servername_cb(SSL *ssl, int *al, void *arg)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -109,7 +109,7 @@ servername_cb(SSL *ssl, int *al, void *arg)
 static int
 client_hello_cb(SSL *ssl, int *al, void *arg)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -132,7 +132,7 @@ client_hello_cb(SSL *ssl, int *al, void *arg)
 static int
 srp_username_cb(SSL *ssl, int *ad, void *arg)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -155,7 +155,7 @@ srp_username_cb(SSL *ssl, int *ad, void *arg)
 static int
 sess_new_cb(SSL *ssl, SSL_SESSION *s)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -186,7 +186,7 @@ sess_new_cb(SSL *ssl, SSL_SESSION *s)
 static void
 sess_remove_cb(SSL_CTX *ctx, SSL_SESSION *s)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -215,7 +215,7 @@ sess_remove_cb(SSL_CTX *ctx, SSL_SESSION *s)
 SSL_SESSION *
 sess_get_cb(SSL *ssl, const unsigned char *data, int len, int *copy)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -246,7 +246,7 @@ tmp_dh_cb(SSL *ssl, int is_export, int keylength)
 	body.is_export = is_export;
 	body.keylength = keylength;
 
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -277,7 +277,7 @@ info_cb(const SSL *ssl, int where, int ret)
 	body.where = where;
 	body.ret = ret;
 
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -294,7 +294,7 @@ static int
 alpn_select_cb(SSL *ssl, const unsigned char **out, unsigned char *outlen,
     const unsigned char *in, unsigned int inlen, void *arg)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -324,7 +324,7 @@ alpn_select_cb(SSL *ssl, const unsigned char **out, unsigned char *outlen,
 static int
 client_cert_cb(SSL *ssl, X509 **certp, EVP_PKEY **pkeyp)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -372,7 +372,7 @@ verify_cb(int preverify_ok, X509_STORE_CTX *x509_ctx)
 	body.x509_error = X509_STORE_CTX_get_error(x509_ctx);
 	body.x509_error_depth = X509_STORE_CTX_get_error_depth(x509_ctx);
 
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -421,7 +421,7 @@ verify_cb(int preverify_ok, X509_STORE_CTX *x509_ctx)
 static int
 default_passwd_cb(char *buf, int num, int rwflag, void *userdata)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -466,7 +466,7 @@ default_passwd_cb(char *buf, int num, int rwflag, void *userdata)
 static int
 ctx_default_passwd_cb(char *buf, int num, int rwflag, void *userdata)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	if (cs == nullptr) {
 		syslog(LOG_WARNING, "%s: invoked without active command socket",
 		    __func__);
@@ -509,25 +509,25 @@ ctx_default_passwd_cb(char *buf, int num, int rwflag, void *userdata)
 }
 
 static void *
-commandSocketRun(void *arg)
+commandChannelRun(void *arg)
 {
-	CommandSocket *cs = reinterpret_cast<CommandSocket *>(arg);
+	CommandChannel *cs = reinterpret_cast<CommandChannel *>(arg);
 
-	currentSocket = cs;
+	currentChannel = cs;
 	cs->run();
-	ControlSocket::deleteCommandSocket(cs);
+	ControlChannel::deleteCommandChannel(cs);
 	delete cs;
 	return (nullptr);
 }
 
 bool
-CommandSocket::init()
+CommandChannel::init()
 {
 	if (!allocateMessages(4, 64))
 		return (false);
 
 	pthread_t thread;
-	int error = pthread_create(&thread, &attr, commandSocketRun, this);
+	int error = pthread_create(&thread, &attr, commandChannelRun, this);
 	if (error != 0)
 		return (false);
 
@@ -535,7 +535,7 @@ CommandSocket::init()
 }
 
 void
-CommandSocket::writeSSLErrorReply(enum Message::Type type, long ret,
+CommandChannel::writeSSLErrorReply(enum Message::Type type, long ret,
     int errorType)
 {
 	switch (errorType) {
@@ -622,7 +622,7 @@ findSSL_SESSION(const Message::Targeted *thdr)
 }
 
 bool
-CommandSocket::handleMessage(const Message::Header *hdr)
+CommandChannel::handleMessage(const Message::Header *hdr)
 {
 	const Message::Targeted *thdr;
 	SSL_CONF_CTX *cctx;
@@ -2638,7 +2638,7 @@ CommandSocket::handleMessage(const Message::Header *hdr)
 }
 
 void
-CommandSocket::run()
+CommandChannel::run()
 {
 	for (;;) {
 		MessageRef ref;
@@ -2653,7 +2653,7 @@ CommandSocket::run()
 }
 
 void
-CommandSocket::observeReadError(enum ReadError error,
+CommandChannel::observeReadError(enum ReadError error,
     const Message::Header *hdr)
 {
 	switch (error) {
@@ -2684,14 +2684,14 @@ CommandSocket::observeReadError(enum ReadError error,
 }
 
 void
-CommandSocket::observeWriteError()
+CommandChannel::observeWriteError()
 {
 	syslog(LOG_WARNING, "failed to write message on command socket: %m");
 	writeFailed = true;
 }
 
 MessageRef
-CommandSocket::sendRequest(enum Message::Type type, int target,
+CommandChannel::sendRequest(enum Message::Type type, int target,
     struct iovec *iov, int iovCnt)
 {
 	if (!writeMessage(type, target, iov, iovCnt)) {
@@ -2704,7 +2704,7 @@ CommandSocket::sendRequest(enum Message::Type type, int target,
 }
 
 MessageRef
-CommandSocket::sendRequest(enum Message::Type type, int target,
+CommandChannel::sendRequest(enum Message::Type type, int target,
     const void *payload, size_t payloadLen)
 {
 	if (!writeMessage(type, target, payload, payloadLen)) {
@@ -2717,7 +2717,7 @@ CommandSocket::sendRequest(enum Message::Type type, int target,
 }
 
 MessageRef
-CommandSocket::waitForReply(enum Message::Type type)
+CommandChannel::waitForReply(enum Message::Type type)
 {
 	for (;;) {
 		MessageRef ref;
@@ -2756,7 +2756,7 @@ CommandSocket::waitForReply(enum Message::Type type)
 }
 
 MessageRef
-CommandSocket::sendRequest(enum Message::Type type, const SSL *ssl,
+CommandChannel::sendRequest(enum Message::Type type, const SSL *ssl,
     struct iovec *iov, int iovCnt)
 {
 	int target = reinterpret_cast<intptr_t>(SSL_get_app_data(ssl));
@@ -2765,7 +2765,7 @@ CommandSocket::sendRequest(enum Message::Type type, const SSL *ssl,
 }
 
 MessageRef
-CommandSocket::sendRequest(enum Message::Type type, const SSL *ssl,
+CommandChannel::sendRequest(enum Message::Type type, const SSL *ssl,
     const void *payload, size_t payloadLen)
 {
 	int target = reinterpret_cast<intptr_t>(SSL_get_app_data(ssl));
@@ -2774,7 +2774,7 @@ CommandSocket::sendRequest(enum Message::Type type, const SSL *ssl,
 }
 
 MessageRef
-CommandSocket::sendRequest(enum Message::Type type, const SSL_CTX *ctx,
+CommandChannel::sendRequest(enum Message::Type type, const SSL_CTX *ctx,
     const void *payload, size_t payloadLen)
 {
 	int target = reinterpret_cast<intptr_t>(SSL_CTX_get_app_data(ctx));
@@ -2790,7 +2790,7 @@ CommandSocket::sendRequest(enum Message::Type type, const SSL_CTX *ctx,
 static int
 readBioRead(BIO *bio, char *out, int outl)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	SSL *ssl = reinterpret_cast<SSL *>(BIO_get_data(bio));
 
 	if (cs == nullptr) {
@@ -2863,7 +2863,7 @@ readBioPuts(BIO *bio, const char *str)
 static long
 readBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	SSL *ssl = reinterpret_cast<SSL *>(BIO_get_data(bio));
 	long ret;
 
@@ -2916,7 +2916,7 @@ writeBioRead(BIO *bio, char *out, int outl)
 static int
 writeBioWrite(BIO *bio, const char *in, int inl)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	SSL *ssl = reinterpret_cast<SSL *>(BIO_get_data(bio));
 
 	if (in == nullptr || inl == 0)
@@ -2961,7 +2961,7 @@ writeBioPuts(BIO *bio, const char *str)
 static long
 writeBioCtrl(BIO *bio, int cmd, long num, void *ptr)
 {
-	CommandSocket *cs = currentSocket;
+	CommandChannel *cs = currentChannel;
 	SSL *ssl = reinterpret_cast<SSL *>(BIO_get_data(bio));
 	long ret;
 

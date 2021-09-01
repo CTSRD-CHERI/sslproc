@@ -32,37 +32,22 @@
 
 #pragma once
 
-#include <openssl/ssl.h>
-
 #include "MessageSocket.h"
 
-class CommandSocket final : public MessageStreamSocket {
+class CommandChannel;
+
+class ControlChannel final : MessageDatagramSocket {
 public:
-	CommandSocket(int fd) : MessageStreamSocket(fd) {}
-	~CommandSocket() = default;
+	ControlChannel(int fd) : MessageDatagramSocket(fd) {}
+	~ControlChannel() = default;
 	bool init();
 	void run();
-	MessageRef sendRequest(enum Message::Type type, const SSL *ssl,
-	    struct iovec *iov, int iovCnt);
-	MessageRef sendRequest(enum Message::Type type, const SSL *ssl,
-	    const void *payload = nullptr, size_t payloadLen = 0);
-	MessageRef sendRequest(enum Message::Type type, const SSL_CTX *ctx,
-	    const void *payload = nullptr, size_t payloadLen = 0);
 
+	static void deleteCommandChannel(CommandChannel *cs);
 private:
-	MessageRef sendRequest(enum Message::Type type, int target,
-	    struct iovec *iov, int iovCnt);
-	MessageRef sendRequest(enum Message::Type type, int target,
-	    const void *payload = nullptr, size_t payloadLen = 0);
-	MessageRef waitForReply(enum Message::Type type);
-	void writeSSLErrorReply(enum Message::Type type, long ret,
-	    int errorType);
-	bool handleMessage(const Message::Header *hdr);
 	virtual void observeReadError(enum ReadError,
 	    const Message::Header *hdr);
 	virtual void observeWriteError();
-
-	DataBuffer readBuffer;
-
-	bool writeFailed = false;
+	void handleMessage(const Message::Header *hdr,
+	    const struct cmsghdr *cmsg);
 };

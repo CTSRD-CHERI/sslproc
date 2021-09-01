@@ -31,8 +31,8 @@
  */
 
 /*
- * Each SSL session is managed messages passed over a UNIX domain
- * datagram socket.  Each request is answered by a result message,
+ * Each SSL session is managed by messages passed over a UNIX domain
+ * stream socket.  Each request is answered by a result message,
  * but the helper library is permitted to submit async requests to
  * client while servicing a request.  Only one async request is
  * permitted at a time, and the client should respond to each
@@ -54,7 +54,7 @@
 #include <syslog.h>
 
 #include "local.h"
-#include "ControlSocket.h"
+#include "ControlChannel.h"
 
 int
 main(int ac, char **av)
@@ -85,7 +85,7 @@ main(int ac, char **av)
 		if (fd != -1) {
 			cap_rights_init(&rights, CAP_WRITE);
 			if (caph_rights_limit(fd, &rights) == 0)
-				MessageSocket::enableTracing(fd);
+				MessageChannel::enableTracing(fd);
 			else
 				close(fd);
 		}
@@ -96,11 +96,11 @@ main(int ac, char **av)
 		return (1);
 	}
 
-	ControlSocket controlSocket(3);
+	ControlChannel controlChannel(3);
 
-	if (!controlSocket.init())
+	if (!controlChannel.init())
 		return (1);
 
-	controlSocket.run();
+	controlChannel.run();
 	return (0);
 }

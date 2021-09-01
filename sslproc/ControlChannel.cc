@@ -43,14 +43,14 @@
 #include "local.h"
 #include "Messages.h"
 #include "MessageSocket.h"
-#include "ControlSocket.h"
-#include "CommandSocket.h"
+#include "ControlChannel.h"
+#include "CommandChannel.h"
 
-static std::list<CommandSocket *> commandSockets;
-static pthread_mutex_t commandSocketsLock = { PTHREAD_MUTEX_INITIALIZER };
+static std::list<CommandChannel *> commandChannels;
+static pthread_mutex_t commandChannelsLock = { PTHREAD_MUTEX_INITIALIZER };
 
 bool
-ControlSocket::init()
+ControlChannel::init()
 {
 	/* Control socket messages don't recurse. */
 	if (!allocateMessages(1, 64, CMSG_SPACE(sizeof(int))))
@@ -59,15 +59,15 @@ ControlSocket::init()
 }
 
 void
-ControlSocket::deleteCommandSocket(CommandSocket *cs)
+ControlChannel::deleteCommandChannel(CommandChannel *cs)
 {
-	pthread_mutex_lock(&commandSocketsLock);
-	commandSockets.remove(cs);
-	pthread_mutex_unlock(&commandSocketsLock);
+	pthread_mutex_lock(&commandChannelsLock);
+	commandChannels.remove(cs);
+	pthread_mutex_unlock(&commandChannelsLock);
 }
 
 void
-ControlSocket::handleMessage(const Message::Header *hdr,
+ControlChannel::handleMessage(const Message::Header *hdr,
     const struct cmsghdr *cmsg)
 {
 	int *fds;
@@ -100,16 +100,16 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			break;
 		}
 
-		CommandSocket *cs = new CommandSocket(fds[0]);
+		CommandChannel *cs = new CommandChannel(fds[0]);
 		if (!cs->init()) {
 			syslog(LOG_WARNING, "failed to init command socket");
 			delete cs;
 			writeErrnoReply(hdr->type, -1, ENXIO);
 			break;
 		}
-		pthread_mutex_lock(&commandSocketsLock);
-		commandSockets.push_back(cs);
-		pthread_mutex_unlock(&commandSocketsLock);
+		pthread_mutex_lock(&commandChannelsLock);
+		commandChannels.push_back(cs);
+		pthread_mutex_unlock(&commandChannelsLock);
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
@@ -153,10 +153,10 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 			 * here since the child process is
 			 * single-threaded at this point.
 			 */
-			while (!commandSockets.empty()) {
-				CommandSocket *cs = commandSockets.front();
+			while (!commandChannels.empty()) {
+				CommandChannel *cs = commandChannels.front();
 				delete cs;
-				commandSockets.pop_front();
+				commandChannels.pop_front();
 			}
 
 			/* Switch fd of child control socket. */
@@ -179,7 +179,7 @@ ControlSocket::handleMessage(const Message::Header *hdr,
 }
 
 void
-ControlSocket::run()
+ControlChannel::run()
 {
 	for (;;) {
 		MessageRef ref;
@@ -195,7 +195,7 @@ ControlSocket::run()
 }
 
 void
-ControlSocket::observeReadError(enum ReadError error,
+ControlChannel::observeReadError(enum ReadError error,
     const Message::Header *hdr)
 {
 	switch (error) {
@@ -226,7 +226,7 @@ ControlSocket::observeReadError(enum ReadError error,
 }
 
 void
-ControlSocket::observeWriteError()
+ControlChannel::observeWriteError()
 {
 	syslog(LOG_WARNING, "failed to write message on control socket: %m");
 	exit(1);
