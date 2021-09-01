@@ -32,68 +32,25 @@
 
 #pragma once
 
-#include <stack>
-
-#include "Messages.h"
-#include "MessageBuffer.h"
+#include "MessageChannel.h"
 
 /*
- * A MessageSocket sends and receives messages over a reliable
- * datagram socket.  It provides methods to read messages and write
- * messages.
+ * A MessageSocket is a MessageChannel that uses a socket for the
+ * transport.
  */
-class MessageRef;
-
-class MessageSocket {
-public:
-	void freeMessage(MessageBuffer *);
-	enum ReadError {
-		NO_BUFFER,
-		READ_ERROR,
-		GROW_FAIL,
-		SHORT,
-		TRUNCATED,
-		BAD_MSG_LENGTH,
-		LENGTH_MISMATCH
-	};
-	static void enableTracing(int fd);
+class MessageSocket : public MessageChannel {
 protected:
-	MessageSocket(int _fd) : fd(_fd) {};
+	MessageSocket(int _fd) : fd(_fd) { setId(_fd); };
 	~MessageSocket();
 
-	bool allocateMessages(int count, size_t size, size_t controlSize = 0);
 	void updateFd(int newFd);
-	virtual int readMessage(MessageRef &ref) = 0;
-	bool writeMessage(enum Message::Type type,
-	    const void *payload = nullptr, size_t payloadLen = 0);
-	bool writeMessage(enum Message::Type type, int target,
-	    const void *payload = nullptr, size_t payloadLen = 0);
-	bool writeMessage(enum Message::Type type, int target,
-	    const struct iovec *iov, int iovCnt);
-	void writeErrorReply(enum Message::Type type, long ret, int errorType,
-	    const void *payload = NULL, size_t payloadLen = 0);
-	void writeReplyMessage(enum Message::Type type, long ret,
-	    const void *payload = nullptr, size_t payloadLen = 0);
-	void writeReplyMessage(enum Message::Type type, long ret,
-	    const struct iovec *iov, int iovCnt);
-	void writeErrnoReply(enum Message::Type type, long ret, int error);
-	virtual void observeReadError(enum ReadError error,
-	    const Message::Header *hdr) = 0;
-	virtual void observeWriteError() = 0;
 private:
-	bool writeMessage(struct iovec *iov, int iovCnt);
-	void writeReplyMessage(enum Message::Type type, long ret, int error,
-	    const void *payload, size_t payloadLen);
+	virtual bool writeRawMessage(struct iovec *iov, int iovCnt);
 
 	int fd;
-	std::stack<MessageBuffer *> messages;
 
 	friend class MessageDatagramSocket;
 	friend class MessageStreamSocket;
-
-	static int traceFd;
-	static void trace(const char *fmt, ...)
-	    __attribute__((__format__ (__printf__, 1, 2)));
 };
 
 class MessageDatagramSocket : public MessageSocket {
@@ -112,71 +69,4 @@ protected:
 	MessageStreamSocket(int _fd): MessageSocket(_fd) {}
 	~MessageStreamSocket() = default;
 	virtual int readMessage(MessageRef &ref);
-};
-
-class MessageRef {
-public:
-	MessageRef() : ms(nullptr), b(nullptr)
-	{}
-
-	MessageRef(MessageRef &&ref) : ms(ref.ms), b(ref.b)
-	{ ref.b = nullptr; }
-
-	MessageRef(const MessageRef &) = delete;
-
-	~MessageRef()
-	{
-		if (b != nullptr)
-			ms->freeMessage(b);
-	}
-
-	MessageRef &operator=(MessageRef &&ref)
-	{
-		reset(ref.ms, ref.b);
-		ref.b = nullptr;
-		return (*this);
-	}
-
-	void reset(MessageSocket *_ms, MessageBuffer *_b)
-	{
-		if (b != nullptr)
-			ms->freeMessage(b);
-		ms = _ms;
-		b = _b;
-	}
-
-	size_t length() const
-	{
-		if (b == nullptr)
-			return (0);
-		return (b->length());
-	}
-
-	const Message::Header *hdr() const
-	{
-		if (b == nullptr)
-			return (nullptr);
-		return (b->hdr());
-	}
-
-	const Message::Result *result() const
-	{
-		if (b == nullptr)
-			return (nullptr);
-		return (b->result());
-	}
-
-	const struct cmsghdr *cmsg() const
-	{
-		if (b == nullptr)
-			return (nullptr);
-		return (b->cmsg());
-	}
-
-	explicit operator bool() const
-	{ return (b != nullptr); }
-
-private:
-	MessageSocket *ms;
-	MessageBuffer *b;
 };

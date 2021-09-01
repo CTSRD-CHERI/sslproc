@@ -30,48 +30,16 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/socket.h>
 #include <sys/uio.h>
 #include <assert.h>
-#include <errno.h>
-#include <string.h>
 #include <unistd.h>
-
-#include <openssl/ssl.h>
 
 #include "Messages.h"
 #include "MessageSocket.h"
 
-int MessageSocket::traceFd = -1;
-
 MessageSocket::~MessageSocket()
 {
-	while (!messages.empty()) {
-		MessageBuffer *buffer = messages.top();
-		messages.pop();
-		delete buffer;
-	}
 	close(fd);
-}
-
-void
-MessageSocket::enableTracing(int fd)
-{
-	traceFd = fd;
-}
-
-void
-MessageSocket::trace(const char *fmt, ...)
-{
-	if (traceFd == -1)
-		return;
-
-	int save_error = errno;
-	va_list ap;
-	va_start(ap, fmt);
-	vdprintf(traceFd, fmt, ap);
-	va_end(ap);
-	errno = save_error;
 }
 
 void
@@ -80,25 +48,7 @@ MessageSocket::updateFd(int newFd)
 	assert(fd != newFd);
 	close(fd);
 	fd = newFd;
-}
-
-bool
-MessageSocket::allocateMessages(int count, size_t size, size_t controlSize)
-{
-	assert(size >= sizeof(Message::Header));
-	for (int i = 0; i < count; i++) {
-		MessageBuffer *buffer = new MessageBuffer();
-		if (!buffer->grow(size)) {
-			delete buffer;
-			return (false);
-		}
-		if (controlSize != 0 && !buffer->controlAlloc(controlSize)) {
-			delete buffer;
-			return (false);
-		}
-		freeMessage(buffer);
-	}
-	return (true);
+	setId(newFd);
 }
 
 int
@@ -323,15 +273,8 @@ MessageStreamSocket::readMessage(MessageRef &ref)
 	return (1);
 }
 
-void
-MessageSocket::freeMessage(MessageBuffer *buffer)
-{
-	if (buffer != nullptr)
-		messages.push(buffer);
-}
-
 bool
-MessageSocket::writeMessage(struct iovec *iov, int iovCnt)
+MessageSocket::writeRawMessage(struct iovec *iov, int iovCnt)
 {
 	ssize_t nwritten;
 
@@ -377,141 +320,4 @@ MessageDatagramSocket::writeMessage(enum Message::Type type,
 		return (false);
 	}
 	return (true);
-}
-
-bool
-MessageSocket::writeMessage(enum Message::Type type,
-    const void *payload, size_t payloadLen)
-{
-	Message::Header hdr;
-	struct iovec iov[2];
-	int cnt;
-
-	hdr.type = type;
-	hdr.length = sizeof(hdr) + payloadLen;
-	iov[0].iov_base = &hdr;
-	iov[0].iov_len = sizeof(hdr);
-	iov[1].iov_base = const_cast<void *>(payload);
-	iov[1].iov_len = payloadLen;
-	if (payload == nullptr)
-		cnt = 1;
-	else
-		cnt = 2;
-	trace("SND %d: type %s len %d\n", fd, Message::typeName(hdr.type),
-	    hdr.length);
-	return (writeMessage(iov, cnt));
-}
-
-bool
-MessageSocket::writeMessage(enum Message::Type type, int target,
-    const void *payload,  size_t payloadLen)
-{
-	Message::Targeted hdr;
-	struct iovec iov[2];
-	int cnt;
-
-	hdr.type = type;
-	hdr.length = sizeof(hdr) + payloadLen;
-	hdr.target = target;
-	iov[0].iov_base = &hdr;
-	iov[0].iov_len = sizeof(hdr);
-	iov[1].iov_base = const_cast<void *>(payload);
-	iov[1].iov_len = payloadLen;
-	if (payload == nullptr)
-		cnt = 1;
-	else
-		cnt = 2;
-	trace("SND %d: type %s len %d target %u\n", fd,
-	    Message::typeName(hdr.type), hdr.length, hdr.target);
-	return (writeMessage(iov, cnt));
-}
-
-bool
-MessageSocket::writeMessage(enum Message::Type type, int target,
-    const struct iovec *iov, int iovCnt)
-{
-	Message::Targeted hdr;
-	struct iovec iov2[iovCnt + 1];
-	int i;
-
-	hdr.type = type;
-	hdr.length = sizeof(hdr);
-	hdr.target = target;
-	for (i = 0; i < iovCnt; i++)
-		hdr.length += iov[i].iov_len;
-	iov2[0].iov_base = &hdr;
-	iov2[0].iov_len = sizeof(hdr);
-	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
-	trace("SND %d: type %s len %d target %u\n", fd,
-	    Message::typeName(hdr.type), hdr.length, hdr.target);
-	return (writeMessage(iov2, iovCnt + 1));
-}
-
-void
-MessageSocket::writeReplyMessage(enum Message::Type type, long ret, int error,
-    const void *payload, size_t payloadLen)
-{
-	Message::Result result;
-	struct iovec iov[2];
-	int cnt;
-
-	result.type = Message::RESULT;
-	result.length = sizeof(result) + payloadLen;
-	result.request = type;
-	result.error = error;
-	result.ret = ret;
-	iov[0].iov_base = &result;
-	iov[0].iov_len = sizeof(result);
-	iov[1].iov_base = const_cast<void *>(payload);
-	iov[1].iov_len = payloadLen;
-	if (payload == nullptr)
-		cnt = 1;
-	else
-		cnt = 2;
-	trace("SND %d: type RESULT len %d request %s error %d\n", fd,
-	    result.length, Message::typeName(result.request), result.error);
-	writeMessage(iov, cnt);
-}
-
-void
-MessageSocket::writeReplyMessage(enum Message::Type type, long ret,
-    const void *payload, size_t payloadLen)
-{
-	writeReplyMessage(type, ret, SSL_ERROR_NONE, payload, payloadLen);
-}
-
-void
-MessageSocket::writeReplyMessage(enum Message::Type type, long ret,
-    const struct iovec *iov, int iovCnt)
-{
-	Message::Result result;
-	struct iovec iov2[iovCnt + 1];
-	int i;
-
-	result.type = Message::RESULT;
-	result.length = sizeof(result);
-	result.request = type;
-	result.error = SSL_ERROR_NONE;
-	result.ret = ret;
-	for (i = 0; i < iovCnt; i++)
-		result.length += iov[i].iov_len;
-	iov2[0].iov_base = &result;
-	iov2[0].iov_len = sizeof(result);
-	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
-	trace("SND %d: type RESULT len %d request %s error %d\n", fd,
-	    result.length, Message::typeName(result.request), result.error);
-	writeMessage(iov2, iovCnt + 1);
-}
-
-void
-MessageSocket::writeErrorReply(enum Message::Type type, long ret, int errorType,
-    const void *payload, size_t payloadLen)
-{
-	writeReplyMessage(type, ret, errorType, payload, payloadLen);
-}
-
-void
-MessageSocket::writeErrnoReply(enum Message::Type type, long ret, int error)
-{
-	writeErrorReply(type, ret, SSL_ERROR_SYSCALL, &error, sizeof(error));
 }
