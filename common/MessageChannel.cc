@@ -68,6 +68,15 @@ MessageChannel::trace(const char *fmt, ...)
 	errno = save_error;
 }
 
+void
+MessageChannel::setId(int value)
+{
+	char buf[64];
+
+	snprintf(buf, sizeof(buf), "%d", value);
+	id = std::string(buf);
+}
+
 bool
 MessageChannel::allocateMessages(int count, size_t size, size_t controlSize)
 {
@@ -112,8 +121,8 @@ MessageChannel::writeMessage(enum Message::Type type,
 		cnt = 1;
 	else
 		cnt = 2;
-	trace("SND %d: type %s len %d\n", id, Message::typeName(hdr.type),
-	    hdr.length);
+	trace("SND %s: type %s len %d\n", id.c_str(),
+	    Message::typeName(hdr.type), hdr.length);
 	return (writeRawMessage(iov, cnt));
 }
 
@@ -136,7 +145,7 @@ MessageChannel::writeMessage(enum Message::Type type, int target,
 		cnt = 1;
 	else
 		cnt = 2;
-	trace("SND %d: type %s len %d target %u\n", id,
+	trace("SND %s: type %s len %d target %u\n", id.c_str(),
 	    Message::typeName(hdr.type), hdr.length, hdr.target);
 	return (writeRawMessage(iov, cnt));
 }
@@ -157,7 +166,7 @@ MessageChannel::writeMessage(enum Message::Type type, int target,
 	iov2[0].iov_base = &hdr;
 	iov2[0].iov_len = sizeof(hdr);
 	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
-	trace("SND %d: type %s len %d target %u\n", id,
+	trace("SND %s: type %s len %d target %u\n", id.c_str(),
 	    Message::typeName(hdr.type), hdr.length, hdr.target);
 	return (writeRawMessage(iov2, iovCnt + 1));
 }
@@ -183,7 +192,7 @@ MessageChannel::writeReplyMessage(enum Message::Type type, long ret, int error,
 		cnt = 1;
 	else
 		cnt = 2;
-	trace("SND %d: type RESULT len %d request %s error %d\n", id,
+	trace("SND %s: type RESULT len %d request %s error %d\n", id.c_str(),
 	    result.length, Message::typeName(result.request), result.error);
 	writeRawMessage(iov, cnt);
 }
@@ -213,7 +222,7 @@ MessageChannel::writeReplyMessage(enum Message::Type type, long ret,
 	iov2[0].iov_base = &result;
 	iov2[0].iov_len = sizeof(result);
 	memcpy(iov2 + 1, iov, sizeof(*iov) * iovCnt);
-	trace("SND %d: type RESULT len %d request %s error %d\n", id,
+	trace("SND %s: type RESULT len %d request %s error %d\n", id.c_str(),
 	    result.length, Message::typeName(result.request), result.error);
 	writeRawMessage(iov2, iovCnt + 1);
 }

@@ -33,6 +33,7 @@
 #pragma once
 
 #include <stack>
+#include <string>
 
 #include "Messages.h"
 #include "MessageBuffer.h"
@@ -61,7 +62,8 @@ protected:
 	MessageChannel() {};
 	~MessageChannel();
 
-	void setId(int _id) { id = _id; };
+	void setId(int value);
+	void setId(const char *str) { id = std::string(str); }
 	bool allocateMessages(int count, size_t size, size_t controlSize = 0);
 	virtual int readMessage(MessageRef &ref) = 0;
 	bool writeMessage(enum Message::Type type,
@@ -85,7 +87,7 @@ private:
 	void writeReplyMessage(enum Message::Type type, long ret, int error,
 	    const void *payload, size_t payloadLen);
 
-	int id = -1;
+	std::string id;
 	std::stack<MessageBuffer *> messages;
 
 	friend class MessageDatagramSocket;
