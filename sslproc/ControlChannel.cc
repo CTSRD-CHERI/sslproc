@@ -76,7 +76,7 @@ ControlChannel::handleMessage(const Message::Header *hdr,
 	case Message::NOP:
 		writeReplyMessage(hdr->type, 0);
 		break;
-	case Message::CREATE_COMMAND_SOCKET:
+	case Message::CREATE_COMMAND_CHANNEL:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
 		    cmsg->cmsg_type != SCM_RIGHTS ||

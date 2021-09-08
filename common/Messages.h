@@ -42,11 +42,11 @@ namespace Message {
 		RESULT,
 
 		/*
-		 * Special message sent only on the control socket to
-		 * allocate a command socket.  Each client thread or
-		 * process needs its own command socket.
+		 * Special message sent only on the control channel to
+		 * allocate a command channel.  Each client thread or
+		 * process needs its own command channel.
 		 */
-		CREATE_COMMAND_SOCKET,
+		CREATE_COMMAND_CHANNEL,
 
 		/*
 		 * Special message sent only on the control socket to

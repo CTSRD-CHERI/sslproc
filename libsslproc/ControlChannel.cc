@@ -66,7 +66,7 @@ ControlChannel::createCommandChannel(int fd)
 	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
 	fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
 	fds[0] = fd;
-	MessageRef ref = waitForReply(Message::CREATE_COMMAND_SOCKET,
+	MessageRef ref = waitForReply(Message::CREATE_COMMAND_CHANNEL,
 	    nullptr, 0, &cmsgbuf, sizeof(cmsgbuf));
 	if (!ref)
 		return (false);
