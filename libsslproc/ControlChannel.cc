@@ -39,9 +39,18 @@
 bool
 ControlChannel::init()
 {
+#ifdef HAVE_COCALL
+	if (!MessageCoCall::init())
+		return (false);
+
+	/* Control socket messages don't recurse. */
+	if (!allocateMessages(1, 128))
+		return (false);
+#else
 	/* Control socket messages don't recurse. */
 	if (!allocateMessages(1, 64))
 		return (false);
+#endif
 
 	MessageRef ref = waitForReply(Message::NOP);
 	if (!ref)
@@ -50,6 +59,17 @@ ControlChannel::init()
 	return (true);
 }
 
+#ifdef HAVE_COCALL
+bool
+ControlChannel::createCommandChannel(const char *name)
+{
+	MessageRef ref = waitForReply(Message::CREATE_COMMAND_CHANNEL,
+	    name, strlen(name));
+	if (!ref)
+		return (false);
+	return (ref.result()->ret == 0);
+}
+#else
 bool
 ControlChannel::createCommandChannel(int fd)
 {
@@ -95,6 +115,7 @@ ControlChannel::requestFork(int fd)
 		return (false);
 	return (ref.result()->ret == 0);
 }
+#endif
 
 void
 ControlChannel::handleMessage(const Message::Header *hdr)

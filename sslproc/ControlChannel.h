@@ -32,13 +32,25 @@
 
 #pragma once
 
+#ifdef HAVE_COCALL
+#include "MessageCoproc.h"
+#else
 #include "MessageSocket.h"
+#endif
 
 class CommandChannel;
 
+#ifdef HAVE_COCALL
+class ControlChannel final : MessageCoAccept {
+#else
 class ControlChannel final : MessageDatagramSocket {
+#endif
 public:
+#ifdef HAVE_COCALL
+	ControlChannel(const char *name) : MessageCoAccept(name) {}
+#else
 	ControlChannel(int fd) : MessageDatagramSocket(fd) {}
+#endif
 	~ControlChannel() = default;
 	bool init();
 	void run();

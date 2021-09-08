@@ -72,11 +72,13 @@ main(int ac, char **av)
 	}
 
 	cap_rights_t rights;
+#ifndef HAVE_COCALL
 	cap_rights_init(&rights, CAP_EVENT, CAP_READ, CAP_WRITE);
 	if (caph_rights_limit(3, &rights) < 0) {
 		syslog(LOG_ERR, "failed to restrict control socket: %m");
 		return (false);
 	}
+#endif
 
 	const char *tracerPath = getenv("SSLPROC_TRACE_PATH");
 	if (tracerPath != nullptr) {
@@ -91,12 +93,29 @@ main(int ac, char **av)
 		}
 	}
 
+#ifndef HAVE_COCALL
+	/*
+	 * XXX: Can't use co* in capability mode.
+	 *
+	 * cocall/coaccept/cosetup are no brainers to permit, but we
+	 * also need coregister and it's not clear that would be safe.
+	 */
 	if (caph_enter() < 0) {
 		syslog(LOG_ERR, "failed to enter capability mode: %m");
 		return (1);
 	}
+#endif
 
+#ifdef HAVE_COCALL
+	if (ac != 2) {
+		syslog(LOG_ERR, "control channel name not provided");
+		return (1);
+	}
+
+	ControlChannel controlChannel(av[1]);
+#else
 	ControlChannel controlChannel(3);
+#endif
 
 	if (!controlChannel.init())
 		return (1);

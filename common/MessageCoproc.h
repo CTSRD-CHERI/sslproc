@@ -32,27 +32,47 @@
 
 #pragma once
 
-#include "LibMessageChannel.h"
+#include "MessageChannel.h"
 
-#ifdef HAVE_COCALL
-class ControlChannel final : public LibMessageChannel<MessageCoCall> {
-#else
-class ControlChannel final : public LibMessageChannel<MessageDatagramSocket> {
-#endif
-public:
-#ifdef HAVE_COCALL
-	ControlChannel(const char *name) : LibMessageChannel(name) {}
-#else
-	ControlChannel(int fd) : LibMessageChannel(fd) {}
-#endif
-	~ControlChannel() = default;
-	bool init();
-#ifdef HAVE_COCALL
-	bool createCommandChannel(const char *name);
-#else
-	bool createCommandChannel(int fd);
-	bool requestFork(int fd);
-#endif
+/*
+ * MessageCoAccept and MessageCoCall are MessageChannels that use
+ * coprocess IPC for the transport.  Written messages are saved in a
+ * pending MessageBuffer that ispassed as the output buffer to
+ * coaccept() and cocall().
+ */
+class MessageCoprocBase : public MessageChannel {
+protected:
+	MessageCoprocBase(const char *_name) : name(_name)
+	{ setId(_name); };
+	~MessageCoprocBase() = default;
+
 private:
-	void handleMessage(const Message::Header *hdr);
+	virtual bool writeRawMessage(struct iovec *iov, int iovCnt);
+
+	class MessageBuffer *pendingWrite = nullptr;
+	std::string name;
+
+	friend class MessageCoAccept;
+	friend class MessageCoCall;
+};
+
+class MessageCoAccept : public MessageCoprocBase {
+protected:
+	MessageCoAccept(const char *_name) : MessageCoprocBase(_name) {}
+	~MessageCoAccept() = default;
+	virtual int readMessage(MessageRef &ref);
+
+	bool init();
+};
+
+class MessageCoCall : public MessageCoprocBase {
+protected:
+	MessageCoCall(const char *_name) : MessageCoprocBase(_name) {};
+	~MessageCoCall() = default;
+	virtual int readMessage(MessageRef &ref);
+
+	bool init();
+
+private:
+	void *target;
 };

@@ -46,48 +46,88 @@
 #include "ControlChannel.h"
 #include "CommandChannel.h"
 
+#ifndef HAVE_COCALL
 static std::list<CommandChannel *> commandChannels;
 static pthread_mutex_t commandChannelsLock = { PTHREAD_MUTEX_INITIALIZER };
+#endif
 
 bool
 ControlChannel::init()
 {
+#ifdef HAVE_COCALL
+	if (!MessageCoAccept::init())
+		return (false);
+
+	/*
+	 * Control socket messages don't recurse.  However two
+	 * messages are needed so that the reply can be allocated
+	 * while the read message is still outstanding.
+	 */
+	if (!allocateMessages(2, 128))
+		return (false);
+#else
 	/* Control socket messages don't recurse. */
 	if (!allocateMessages(1, 64, CMSG_SPACE(sizeof(int))))
 		return (false);
+#endif
 	return (true);
 }
 
 void
 ControlChannel::deleteCommandChannel(CommandChannel *cs)
 {
+#ifndef HAVE_COCALL
 	pthread_mutex_lock(&commandChannelsLock);
 	commandChannels.remove(cs);
 	pthread_mutex_unlock(&commandChannelsLock);
+#endif
 }
 
 void
 ControlChannel::handleMessage(const Message::Header *hdr,
     const struct cmsghdr *cmsg)
 {
-	int *fds;
-
 	switch (hdr->type) {
 	case Message::NOP:
 		writeReplyMessage(hdr->type, 0);
 		break;
+#ifdef HAVE_COCALL
+	case Message::CREATE_COMMAND_CHANNEL:
+	{
+		if (hdr->bodyLength() == 0) {
+			syslog(LOG_WARNING,
+	    "missing channel name for Message::CREATE_COMMAND_CHANNEL");
+			writeErrnoReply(hdr->type, -1, EBADMSG);
+			break;
+		}
+
+		char *name = strndup(
+		    reinterpret_cast<const char *>(hdr->body()),
+		    hdr->bodyLength());
+		CommandChannel *cs = new CommandChannel(name);
+		free(name);
+		if (!cs->init()) {
+			syslog(LOG_WARNING, "failed to init command channel");
+			delete cs;
+			writeErrnoReply(hdr->type, -1, ENXIO);
+			break;
+		}
+		writeReplyMessage(hdr->type, 0);
+		break;
+	}
+#else
 	case Message::CREATE_COMMAND_CHANNEL:
 	{
 		if (cmsg->cmsg_level != SOL_SOCKET ||
 		    cmsg->cmsg_type != SCM_RIGHTS ||
 		    cmsg->cmsg_len != CMSG_LEN(sizeof(int))) {
 			syslog(LOG_WARNING,
-	    "invalid control message for Message::CREATE_COMMAND_SOCKET");
+	    "invalid control message for Message::CREATE_COMMAND_CHANNEL");
 			writeErrnoReply(hdr->type, -1, EBADMSG);
 			break;
 		}
 
-		fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
+		int *fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
 
 		cap_rights_t rights;
 		cap_rights_init(&rights, CAP_EVENT, CAP_READ, CAP_WRITE);
@@ -124,7 +164,7 @@ ControlChannel::handleMessage(const Message::Header *hdr,
 			break;
 		}
 
-		fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
+		int *fds = reinterpret_cast<int *>(CMSG_DATA(cmsg));
 
 		cap_rights_t rights;
 		cap_rights_init(&rights, CAP_EVENT, CAP_READ, CAP_WRITE);
@@ -173,6 +213,7 @@ ControlChannel::handleMessage(const Message::Header *hdr,
 		writeReplyMessage(hdr->type, 0);
 		break;
 	}
+#endif
 	default:
 		syslog(LOG_WARNING, "unknown control request %d", hdr->type);
 	}

@@ -49,7 +49,11 @@ LibMessageChannelHelpers::observeReadError(enum MessageChannel::ReadError error,
 		PROCerr(PROC_F_READ_MESSAGE, ERR_R_NO_BUFFER);
 		break;
 	case MessageChannel::READ_ERROR:
+#ifdef HAVE_COCALL
+		PROCerr(PROC_F_COCALL, ERR_R_IO_ERROR);
+#else
 		PROCerr(PROC_F_RECVMSG, ERR_R_IO_ERROR);
+#endif
 		ERR_add_error_data(1, strerror(errno));
 		break;
 	case MessageChannel::GROW_FAIL:

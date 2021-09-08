@@ -92,6 +92,9 @@ private:
 
 	friend class MessageDatagramSocket;
 	friend class MessageStreamSocket;
+	friend class MessageCoprocBase;
+	friend class MessageCoAccept;
+	friend class MessageCoCall;
 
 	static int traceFd;
 	static void trace(const char *fmt, ...)

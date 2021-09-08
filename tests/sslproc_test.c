@@ -857,6 +857,7 @@ test_conf(void)
 	PASS();
 }
 
+#ifndef HAVE_COCALL
 static void
 test_fork(void)
 {
@@ -942,6 +943,7 @@ test_fork(void)
 	} else
 		FAIL("unexpected child wait status %#x", status);
 }
+#endif
 
 int
 main(int ac, char **av)
@@ -980,7 +982,9 @@ main(int ac, char **av)
 	test_ssl_memory_ping_pong();
 	test_ssl_peek();
 	test_conf();
+#ifndef HAVE_COCALL
 	test_fork();
+#endif
 
 	return (0);
 }

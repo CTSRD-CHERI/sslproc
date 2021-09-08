@@ -34,11 +34,23 @@
 
 #include <openssl/ssl.h>
 
+#ifdef HAVE_COCALL
+#include "MessageCoproc.h"
+#else
 #include "MessageSocket.h"
+#endif
 
+#ifdef HAVE_COCALL
+class CommandChannel final : public MessageCoAccept {
+#else
 class CommandChannel final : public MessageStreamSocket {
+#endif
 public:
+#ifdef HAVE_COCALL
+	CommandChannel(const char *name) : MessageCoAccept(name) {}
+#else
 	CommandChannel(int fd) : MessageStreamSocket(fd) {}
+#endif
 	~CommandChannel() = default;
 	bool init();
 	void run();

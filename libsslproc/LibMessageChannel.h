@@ -36,7 +36,11 @@
 #include <openssl/ssl.h>
 
 #include <Messages.h>
+#ifdef HAVE_COCALL
+#include <MessageCoproc.h>
+#else
 #include <MessageSocket.h>
+#endif
 #include "sslproc_internal.h"
 
 namespace LibMessageChannelHelpers {
@@ -49,7 +53,11 @@ namespace LibMessageChannelHelpers {
 template<class Base>
 class LibMessageChannel : public Base {
 public:
+#ifdef HAVE_COCALL
+	LibMessageChannel(const char *name) : Base(name) {}
+#else
 	LibMessageChannel(int fd) : Base(fd) {}
+#endif
 	~LibMessageChannel() = default;
 	MessageRef waitForReply(enum Message::Type type, int target,
 	    const struct iovec *iov, int iovCnt);

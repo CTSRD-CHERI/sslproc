@@ -32,6 +32,10 @@
 
 #include <fcntl.h>
 #include <pthread.h>
+#ifdef HAVE_COCALL
+#include <paths.h>
+#include <pthread_np.h>
+#endif
 #include <unistd.h>
 #include <atomic>
 #include <list>
@@ -44,13 +48,17 @@
 
 static void commandChannelDeleter(CommandChannel *cs);
 
+#ifndef HAVE_COCALL
 static std::list<CommandChannel *> commandChannels;
 static pthread_mutex_t commandChannelsLock = { PTHREAD_MUTEX_INITIALIZER };
+#endif
 static std::unique_ptr<ControlChannel> controlChannel;
 static thread_local std::unique_ptr<CommandChannel,
     decltype(&commandChannelDeleter)> commandChannel(nullptr,
     &commandChannelDeleter);
+#ifndef HAVE_COCALL
 static thread_local std::unique_ptr<ControlChannel> childControlChannel;
+#endif
 TargetStore targets;
 
 static void
@@ -67,6 +75,138 @@ MessageTracing_init(void)
 	MessageChannel::enableTracing(fd);
 }
 
+#ifdef HAVE_COCALL
+extern "C" char **environ;
+
+bool
+execHelper(pid_t pid, char **argv, char **envp)
+{
+	char buf[MAXPATHLEN];
+	const char *path;
+	int eacces;
+
+	path = getenv("PATH");
+	if (path == nullptr)
+		path = _PATH_DEFPATH;
+
+	char *tofree = strdup(path);
+	char *cookie, *token;
+
+	eacces = 0;
+
+	cookie = tofree;
+	while ((token = strsep(&cookie, ":")) != nullptr) {
+		/*
+		 * An empty entry means to use the cwd.
+		 */
+		if (token[0] == '\0')
+			snprintf(buf, sizeof(buf), "%s", "sslproc");
+		else
+			snprintf(buf, sizeof(buf), "%s/%s", token, "sslproc");
+
+		if (coexecve(pid, buf, argv, envp) == 0) {
+			free(tofree);
+			return (true);
+		}
+
+		switch (errno) {
+		case ELOOP:
+		case ENAMETOOLONG:
+		case ENOENT:
+#ifdef EGOTDIR
+		case EGOTDIR:
+#endif
+			break;
+		default:
+			return (false);
+		}
+	}
+
+	free(tofree);
+	errno = ENOENT;
+	return (false);
+}
+
+static void
+ControlChannel_init(void)
+{
+	char *name;
+	pid_t pid;
+
+	pid = getpid();
+	if (asprintf(&name, "sslproc-%s-%d-control", getprogname(), pid) ==
+	    -1) {
+		PROCerr(PROC_F_CONTROLCHANNEL_INIT, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "asprintf: ", strerror(errno));
+		return;
+	}
+
+	/*
+	 * This doesn't use posix_spawn due to a lack of
+	 * posix_spawn_file_actions_addclosefrom().
+	 */
+	pid_t fpid = vfork();
+	if (fpid == -1) {
+		PROCerr(PROC_F_CONTROLCHANNEL_INIT, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "vfork: ", strerror(errno));
+		free(name);
+		return;
+	}
+
+	if (fpid == 0) {
+		/* child */
+		char *argv[3];
+		argv[0] = const_cast<char *>("sslproc");
+		argv[1] = name;
+		argv[2] = nullptr;
+
+		closefrom(3);
+		execHelper(pid, argv, environ);
+		exit(127);
+	}
+
+	ControlChannel *cs = new ControlChannel(name);
+	free(name);
+	if (!cs->init()) {
+		delete cs;
+
+		/* TODO: wait for helper, maybe kill it if necessary? */
+		return;
+	}
+
+	controlChannel.reset(cs);
+}
+
+static CommandChannel *
+createCommandChannel()
+{
+	ControlChannel *ctrl = controlChannel.get();
+	if (ctrl == nullptr)
+		return (nullptr);
+
+	char *name;
+	if (asprintf(&name, "sslproc-%s-%d-command-%d", getprogname(),
+	    getpid(), pthread_getthreadid_np()) == -1) {
+		PROCerr(PROC_F_CREATECOMMANDCHANNEL, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "asprintf: ", strerror(errno));
+		return (nullptr);
+	}
+
+	if (!ctrl->createCommandChannel(name)) {
+		free(name);
+		return (nullptr);
+	}
+
+	CommandChannel *cs = new CommandChannel(name);
+	free(name);
+	if (!cs->init()) {
+		delete cs;
+		return (nullptr);
+	}
+
+	return (cs);
+}
+#else
 static void
 ControlChannel_init(void)
 {
@@ -119,7 +259,7 @@ createCommandChannel()
 
 	int fds[2];
 	if (socketpair(PF_LOCAL, SOCK_STREAM, 0, fds) == -1) {
-		PROCerr(PROC_F_CONTROLCHANNEL_INIT, ERR_R_INTERNAL_ERROR);
+		PROCerr(PROC_F_CREATECOMMANDCHANNEL, ERR_R_INTERNAL_ERROR);
 		ERR_add_error_data(2, "socketpair: ", strerror(errno));
 		return (nullptr);
 	}
@@ -143,6 +283,7 @@ createCommandChannel()
 	pthread_mutex_unlock(&commandChannelsLock);
 	return (cs);
 }
+#endif
 
 CommandChannel *
 currentCommandChannel()
@@ -158,12 +299,15 @@ currentCommandChannel()
 static void
 commandChannelDeleter(CommandChannel *cs)
 {
+#ifndef HAVE_COCALL
 	pthread_mutex_lock(&commandChannelsLock);
 	commandChannels.remove(cs);
 	pthread_mutex_unlock(&commandChannelsLock);
+#endif
 	delete cs;
 }
 
+#ifndef HAVE_COCALL
 /*
  * For an application fork(), the helper needs to also fork preserving
  * COW semantics for any state established in the helper by the
@@ -249,6 +393,7 @@ POPENSSL_atfork_child(void)
 	 */
 	controlChannel = std::move(childControlChannel);
 }
+#endif
 
 int
 POPENSSL_init_ssl(void)
@@ -271,8 +416,10 @@ POPENSSL_init_ssl(void)
 	PERR_init();
 	MessageTracing_init();
 	ControlChannel_init();
+#ifndef HAVE_COCALL
 	pthread_atfork(POPENSSL_atfork_prepare, POPENSSL_atfork_parent,
 	    POPENSSL_atfork_child);
+#endif
 	SSL_init();
 	initted.store(1);
 	return (0);

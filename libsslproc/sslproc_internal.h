@@ -71,7 +71,11 @@ __END_DECLS
 #define	PROC_F_SSL_CTX_NEW		1
 #define	PROC_F_READ_MESSAGE		2
 #define	PROC_F_WRITE_MESSAGE		3
+#ifdef HAVE_COCALL
+#define	PROC_F_COCALL			4
+#else
 #define	PROC_F_RECVMSG			4
+#endif
 #define	PROC_F_WAIT_FOR_REPLY		5
 #define	PROC_F_SET_MESSAGE_ERROR	6
 #define	PROC_F_SSL_NEW			7

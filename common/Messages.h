@@ -48,6 +48,7 @@ namespace Message {
 		 */
 		CREATE_COMMAND_CHANNEL,
 
+#ifndef HAVE_COCALL
 		/*
 		 * Special message sent only on the control socket to
 		 * request a fork of the helper.  This message passes
@@ -55,6 +56,7 @@ namespace Message {
 		 * helper.
 		 */
 		FORK,
+#endif
 
 		/* Returns a target for the created context. */
 		CREATE_CONTEXT,

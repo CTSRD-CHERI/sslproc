@@ -35,9 +35,17 @@
 #include "LibMessageChannel.h"
 #include "sslproc.h"
 
+#ifdef HAVE_COCALL
+class CommandChannel final : public LibMessageChannel<MessageCoCall> {
+#else
 class CommandChannel final : public LibMessageChannel<MessageStreamSocket> {
+#endif
 public:
+#ifdef HAVE_COCALL
+	CommandChannel(const char *name) : LibMessageChannel(name) {}
+#else
 	CommandChannel(int fd) : LibMessageChannel(fd) {}
+#endif
 	~CommandChannel() = default;
 	bool init();
 

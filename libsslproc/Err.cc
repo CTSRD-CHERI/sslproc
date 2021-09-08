@@ -42,7 +42,11 @@ static ERR_STRING_DATA PROC_strings[] = {
 	{ERR_PACK(0, PROC_F_SSL_CTX_NEW, 0), "PSSL_CTX_new"},
 	{ERR_PACK(0, PROC_F_READ_MESSAGE, 0), "MessageChannel::readMessage"},
 	{ERR_PACK(0, PROC_F_WRITE_MESSAGE, 0), "MessageChannel::writeMessage"},
+#ifdef HAVE_COCALL
+	{ERR_PACK(0, PROC_F_COCALL, 0), "cocall"},
+#else
 	{ERR_PACK(0, PROC_F_RECVMSG, 0), "recvmsg"},
+#endif
 	{ERR_PACK(0, PROC_F_WAIT_FOR_REPLY, 0),
 	 "LibMessageChannel::waitForReply"},
 	{ERR_PACK(0, PROC_F_SET_MESSAGE_ERROR, 0),
