@@ -2652,7 +2652,8 @@ void
 CommandChannel::run()
 {
 #ifdef HAVE_COCALL
-	if (!MessageCoAccept::init())
+	if (!MessageCoAccept::initThread() ||
+	    !MessageCoAccept::init())
 		return;
 #endif
 	for (;;) {

@@ -80,10 +80,16 @@ MessageCoprocBase::writeRawMessage(struct iovec *iov, int iovCnt)
 }
 
 bool
-MessageCoAccept::init()
+MessageCoAccept::initThread()
 {
 	if (cosetup(COSETUP_COACCEPT) != 0)
 		return (false);
+	return (true);
+}
+
+bool
+MessageCoAccept::init()
+{
 	if (coregister(name.c_str(), NULL) != 0)
 		return (false);
 	return (true);
@@ -163,11 +169,16 @@ MessageCoAccept::readMessage(MessageRef &ref)
 }
 
 bool
-MessageCoCall::init()
+MessageCoCall::initThread()
 {
 	if (cosetup(COSETUP_COCALL) != 0)
 		return (false);
+	return (true);
+}
 
+bool
+MessageCoCall::init()
+{
 	/*
 	 * XXX: There is no way to know if the remote thread has
 	 * executed coregister(2) by the time the client invokes this.

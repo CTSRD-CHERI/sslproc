@@ -133,6 +133,12 @@ ControlChannel_init(void)
 	char *name;
 	pid_t pid;
 
+	if (!MessageCoCall::initThread()) {
+		PROCerr(PROC_F_CONTROLCHANNEL_INIT, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "cosetup: ", strerror(errno));
+		return;
+	}
+
 	pid = getpid();
 	if (asprintf(&name, "sslproc-%s-%d-control", getprogname(), pid) ==
 	    -1) {
@@ -183,6 +189,17 @@ createCommandChannel()
 	ControlChannel *ctrl = controlChannel.get();
 	if (ctrl == nullptr)
 		return (nullptr);
+
+	/*
+	 * XXX: The manpage says to only call this once, but it's
+	 * actually idempotent.  This gets called a second time here
+	 * in the first thread.
+	 */
+	if (!MessageCoCall::initThread()) {
+		PROCerr(PROC_F_CREATECOMMANDCHANNEL, ERR_R_INTERNAL_ERROR);
+		ERR_add_error_data(2, "asprintf: ", strerror(errno));
+		return (nullptr);
+	}
 
 	char *name;
 	if (asprintf(&name, "sslproc-%s-%d-command-%d", getprogname(),

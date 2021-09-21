@@ -112,6 +112,11 @@ main(int ac, char **av)
 		return (1);
 	}
 
+	if (!MessageCoAccept::initThread()) {
+		syslog(LOG_ERR, "cosetup() failed: %m");
+		return (1);
+	}
+
 	ControlChannel controlChannel(av[1]);
 #else
 	ControlChannel controlChannel(3);

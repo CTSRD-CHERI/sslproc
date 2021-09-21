@@ -57,6 +57,8 @@ private:
 };
 
 class MessageCoAccept : public MessageCoprocBase {
+public:
+	static bool initThread();
 protected:
 	MessageCoAccept(const char *_name) : MessageCoprocBase(_name) {}
 	~MessageCoAccept() = default;
@@ -66,6 +68,8 @@ protected:
 };
 
 class MessageCoCall : public MessageCoprocBase {
+public:
+	static bool initThread();
 protected:
 	MessageCoCall(const char *_name) : MessageCoprocBase(_name) {};
 	~MessageCoCall() = default;
