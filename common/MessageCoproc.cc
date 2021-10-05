@@ -68,6 +68,7 @@ MessageCoprocBase::writeRawMessage(struct iovec *iov, int iovCnt)
 				observeWriteError();
 				return (false);
 			}
+			cp = reinterpret_cast<char *>(buffer->data()) + length;
 		}
 		memcpy(cp, iov[i].iov_base, iov[i].iov_len);
 		length += iov[i].iov_len;
