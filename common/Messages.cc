@@ -69,7 +69,9 @@ MessageNames::MessageNames()
 	ADD_MESSAGE(RESULT);
 
 	ADD_MESSAGE(CREATE_COMMAND_CHANNEL);
-#ifndef HAVE_COCALL
+#ifdef HAVE_COCALL
+	ADD_MESSAGE(RETRY);
+#else
 	ADD_MESSAGE(FORK);
 #endif
 

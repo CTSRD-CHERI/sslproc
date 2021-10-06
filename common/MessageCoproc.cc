@@ -40,6 +40,11 @@
 #define	cocall		cocall_slow
 #endif
 
+static const Message::Header retryMessage = {
+	.type = Message::RETRY,
+	.length = sizeof(retryMessage)
+};
+
 bool
 MessageCoprocBase::writeRawMessage(struct iovec *iov, int iovCnt)
 {
@@ -80,6 +85,20 @@ MessageCoprocBase::writeRawMessage(struct iovec *iov, int iovCnt)
 	return (true);
 }
 
+void
+MessageCoprocBase::logRecvMessage(MessageBuffer *buffer)
+{
+	const Message::Header *hdr = buffer->hdr();
+	if (hdr->type == Message::RESULT && buffer->result() != nullptr) {
+		const Message::Result *result = buffer->result();
+		trace("RCV %s: type RESULT len %d request %s error %d\n",
+		    name.c_str(), result->length,
+		    Message::typeName(result->request), result->error);
+	} else
+		trace("RCV %s: type %s len %d\n", name.c_str(),
+		    Message::typeName(hdr->type), hdr->length);
+}
+
 bool
 MessageCoAccept::initThread()
 {
@@ -101,72 +120,81 @@ MessageCoAccept::readMessage(MessageRef &ref)
 {
 	MessageBuffer *buffer;
 	int error;
-	bool allocatedBuffer;
 
-	/*
-	 * allocatedBuffer is a bit odd.  The pendingWrite buffer has
-	 * been allocated previously by writeRawMessage, so if this
-	 * function fails, after sending pendingWrite, it should
-	 * release the buffer.  However, if pendingWrite is nullptr,
-	 * then a new buffer is reserved, but it is not allocated
-	 * until the end of the function when success is returned.
-	 */
-	if (pendingWrite == nullptr) {
-		if (messages.empty()) {
-			trace("RCV %s: out of message buffers\n",
-			    name.c_str());
-			observeReadError(NO_BUFFER, nullptr);
-			return (-1);
+	if (messages.empty()) {
+		trace("RCV %s: out of message buffers\n", name.c_str());
+		observeReadError(NO_BUFFER, nullptr);
+		return (-1);
+	}
+
+	buffer = messages.top();
+	messages.pop();
+	buffer->reset();
+	const Message::Header *hdr = reinterpret_cast<const Message::Header *>
+	    (buffer->data());
+
+	for (;;) {
+		if (pendingWrite == nullptr)
+			error = coaccept(nullptr, nullptr, 0, buffer->data(),
+			    buffer->capacity());
+		else
+			error = coaccept(nullptr, pendingWrite->data(),
+			    pendingWrite->length(), buffer->data(),
+			    buffer->capacity());
+		if (error != 0) {
+			trace("RCV %s: coaccept failed: %m\n", name.c_str());
+			observeReadError(READ_ERROR, nullptr);
+			goto error;
 		}
 
-		buffer = messages.top();
-		buffer->reset();
-		allocatedBuffer = false;
-
-		error = coaccept(nullptr, nullptr, 0, buffer->data(),
-		    buffer->capacity());
-	} else {
-		buffer = pendingWrite;
-		allocatedBuffer = true;
-
-		error = coaccept(nullptr, pendingWrite->data(),
-		    pendingWrite->length(), buffer->data(),
-		    buffer->capacity());
-
+		if (hdr->type == Message::RETRY) {
+			buffer->setLength(hdr->length);
+			logRecvMessage(buffer);
+			continue;
+		}
+		break;
+	}
+	if (pendingWrite != nullptr) {
+		freeMessage(pendingWrite);
 		pendingWrite = nullptr;
 	}
-	if (error != 0) {
-		trace("RCV %s: coaccept failed: %m\n", name.c_str());
-		observeReadError(READ_ERROR, nullptr);	
-		if (allocatedBuffer)
-			freeMessage(buffer);
-		return (-1);
-	}
-	buffer->setLength(sizeof(Message::Header));
 
-	const Message::Header *hdr = buffer->hdr();
-	if (hdr->length > buffer->capacity()) {
-		trace("RCV %s: message truncated\n", name.c_str());
-		observeReadError(TRUNCATED, nullptr);
-		errno = EMSGSIZE;
-		if (allocatedBuffer)
-			freeMessage(buffer);
-		return (-1);
+	while (hdr->length > buffer->capacity()) {
+		trace("RCV %s: type %s truncated\n", name.c_str(),
+		    Message::typeName(hdr->type));
+
+		if (!buffer->grow(hdr->length)) {
+			trace("RCV %s: failed to grow buffer to %u\n",
+			    name.c_str(), hdr->length);
+			observeReadError(GROW_FAIL, hdr);
+			errno = ENOMEM;
+			goto error;
+		}
+		hdr = reinterpret_cast<const Message::Header *>
+		    (buffer->data());
+
+		trace("SND %s: type %s len %d\n", name.c_str(),
+		    Message::typeName(retryMessage.type), retryMessage.length);
+		error = coaccept(nullptr, &retryMessage, sizeof(retryMessage),
+		    buffer->data(), buffer->capacity());
+		if (error != 0) {
+			trace("RCV %s: coaccept failed: %m\n", name.c_str());
+			observeReadError(READ_ERROR, nullptr);
+			goto error;
+		}
 	}
 	buffer->setLength(hdr->length);
-
-	if (hdr->type == Message::RESULT && buffer->result() != nullptr) {
-		const Message::Result *result = buffer->result();
-		trace("RCV %s: type RESULT len %d request %s error %d\n",
-		    name.c_str(), result->length,
-		    Message::typeName(result->request), result->error);
-	} else
-		trace("RCV %s: type %s len %d\n", name.c_str(),
-		    Message::typeName(hdr->type), hdr->length);
-	if (!allocatedBuffer)
-		messages.pop();
+	logRecvMessage(buffer);
 	ref.reset(this, buffer);
 	return (1);
+
+error:
+	if (pendingWrite != nullptr) {
+		freeMessage(pendingWrite);
+		pendingWrite = nullptr;
+	}
+	freeMessage(buffer);
+	return (-1);
 }
 
 bool
@@ -201,43 +229,80 @@ MessageCoCall::init()
 int
 MessageCoCall::readMessage(MessageRef &ref)
 {
+	int error;
+
 	if (pendingWrite == nullptr) {
 		trace("RCV %s: no pending message to write\n", name.c_str());
 		observeReadError(NO_BUFFER, nullptr);
 		return (-1);
 	}
 
-	MessageBuffer *buffer = pendingWrite;
+	if (messages.empty()) {
+		trace("RCV %s: out of message buffers\n", name.c_str());
+		observeReadError(NO_BUFFER, nullptr);
+		return (-1);
+	}
+
+	MessageBuffer *buffer = messages.top();
+	messages.pop();
+	buffer->reset();
+	const Message::Header *hdr = reinterpret_cast<const Message::Header *>
+	    (buffer->data());
+
+	for (;;) {
+		error = cocall(target, pendingWrite->data(),
+		    pendingWrite->length(), buffer->data(),
+		    buffer->capacity());
+		if (error != 0) {
+			trace("RCV %s: cocall failed: %m\n", name.c_str());
+			observeReadError(READ_ERROR, nullptr);
+			goto error;
+		}
+
+		if (hdr->type == Message::RETRY) {
+			buffer->setLength(hdr->length);
+			logRecvMessage(buffer);
+			continue;
+		}
+		break;
+	}
+	freeMessage(pendingWrite);
 	pendingWrite = nullptr;
 
-	int error = cocall(target, buffer->data(), buffer->length(),
-	    buffer->data(), buffer->capacity());
-	if (error != 0) {
-		trace("RCV %s: cocall failed: %m\n", name.c_str());
-		observeReadError(READ_ERROR, nullptr);	
-		freeMessage(buffer);
-		return (-1);
-	}
-	buffer->setLength(sizeof(Message::Header));
+	while (hdr->length > buffer->capacity()) {
+		trace("RCV %s: type %s truncated\n", name.c_str(),
+		    Message::typeName(hdr->type));
 
-	const Message::Header *hdr = buffer->hdr();
-	if (hdr->length > buffer->capacity()) {
-		trace("RCV %s: message truncated\n", name.c_str());
-		observeReadError(TRUNCATED, nullptr);
-		errno = EMSGSIZE;
-		freeMessage(buffer);
-		return (-1);
+		if (!buffer->grow(hdr->length)) {
+			trace("RCV %s: failed to grow buffer to %u\n",
+			    name.c_str(), hdr->length);
+			observeReadError(GROW_FAIL, hdr);
+			errno = ENOMEM;
+			goto error;
+		}
+		hdr = reinterpret_cast<const Message::Header *>
+		    (buffer->data());
+
+		trace("SND %s: type %s len %d\n", name.c_str(),
+		    Message::typeName(retryMessage.type), retryMessage.length);
+		error = cocall(target, &retryMessage, sizeof(retryMessage),
+		    buffer->data(), buffer->capacity());
+		if (error != 0) {
+			trace("RCV %s: coaccept failed: %m\n", name.c_str());
+			observeReadError(READ_ERROR, nullptr);
+			goto error;
+		}
 	}
 	buffer->setLength(hdr->length);
-
-	if (hdr->type == Message::RESULT && buffer->result() != nullptr) {
-		const Message::Result *result = buffer->result();
-		trace("RCV %s: type RESULT len %d request %s error %d\n",
-		    name.c_str(), result->length,
-		    Message::typeName(result->request), result->error);
-	} else
-		trace("RCV %s: type %s len %d\n", name.c_str(),
-		    Message::typeName(hdr->type), hdr->length);
+	logRecvMessage(buffer);
 	ref.reset(this, buffer);
 	return (1);
+
+error:
+	if (pendingWrite != nullptr) {
+		freeMessage(pendingWrite);
+		pendingWrite = nullptr;
+	}
+	freeMessage(buffer);
+	return (-1);
 }

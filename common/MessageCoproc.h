@@ -48,6 +48,7 @@ protected:
 
 private:
 	virtual bool writeRawMessage(struct iovec *iov, int iovCnt);
+	void logRecvMessage(MessageBuffer *buffer);
 
 	class MessageBuffer *pendingWrite = nullptr;
 	std::string name;

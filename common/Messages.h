@@ -48,7 +48,15 @@ namespace Message {
 		 */
 		CREATE_COMMAND_CHANNEL,
 
-#ifndef HAVE_COCALL
+#ifdef HAVE_COCALL
+		/*
+		 * Special message sent to request a retry of the last
+		 * sent message.  Sent after the receiving side has
+		 * grown its buffer after receiving a truncated
+		 * message.
+		 */
+		RETRY,
+#else
 		/*
 		 * Special message sent only on the control socket to
 		 * request a fork of the helper.  This message passes
