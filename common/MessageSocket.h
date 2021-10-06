@@ -57,6 +57,8 @@ class MessageDatagramSocket : public MessageSocket {
 protected:
 	MessageDatagramSocket(int _fd): MessageSocket(_fd) {}
 	~MessageDatagramSocket() = default;
+
+	bool allocateMessages(int count, size_t size, size_t controlSize);
 	virtual int readMessage(MessageRef &ref);
 	bool writeMessage(enum Message::Type type,
 	    const void *payload = nullptr,
@@ -68,5 +70,7 @@ class MessageStreamSocket : public MessageSocket {
 protected:
 	MessageStreamSocket(int _fd): MessageSocket(_fd) {}
 	~MessageStreamSocket() = default;
+
+	bool allocateMessages(int count, size_t size);
 	virtual int readMessage(MessageRef &ref);
 };

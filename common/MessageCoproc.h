@@ -46,6 +46,7 @@ protected:
 	{ setId(_name); };
 	~MessageCoprocBase() = default;
 
+	bool allocateMessages(int count, size_t size);
 private:
 	virtual bool writeRawMessage(struct iovec *iov, int iovCnt);
 	void logRecvMessage(MessageBuffer *buffer);

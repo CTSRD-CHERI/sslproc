@@ -46,6 +46,16 @@ static const Message::Header retryMessage = {
 };
 
 bool
+MessageCoprocBase::allocateMessages(int count, size_t size)
+{
+	/*
+	 * cocall/coaccept need an extra message for the pending write
+	 * buffer.
+	 */
+	return (MessageChannel::allocateMessageBuffers(count + 1, size, 0));
+}
+
+bool
 MessageCoprocBase::writeRawMessage(struct iovec *iov, int iovCnt)
 {
 	if (pendingWrite != nullptr) {

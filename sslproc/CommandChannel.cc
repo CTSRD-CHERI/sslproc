@@ -523,19 +523,8 @@ commandChannelRun(void *arg)
 bool
 CommandChannel::init()
 {
-#ifdef HAVE_COCALL
-	/*
-	 * coaccept needs an additional message buffer and it cannot
-	 * resize buffers for receive on demand as the messages just
-	 * get truncated and dropped instead.  The 16k is just hoping
-	 * that BIO_read/write don't request more than that.
-	 */
-	if (!allocateMessages(4 + 1, 16384 + 512))
-		return (false);
-#else
 	if (!allocateMessages(4, 64))
 		return (false);
-#endif
 
 	pthread_t thread;
 	int error = pthread_create(&thread, &attr, commandChannelRun, this);

@@ -43,19 +43,10 @@ CommandChannel::init()
 #ifdef HAVE_COCALL
 	if (!MessageCoCall::init())
 		return (false);
+#endif
 
-	/*
-	 * cocall cannot resize buffers for receive on demand as the
-	 * messages just get truncated and dropped instead.  The 16k
-	 * is just hoping that BIO_read/write don't request more than
-	 * that.
-	 */
-	if (!allocateMessages(4, 16384 + 512))
-		return (false);
-#else
 	if (!allocateMessages(4, 64))
 		return (false);
-#endif
 	return (true);
 }
 

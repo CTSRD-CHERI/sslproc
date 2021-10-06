@@ -58,12 +58,8 @@ ControlChannel::init()
 	if (!MessageCoAccept::init())
 		return (false);
 
-	/*
-	 * Control socket messages don't recurse.  However two
-	 * messages are needed so that the reply can be allocated
-	 * while the read message is still outstanding.
-	 */
-	if (!allocateMessages(2, 128))
+	/* Control socket messages don't recurse. */
+	if (!allocateMessages(1, 64))
 		return (false);
 #else
 	/* Control socket messages don't recurse. */

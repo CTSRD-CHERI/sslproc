@@ -51,6 +51,13 @@ MessageSocket::updateFd(int newFd)
 	setId(newFd);
 }
 
+bool
+MessageDatagramSocket::allocateMessages(int count, size_t size,
+    size_t controlSize)
+{
+	return (allocateMessageBuffers(count, size, controlSize));
+}
+
 int
 MessageDatagramSocket::readMessage(MessageRef &ref)
 {
@@ -163,6 +170,12 @@ MessageDatagramSocket::readMessage(MessageRef &ref)
 	messages.pop();
 	ref.reset(this, buffer);
 	return (1);
+}
+
+bool
+MessageStreamSocket::allocateMessages(int count, size_t size)
+{
+	return (allocateMessageBuffers(count, size, 0));
 }
 
 static ssize_t

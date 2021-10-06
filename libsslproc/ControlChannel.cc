@@ -42,15 +42,11 @@ ControlChannel::init()
 #ifdef HAVE_COCALL
 	if (!MessageCoCall::init())
 		return (false);
+#endif
 
-	/* Control socket messages don't recurse. */
-	if (!allocateMessages(1, 128))
-		return (false);
-#else
 	/* Control socket messages don't recurse. */
 	if (!allocateMessages(1, 64))
 		return (false);
-#endif
 
 	MessageRef ref = waitForReply(Message::NOP);
 	if (!ref)

@@ -78,7 +78,8 @@ MessageChannel::setId(int value)
 }
 
 bool
-MessageChannel::allocateMessages(int count, size_t size, size_t controlSize)
+MessageChannel::allocateMessageBuffers(int count, size_t size,
+    size_t controlSize)
 {
 	assert(size >= sizeof(Message::Header));
 	for (int i = 0; i < count; i++) {

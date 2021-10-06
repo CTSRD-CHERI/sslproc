@@ -64,7 +64,8 @@ protected:
 
 	void setId(int value);
 	void setId(const char *str) { id = std::string(str); }
-	bool allocateMessages(int count, size_t size, size_t controlSize = 0);
+	bool allocateMessageBuffers(int count, size_t size,
+	    size_t controlSize);
 	virtual int readMessage(MessageRef &ref) = 0;
 	bool writeMessage(enum Message::Type type,
 	    const void *payload = nullptr, size_t payloadLen = 0);
