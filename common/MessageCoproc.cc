@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/param.h>
 #include <unistd.h>
 
 #include "Messages.h"
@@ -39,6 +40,9 @@
 #define	coaccept	coaccept_slow
 #define	cocall		cocall_slow
 #endif
+
+/* cocall() and coaccept() require buffer sizes to be multiple of 8 bytes */
+#define	ROUND_SIZE(x)	roundup2((x), 8)
 
 static const Message::Header retryMessage = {
 	.type = Message::RETRY,
@@ -52,7 +56,8 @@ MessageCoprocBase::allocateMessages(int count, size_t size)
 	 * cocall/coaccept need an extra message for the pending write
 	 * buffer.
 	 */
-	return (MessageChannel::allocateMessageBuffers(count + 1, size, 0));
+	return (MessageChannel::allocateMessageBuffers(count + 1,
+	    ROUND_SIZE(size), 0));
 }
 
 bool
@@ -76,8 +81,9 @@ MessageCoprocBase::writeRawMessage(struct iovec *iov, int iovCnt)
 	size_t length = 0;
 	char *cp = reinterpret_cast<char *>(buffer->data());
 	for (int i = 0; i < iovCnt; i++) {
-		if (length + iov[i].iov_len > buffer->capacity()) {
-			if (!buffer->grow(length + iov[i].iov_len)) {
+		if (ROUND_SIZE(length + iov[i].iov_len) > buffer->capacity()) {
+			if (!buffer->grow(ROUND_SIZE(length +
+			    iov[i].iov_len))) {
 				trace("SND %s: failed to grow buffer\n",
 				    name.c_str());
 				observeWriteError();
@@ -89,6 +95,9 @@ MessageCoprocBase::writeRawMessage(struct iovec *iov, int iovCnt)
 		length += iov[i].iov_len;
 		cp += iov[i].iov_len;
 	}
+	size_t padding = ROUND_SIZE(length) - length;
+	memset(cp, 0, padding);
+	length += padding;
 	buffer->setLength(length);
 	pendingWrite = buffer;
 	messages.pop();
@@ -173,7 +182,7 @@ MessageCoAccept::readMessage(MessageRef &ref)
 		trace("RCV %s: type %s truncated\n", name.c_str(),
 		    Message::typeName(hdr->type));
 
-		if (!buffer->grow(hdr->length)) {
+		if (!buffer->grow(ROUND_SIZE(hdr->length))) {
 			trace("RCV %s: failed to grow buffer to %u\n",
 			    name.c_str(), hdr->length);
 			observeReadError(GROW_FAIL, hdr);
@@ -283,7 +292,7 @@ MessageCoCall::readMessage(MessageRef &ref)
 		trace("RCV %s: type %s truncated\n", name.c_str(),
 		    Message::typeName(hdr->type));
 
-		if (!buffer->grow(hdr->length)) {
+		if (!buffer->grow(ROUND_SIZE(hdr->length))) {
 			trace("RCV %s: failed to grow buffer to %u\n",
 			    name.c_str(), hdr->length);
 			observeReadError(GROW_FAIL, hdr);
